@@ -1,0 +1,21 @@
+# Reference/scratch material, not part of the template
+/agents/
+/agents.zip
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# uv
+uv.lock.tmp
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
