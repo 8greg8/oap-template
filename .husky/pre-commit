@@ -1,4 +1,13 @@
 #!/usr/bin/env sh
+# Only re-stage files that were already staged for this commit after autofix touches them --
+# `git add -u` would silently sweep in any other dirty tracked file in the working tree,
+# including unrelated in-progress edits that were never meant to be part of this commit.
+staged_files=$(git diff --cached --name-only --diff-filter=ACM)
+
 scripts/autofix.sh
-git add -u
+
+if [ -n "$staged_files" ]; then
+    echo "$staged_files" | xargs -r git add --
+fi
+
 scripts/gate.sh
