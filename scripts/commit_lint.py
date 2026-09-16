@@ -11,12 +11,20 @@ Rules enforced (see CONTRIBUTING.md § Commits):
   - Header line is <=100 chars.
   - If the header has `!`, the body must contain a `BREAKING CHANGE:` footer, and vice versa --
     a breaking change must be marked both ways, never just one.
+
+Git's own auto-generated merge commit messages ("Merge branch 'x' into y", "Merge pull request
+#N ...") are exempt -- they don't follow Conventional Commits and aren't meant to; this matches
+commitlint's default behavior.
 """
 
 from __future__ import annotations
 
 import re
 import sys
+
+MERGE_MESSAGE_RE = re.compile(
+    r"^Merge (branch|pull request|remote-tracking branch|tag) "
+)
 
 ALLOWED_TYPES = {
     "feat",
@@ -63,6 +71,9 @@ def lint(message: str) -> list[str]:
     cleaned = strip_comments(message).strip("\n")
     lines = cleaned.split("\n")
     header = lines[0] if lines else ""
+
+    if MERGE_MESSAGE_RE.match(header):
+        return errors
 
     if len(header) > MAX_HEADER_LEN:
         errors.append(

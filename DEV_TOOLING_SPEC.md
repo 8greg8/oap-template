@@ -133,6 +133,10 @@ message file). Stdlib-only Python, no `npm` commit-lint dependency needed. Enfor
   `CONTRIBUTING.md`'s rule that breaking changes are marked both ways, not just one.
 - If the body contains a `BREAKING CHANGE:` footer, `bang` must also be present (same rule, other
   direction).
+- Git's own auto-generated merge commit messages (`Merge branch 'x' into y`, `Merge pull request
+  #N ...`) are exempt — they don't follow Conventional Commits and aren't meant to (same
+  convention `commitlint` uses by default). Without this exemption, `gitflow.sh`'s `finish`
+  subcommands couldn't complete a merge.
 
 Exits non-zero with a specific, actionable message (which rule failed, what was found) on any
 violation — Husky then blocks the commit.
