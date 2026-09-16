@@ -175,6 +175,11 @@ Explicit, human/agent-invoked, never triggered by a hook:
    default; `--push` additionally runs `git push origin vX.Y.Z`, since pushing a tag is the
    irreversible, shared-state part of this operation.
 
+Note: `hatch-vcs`'s derived version is computed at build time and `uv sync` will not rebuild it
+just because a new tag now exists — after cutting a release, run
+`uv sync --reinstall-package <package>` (or any change that forces a rebuild) if you need the
+installed package's `__version__`/metadata to reflect the new tag immediately.
+
 ## Gitflow helper: `scripts/gitflow.sh`
 
 Thin wrapper around exactly the branch/worktree operations `CONTRIBUTING.md` § Branching already
