@@ -7,6 +7,6 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-0 entr(ies) across 0 tag(s). Generated 2026-09-15.
+0 entr(ies) across 0 tag(s). Generated 2026-09-16.
 
 *No lessons recorded yet.*

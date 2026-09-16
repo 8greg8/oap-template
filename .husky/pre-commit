@@ -1,0 +1,4 @@
+#!/usr/bin/env sh
+scripts/autofix.sh
+git add -u
+scripts/gate.sh

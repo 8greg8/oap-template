@@ -146,7 +146,9 @@ def allocate_id(
             if text.isdigit():
                 stored = int(text)
             else:
-                logger.warning("counter file %s is unreadable; rebuilding", counter_file)
+                logger.warning(
+                    "counter file %s is unreadable; rebuilding", counter_file
+                )
 
         next_number = max(stored, highest_existing_id(tasks_dir)) + 1
 

@@ -101,7 +101,12 @@ REQUIRED_TASK_SECTIONS: Sequence[str] = (
 )
 
 #: Sections that must contain real content, not just the template placeholder.
-NON_EMPTY_TASK_SECTIONS: Sequence[str] = ("Goal", "Scope", "Non-goals", "Acceptance criteria")
+NON_EMPTY_TASK_SECTIONS: Sequence[str] = (
+    "Goal",
+    "Scope",
+    "Non-goals",
+    "Acceptance criteria",
+)
 
 REQUIRED_REPORT_KEYS: Sequence[str] = ("task", "outcome", "branch", "commit", "tags")
 
@@ -206,7 +211,11 @@ class Task:
         matches = list(_SECTION_RE.finditer(self.body))
         for index, match in enumerate(matches):
             if match.group(1).lower().startswith(wanted):
-                end = matches[index + 1].start() if index + 1 < len(matches) else len(self.body)
+                end = (
+                    matches[index + 1].start()
+                    if index + 1 < len(matches)
+                    else len(self.body)
+                )
                 return self.body[match.end() : end].strip()
         return ""
 
@@ -441,7 +450,9 @@ def _words(text: str) -> tuple[str, ...]:
     return tuple(match.group(0).lower() for match in _WORD_RE.finditer(text))
 
 
-def _matched_word_count(cited_words: Sequence[str], headings: Sequence[Sequence[str]]) -> int:
+def _matched_word_count(
+    cited_words: Sequence[str], headings: Sequence[Sequence[str]]
+) -> int:
     """Find how many leading words of a citation name a real heading's start.
 
     Task citations sit in free-form sentences with no reliable delimiter
@@ -465,7 +476,9 @@ def _matched_word_count(cited_words: Sequence[str], headings: Sequence[Sequence[
     candidates = [heading for heading in headings if heading]
     matched = 0
     for word in cited_words:
-        next_candidates = [h for h in candidates if len(h) > matched and h[matched] == word]
+        next_candidates = [
+            h for h in candidates if len(h) > matched and h[matched] == word
+        ]
         if not next_candidates:
             break
         candidates = next_candidates

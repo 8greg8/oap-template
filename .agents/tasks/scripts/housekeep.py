@@ -32,8 +32,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _frontmatter import FrontmatterError  # noqa: E402
-from _schema import (  # noqa: E402
+from _frontmatter import FrontmatterError
+from _schema import (
     BACKLOG_FILE,
     REPO_ROOT,
     TYPES,
@@ -50,7 +50,9 @@ logger = logging.getLogger("housekeep")
 INTEGRATION_BRANCH = "develop"
 
 #: Matches a task branch name, e.g. ``chore/T-0014-housekeeping-audit``.
-_BRANCH_RE = re.compile(r"^(" + "|".join(re.escape(t) for t in TYPES) + r")/(T-\d{4,})-.+$")
+_BRANCH_RE = re.compile(
+    r"^(" + "|".join(re.escape(t) for t in TYPES) + r")/(T-\d{4,})-.+$"
+)
 
 #: Default staleness threshold for a task sitting in ``review``.
 DEFAULT_REVIEW_DAYS = 7
@@ -84,7 +86,9 @@ def branch_exists(branch: str) -> bool:
     Returns:
         ``True`` if git resolves the branch to a commit.
     """
-    return _git("rev-parse", "--verify", "--quiet", f"refs/heads/{branch}").returncode == 0
+    return (
+        _git("rev-parse", "--verify", "--quiet", f"refs/heads/{branch}").returncode == 0
+    )
 
 
 def list_task_branches() -> list[str]:
@@ -208,7 +212,9 @@ def check_touches(branches: Sequence[str] | None = None) -> list[str]:
 
         touched_declared: set[str] = set()
         for changed_path in changed:
-            covered = [entry for entry in declared if paths_overlap(entry, changed_path)]
+            covered = [
+                entry for entry in declared if paths_overlap(entry, changed_path)
+            ]
             if covered:
                 touched_declared.update(covered)
             else:
@@ -274,7 +280,9 @@ def check_drift(review_days: int = DEFAULT_REVIEW_DAYS) -> list[str]:
                 report_rel = task.report_path.relative_to(REPO_ROOT)
             except ValueError:
                 report_rel = task.report_path
-            findings.append(f"DRIFT {task.id}: status done but no report at {report_rel}")
+            findings.append(
+                f"DRIFT {task.id}: status done but no report at {report_rel}"
+            )
 
         if task.status == "in_progress":
             branch = task.branch
@@ -340,7 +348,9 @@ def check_setup() -> list[str]:
             p for p in husky_dir.iterdir() if p.is_file() and not p.name.startswith("_")
         )
         if not hook_files:
-            findings.append("SETUP .husky/: directory exists but contains no hook scripts")
+            findings.append(
+                "SETUP .husky/: directory exists but contains no hook scripts"
+            )
         for hook in hook_files:
             if not os.access(hook, os.X_OK):
                 findings.append(f"SETUP .husky/{hook.name}: not executable")
@@ -390,10 +400,14 @@ def parse_args(argv=None):
         help=f"Diff task branches against {INTEGRATION_BRANCH} and flag out-of-scope changes.",
     )
     touches.add_argument(
-        "branches", nargs="*", help="Explicit branch names. Default: every task branch found."
+        "branches",
+        nargs="*",
+        help="Explicit branch names. Default: every task branch found.",
     )
 
-    drift = sub.add_parser("drift", help="Report backlog, report, branch, and dependency drift.")
+    drift = sub.add_parser(
+        "drift", help="Report backlog, report, branch, and dependency drift."
+    )
     drift.add_argument(
         "--review-days",
         type=int,
@@ -455,7 +469,9 @@ def main(argv=None) -> int:
                 total += len(findings)
                 print()
             if total:
-                print(f"housekeep all: {total} finding(s) across {len(sections)} check(s).")
+                print(
+                    f"housekeep all: {total} finding(s) across {len(sections)} check(s)."
+                )
                 return 1
             print("housekeep all: clean -- no findings.")
             return 0

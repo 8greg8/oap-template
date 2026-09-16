@@ -1,0 +1,11 @@
+{
+  "name": "oap-template-dev-tooling",
+  "private": true,
+  "description": "Husky is used only to manage git hooks (see DEV_TOOLING_SPEC.md); this repo's actual code is Python/uv.",
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9"
+  }
+}

@@ -97,7 +97,9 @@ def parse(text: str) -> tuple[dict[str, Any], str]:
             )
         match = _KEY_RE.match(line)
         if not match:
-            raise FrontmatterError(f"line {offset}: expected 'key: value', got {line!r}")
+            raise FrontmatterError(
+                f"line {offset}: expected 'key: value', got {line!r}"
+            )
         key, raw = match.group(1), (match.group(2) or "").strip()
         if key in metadata:
             raise FrontmatterError(f"line {offset}: duplicate key '{key}'")

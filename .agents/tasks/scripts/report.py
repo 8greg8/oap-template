@@ -24,8 +24,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _frontmatter import FrontmatterError  # noqa: E402
-from _schema import (  # noqa: E402
+from _frontmatter import FrontmatterError
+from _schema import (
     LESSONS_FILE,
     OUTCOMES,
     PLACEHOLDER,
@@ -162,8 +162,10 @@ def render_lessons(grouped: dict[str, list[tuple]]) -> str:
         "Harvested from task reports. Read the tags relevant to your task before",
         "starting — these are repo-specific traps that already cost someone time.",
         "",
-        f"{total} entr(ies) across {len(grouped)} tag(s). "
-        f"Generated {dt.date.today().isoformat()}.",
+        (
+            f"{total} entr(ies) across {len(grouped)} tag(s). "
+            f"Generated {dt.datetime.now(tz=dt.timezone.utc).date().isoformat()}."
+        ),
         "",
     ]
 
@@ -221,11 +223,15 @@ def parse_args(argv=None):
 
     new = sub.add_parser("new", help="Create a report skeleton for a task.")
     new.add_argument("id", help="Task ID, e.g. T-0004.")
-    new.add_argument("--force", action="store_true", help="Overwrite an existing report.")
+    new.add_argument(
+        "--force", action="store_true", help="Overwrite an existing report."
+    )
 
     sub.add_parser("harvest", help="Regenerate .agents/LESSONS.md from all reports.")
 
-    lessons = sub.add_parser("lessons", help="Print lessons, optionally filtered by tag.")
+    lessons = sub.add_parser(
+        "lessons", help="Print lessons, optionally filtered by tag."
+    )
     lessons.add_argument("-t", "--tag", help="Only show lessons carrying this tag.")
 
     validate = sub.add_parser("validate", help="Check reports for missing sections.")

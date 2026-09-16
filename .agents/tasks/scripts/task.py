@@ -22,9 +22,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _frontmatter import FrontmatterError, serialize  # noqa: E402
-from _ids import allocate_id  # noqa: E402
-from _schema import (  # noqa: E402
+from _frontmatter import FrontmatterError, serialize
+from _ids import allocate_id
+from _schema import (
     PRIORITIES,
     STATUSES,
     TASK_TEMPLATE,
@@ -105,7 +105,7 @@ def create_task(
             "priority": priority,
             "depends_on": ", ".join(item.strip().upper() for item in depends_on),
             "touches": ", ".join(item.strip() for item in touches),
-            "created": dt.date.today().isoformat(),
+            "created": dt.datetime.now(tz=dt.timezone.utc).date().isoformat(),
             "slug": slug,
         },
     )
@@ -178,10 +178,18 @@ def parse_args(argv=None):
     new = sub.add_parser("new", help="Create a task from the template.")
     new.add_argument("-t", "--title", required=True, help="One-line task title.")
     new.add_argument(
-        "-T", "--type", required=True, choices=list(TYPES), help="Conventional Commits type."
+        "-T",
+        "--type",
+        required=True,
+        choices=list(TYPES),
+        help="Conventional Commits type.",
     )
     new.add_argument(
-        "-p", "--priority", default="medium", choices=list(PRIORITIES), help="Priority bucket."
+        "-p",
+        "--priority",
+        default="medium",
+        choices=list(PRIORITIES),
+        help="Priority bucket.",
     )
     new.add_argument(
         "-d",
@@ -259,7 +267,10 @@ def main(argv=None):
                 problems = [
                     f"{task.path.name}: {problem}"
                     for problem in validate_task(task, [t.id for t in load_tasks()])
-                ] + [f"{task.path.name}: {problem}" for problem in validate_citations(task)]
+                ] + [
+                    f"{task.path.name}: {problem}"
+                    for problem in validate_citations(task)
+                ]
             else:
                 problems = _collect_problems()
             if problems:

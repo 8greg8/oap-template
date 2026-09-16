@@ -15,6 +15,7 @@ the placeholders (`<repo_name>`, mission, architecture) for your actual reposito
 | [`AGENTS.md`](AGENTS.md) | The entry point for any coding agent working in this repo — autonomy boundaries, what needs asking first, and how the task workflow below fits together. |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Branching (Gitflow), commit conventions, semantic versioning, and the verify/resolve/merge workflow every change follows. |
 | [`PYTHON_CONVENTIONS.md`](PYTHON_CONVENTIONS.md) | Project layout (`uv` workspace, `src/` layout), commands, dependency management, testing, and code style. |
+| [`DEV_TOOLING_SPEC.md`](DEV_TOOLING_SPEC.md) | Spec for the `scripts/` + `.husky/` + `package.json` bundle: deterministic lint/typecheck/test gates, commit-message validation, SemVer release tagging, and Gitflow helpers — copy-pasteable into any repo. |
 | [`.agents/`](.agents/README.md) | Tooling for running work as discrete, PR-sized **tasks**: task files as work orders, reports as evidence, a generated backlog, and harvested lessons-learned memory. See `.agents/README.md`. |
 | [`strategic_model_init_material.md`](strategic_model_init_material.md) | The full OAP reference manual this template's workflow is derived from. |
 
@@ -25,7 +26,10 @@ the placeholders (`<repo_name>`, mission, architecture) for your actual reposito
 2. Fill in the project-specific parts of `AGENTS.md` (mission, architecture, domain) — the process
    sections (autonomy, task workflow, file boundaries) are already ready to use as-is.
 3. Set up the `uv` workspace (`uv init` / `pyproject.toml`) per `PYTHON_CONVENTIONS.md`.
-4. Wire up Husky-managed git hooks per `CONTRIBUTING.md`'s verify/resolve workflow.
+4. Wire up Husky-managed git hooks per `CONTRIBUTING.md`'s verify/resolve workflow: edit
+   `scripts/config/gate.sh` for your stack's lint/typecheck/test commands, then `npm install &&
+   npm run prepare` (see [`DEV_TOOLING_SPEC.md`](DEV_TOOLING_SPEC.md) and
+   [`scripts/README.md`](scripts/README.md)).
 5. Start working via tasks: see `.agents/README.md` for the full command reference
    (`task.py new`, `backlog.py ready`, `report.py new`, `housekeep.py all`).
 

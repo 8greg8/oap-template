@@ -22,8 +22,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _frontmatter import FrontmatterError  # noqa: E402
-from _schema import (  # noqa: E402
+from _frontmatter import FrontmatterError
+from _schema import (
     BACKLOG_FILE,
     DONE_STATUSES,
     INACTIVE_STATUSES,
@@ -123,9 +123,11 @@ def render_backlog(tasks: Sequence[Task]) -> str:
         "",
         "# Task Backlog",
         "",
-        f"{len(ordered)} task(s). Generated {dt.date.today().isoformat()}.",
+        f"{len(ordered)} task(s). Generated {dt.datetime.now(tz=dt.timezone.utc).date().isoformat()}.",
         "",
-        "| " + " | ".join(f"{status}: {counts.get(status, 0)}" for status in STATUSES) + " |",
+        "| "
+        + " | ".join(f"{status}: {counts.get(status, 0)}" for status in STATUSES)
+        + " |",
         "|" + "---|" * len(STATUSES),
         "",
         "## Tasks",
@@ -161,7 +163,9 @@ def render_backlog(tasks: Sequence[Task]) -> str:
             + ", ".join(task.id for task in batch),
         ]
     else:
-        lines.append("*Nothing ready — every open task is blocked or already in flight.*")
+        lines.append(
+            "*Nothing ready — every open task is blocked or already in flight.*"
+        )
 
     dispatchable_ids = {task.id for task in dispatchable}
     blocked = [
@@ -172,7 +176,9 @@ def render_backlog(tasks: Sequence[Task]) -> str:
     if blocked:
         lines += ["", "## Waiting on dependencies", ""]
         for task in blocked:
-            lines.append(f"- **{task.id}** {task.title} — needs {', '.join(task.depends_on)}")
+            lines.append(
+                f"- **{task.id}** {task.title} — needs {', '.join(task.depends_on)}"
+            )
 
     lines.append("")
     return "\n".join(lines)
@@ -207,7 +213,9 @@ def parse_args(argv=None):
     sub.add_parser("reindex", help="Regenerate BACKLOG.md from the task files.")
 
     listing = sub.add_parser("list", help="List tasks as a plain table.")
-    listing.add_argument("-s", "--status", choices=list(STATUSES), help="Filter by status.")
+    listing.add_argument(
+        "-s", "--status", choices=list(STATUSES), help="Filter by status."
+    )
     listing.add_argument(
         "-p", "--priority", choices=list(PRIORITIES), help="Filter by priority."
     )
