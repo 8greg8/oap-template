@@ -1,7 +1,7 @@
 ---
 id: T-0002
 title: Port git-atomic task filing and backlog fixes
-status: in_progress
+status: done
 type: fix
 priority: high
 depends_on: []
