@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-18 lesson(s) across 10 section(s). Generated 2026-10-03.
+19 lesson(s) across 10 section(s). Generated 2026-10-03.
 
 ## Tag index
 
@@ -19,14 +19,16 @@ to all lessons that carry it.
 - `backlog` — [T-0002](#t-0002-success)
 - `bash` — [T-0012](#t-0012-success)
 - `bash-3.2` — [T-0011](#t-0011-success)
+- `commit` — [T-0018](#t-0018-success)
 - `commit-lint` — [T-0004](#t-0004-success)
 - `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
 - `docker` — [T-0006](#t-0006-success)
 - `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success), [T-0013](#t-0013-success), [T-0014](#t-0014-success), [T-0019](#t-0019-success)
+- `end-to-end` — [T-0018](#t-0018-success)
 - `execution-loop` — [T-0001](#t-0001-success)
 - `file-mode` — [T-0009](#t-0009-success)
 - `file-modes` — [T-0007](#t-0007-success)
-- `gate` — [T-0004](#t-0004-success)
+- `gate` — [T-0004](#t-0004-success), [T-0018](#t-0018-success)
 - `git` — [T-0007](#t-0007-success), [T-0012](#t-0012-success)
 - `git-pathspec` — [T-0008](#t-0008-success)
 - `git-publish` — [T-0002](#t-0002-success)
@@ -35,7 +37,7 @@ to all lessons that carry it.
 - `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success)
 - `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success)
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success)
-- `init-script` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success)
+- `init-script` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
 - `merge-authority` — [T-0013](#t-0013-success), [T-0014](#t-0014-success)
 - `method-text` — [T-0014](#t-0014-success)
 - `notice` — [T-0019](#t-0019-success)
@@ -58,8 +60,8 @@ to all lessons that carry it.
 - `task-scripts` — [T-0009](#t-0009-success)
 - `task-state` — [T-0016](#t-0016-success)
 - `task-tooling` — [T-0001](#t-0001-success), [T-0002](#t-0002-success)
-- `template` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success)
-- `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success)
+- `template` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
+- `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
 - `upstream-tracking` — [T-0010](#t-0010-success)
 - `uv` — [T-0006](#t-0006-success)
 - `workflow` — [T-0013](#t-0013-success)
@@ -202,6 +204,17 @@ Source: [`reports/T-0016.md`](tasks/reports/T-0016.md)
 Tags: `init-script`, `template`, `seeding`, `tests`
 
 Source: [`reports/T-0017.md`](tasks/reports/T-0017.md)
+
+### T-0018 (success)
+
+- `npm install --package-lock-only` still runs the root `prepare` script. In a copy without `node_modules/`, that is `husky: not found` and exit 127, which looks like a network failure. Pass `--ignore-scripts`.
+- `husky` sets `core.hooksPath` in the repo where it runs, so a test copy that ran `npm ci` or `npm install` without `--ignore-scripts` has live hooks from then on, whatever the test set earlier.
+- A commit body line over 100 characters fails `scripts/commit_lint.py`; wrap bodies.
+- When a later step makes an earlier step's test assumptions false (the script removes itself), keep the earlier cases by truncating `STEPS` in a small driver rather than editing their assertions.
+
+Tags: `init-script`, `template`, `gate`, `commit`, `end-to-end`, `tests`
+
+Source: [`reports/T-0018.md`](tasks/reports/T-0018.md)
 
 ## report-validation
 
