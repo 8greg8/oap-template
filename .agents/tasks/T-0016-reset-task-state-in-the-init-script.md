@@ -1,7 +1,7 @@
 ---
 id: T-0016
 title: Reset task state in the init script
-status: in_progress
+status: done
 type: feat
 priority: medium
 depends_on: [T-0015]
