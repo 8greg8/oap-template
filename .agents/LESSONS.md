@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-11 lesson(s) across 8 section(s). Generated 2026-10-03.
+12 lesson(s) across 9 section(s). Generated 2026-10-03.
 
 ## Tag index
 
@@ -18,6 +18,7 @@ to all lessons that carry it.
 - `agent-workflow` — [T-0010](#t-0010-success)
 - `backlog` — [T-0002](#t-0002-success)
 - `bash` — [T-0012](#t-0012-success)
+- `bash-3.2` — [T-0011](#t-0011-success)
 - `commit-lint` — [T-0004](#t-0004-success)
 - `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
 - `docker` — [T-0006](#t-0006-success)
@@ -29,10 +30,10 @@ to all lessons that carry it.
 - `git` — [T-0007](#t-0007-success), [T-0012](#t-0012-success)
 - `git-pathspec` — [T-0008](#t-0008-success)
 - `git-publish` — [T-0002](#t-0002-success)
-- `git-worktree` — [T-0010](#t-0010-success)
-- `gitflow` — [T-0004](#t-0004-success)
+- `git-worktree` — [T-0010](#t-0010-success), [T-0011](#t-0011-success)
+- `gitflow` — [T-0004](#t-0004-success), [T-0011](#t-0011-success)
 - `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success)
-- `housekeep` — [T-0003](#t-0003-success)
+- `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success)
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success)
 - `nul-safe` — [T-0012](#t-0012-success)
 - `orchestrator` — [T-0005](#t-0005-success)
@@ -99,6 +100,17 @@ Source: [`reports/T-0010.md`](tasks/reports/T-0010.md)
 Tags: `git`, `ruff`, `file-modes`, `devcontainer`
 
 Source: [`reports/T-0007.md`](tasks/reports/T-0007.md)
+
+## gitflow
+
+### T-0011 (success)
+
+- `housekeep.py`'s old merged check was ancestry-only, so any test that wanted a "merged" worktree could pass with an empty branch. Such tests must commit on the branch and merge it.
+- `ruff format` wraps lines at 88 columns here; the gate's format check fails on a single over-long condition, so run `uv run ruff format <files>` before the gate.
+
+Tags: `gitflow`, `housekeep`, `git-worktree`, `bash-3.2`
+
+Source: [`reports/T-0011.md`](tasks/reports/T-0011.md)
 
 ## hooks
 

@@ -1,7 +1,7 @@
 ---
 id: T-0011
 title: Support docs and chore task branches in gitflow and fix housekeep worktrees
-status: in_progress
+status: done
 type: fix
 priority: low
 depends_on: []
