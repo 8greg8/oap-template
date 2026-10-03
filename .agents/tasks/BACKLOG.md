@@ -6,7 +6,7 @@
 
 7 task(s). Generated 2026-10-03.
 
-| open: 3 | in_progress: 1 | blocked: 0 | review: 0 | done: 3 | abandoned: 0 |
+| open: 3 | in_progress: 0 | blocked: 0 | review: 0 | done: 4 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -19,7 +19,7 @@
 | T-0004 | [Reconcile hooks and dev tooling with the merge and push rules](T-0004-reconcile-hooks-and-dev-tooling-with-the-merge.md) | done | high | feat | — | [report](reports/T-0004.md) |
 | T-0005 | [Port agent rules, process docs and orchestrator-merge rules](T-0005-port-agent-rules-process-docs-and-orchestrator.md) | open | high | docs | T-0002, T-0003, T-0004, T-0006 | — |
 | T-0007 | [Make task scripts executable](T-0007-make-task-scripts-executable.md) | done | high | fix | — | [report](reports/T-0007.md) |
-| T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | in_progress | medium | feat | — | — |
+| T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
 
 ## Ready to dispatch
 
