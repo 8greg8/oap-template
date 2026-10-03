@@ -6,7 +6,7 @@
 
 20 task(s). Generated 2026-10-03.
 
-| open: 4 | in_progress: 1 | blocked: 0 | review: 0 | done: 15 | abandoned: 0 |
+| open: 3 | in_progress: 1 | blocked: 0 | review: 0 | done: 16 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -26,8 +26,8 @@
 | T-0008 | [Fix pre-commit re-staging for unusual filenames](T-0008-fix-pre-commit-re-staging-for-unusual-filenames.md) | done | medium | fix | — | [report](reports/T-0008.md) |
 | T-0012 | [Make staged-file handling NUL-safe in gate and autofix scripts](T-0012-make-staged-file-handling-nul-safe-in-gate-and.md) | done | medium | fix | — | [report](reports/T-0012.md) |
 | T-0014 | [Amend the OAP method text so CLAUDE.md governs merge authority](T-0014-amend-the-oap-method-text-so-claude-md-governs.md) | done | medium | docs | — | [report](reports/T-0014.md) |
-| T-0015 | [Add init script CLI, preconditions, names and rename step](T-0015-add-init-script-cli-preconditions-names-and.md) | in_progress | medium | feat | — | — |
-| T-0016 | [Reset task state in the init script](T-0016-reset-task-state-in-the-init-script.md) | open | medium | feat | T-0015 | — |
+| T-0015 | [Add init script CLI, preconditions, names and rename step](T-0015-add-init-script-cli-preconditions-names-and.md) | done | medium | feat | — | [report](reports/T-0015.md) |
+| T-0016 | [Reset task state in the init script](T-0016-reset-task-state-in-the-init-script.md) | in_progress | medium | feat | T-0015 | — |
 | T-0017 | [Seed project files in the init script](T-0017-seed-project-files-in-the-init-script.md) | open | medium | feat | T-0016 | — |
 | T-0018 | [Finish the init script with gate, commit, branch and self-removal](T-0018-finish-the-init-script-with-gate-commit-branch.md) | open | medium | feat | T-0017 | — |
 | T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | done | low | chore | — | [report](reports/T-0009.md) |
@@ -41,6 +41,5 @@
 ## Waiting on dependencies
 
 - **T-0020** Rewrite history into a clean public repository copy — needs T-0015, T-0016, T-0017, T-0018, T-0019
-- **T-0016** Reset task state in the init script — needs T-0015
 - **T-0017** Seed project files in the init script — needs T-0016
 - **T-0018** Finish the init script with gate, commit, branch and self-removal — needs T-0017

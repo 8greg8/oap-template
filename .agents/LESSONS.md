@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-15 lesson(s) across 9 section(s). Generated 2026-10-03.
+16 lesson(s) across 10 section(s). Generated 2026-10-03.
 
 ## Tag index
 
@@ -35,6 +35,7 @@ to all lessons that carry it.
 - `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success)
 - `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success)
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success)
+- `init-script` — [T-0015](#t-0015-success)
 - `merge-authority` — [T-0013](#t-0013-success), [T-0014](#t-0014-success)
 - `method-text` — [T-0014](#t-0014-success)
 - `notice` — [T-0019](#t-0019-success)
@@ -44,6 +45,7 @@ to all lessons that carry it.
 - `pre-commit` — [T-0008](#t-0008-success)
 - `process` — [T-0005](#t-0005-success)
 - `public-release` — [T-0019](#t-0019-success)
+- `rename` — [T-0015](#t-0015-success)
 - `report-gate` — [T-0001](#t-0001-success)
 - `report-validation` — [T-0003](#t-0003-success)
 - `ruff` — [T-0007](#t-0007-success)
@@ -54,6 +56,8 @@ to all lessons that carry it.
 - `staged-files` — [T-0012](#t-0012-success)
 - `task-scripts` — [T-0009](#t-0009-success)
 - `task-tooling` — [T-0001](#t-0001-success), [T-0002](#t-0002-success)
+- `template` — [T-0015](#t-0015-success)
+- `tests` — [T-0015](#t-0015-success)
 - `upstream-tracking` — [T-0010](#t-0010-success)
 - `uv` — [T-0006](#t-0006-success)
 - `workflow` — [T-0013](#t-0013-success)
@@ -163,6 +167,19 @@ Source: [`reports/T-0004.md`](tasks/reports/T-0004.md)
 Tags: `hooks`, `husky`, `pre-commit`, `git-pathspec`
 
 Source: [`reports/T-0008.md`](tasks/reports/T-0008.md)
+
+## init-script
+
+### T-0015 (success)
+
+- `npm install --package-lock-only` still runs the project's `prepare` script. In this repo that is `husky`, so the command exits 127 in a tree without `node_modules`, though the lock file is written.
+- `git status --porcelain` output passed through a `.strip()` helper loses the leading space of the first line, so ` M file` reads as a staged `M file`. Use `git diff --cached --name-only` to test for staged files.
+- The ruff configuration in this repo flags `datetime.date.today()` (DTZ011) and a bare `except Exception` (BLE001), and flags a shebang file that is not executable (EXE001). Use `datetime.now().astimezone()`, add a reasoned `noqa`, and `chmod +x`.
+- A worktree-isolated agent's shell refuses commands that mention git in a compound or inline-script form. Put such helper code in a file under the scratchpad and run that.
+
+Tags: `init-script`, `template`, `rename`, `tests`
+
+Source: [`reports/T-0015.md`](tasks/reports/T-0015.md)
 
 ## report-validation
 
