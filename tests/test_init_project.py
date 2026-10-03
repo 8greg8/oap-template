@@ -3,8 +3,11 @@
 Each case builds a scratch copy of the template from the files `git ls-files` lists, plus the
 working-tree `init_project.py` and this test file, commits it, gives it a bare `origin`, and runs
 the script there. Stub `uv` and `npm` executables sit first on `PATH` and record their arguments,
-so no case needs the network. Expected values come from the plan and the task file, not from
-the script's output.
+so most cases need no network. The cases for plan steps 2 to 5 run the script's steps up to the
+seeded files only (`_run` without `full`), so they can look at the tree before self-removal and
+the commit. The cases for steps 6 to 10 run the whole script; the end-to-end cases at the bottom
+use the real `uv`, `npm` and gate, and skip when the lock commands cannot run. Expected values
+come from the plan and the task file, not from the script's output.
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ import ast
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -144,16 +148,51 @@ def _args(package: str = "my_project", *extra: str) -> list[str]:
     ]
 
 
+# Steps 2 to 5 only: the earlier cases look at the tree before self-removal, gate and commit.
+_THROUGH_SEEDING = (
+    "import sys\n"
+    "sys.dont_write_bytecode = True\n"
+    "repo, *args = sys.argv[1:]\n"
+    "sys.path.insert(0, repo)\n"
+    "import init_project as m\n"
+    "keep = ('step_install', 'step_rename', 'step_reset_tasks', 'step_seed_files')\n"
+    "m.STEPS = tuple(f for f in m.STEPS if f.__name__ in keep)\n"
+    "m.POST_COMMIT_STEPS = ()\n"
+    "sys.exit(m.main(args))\n"
+)
+
+
 def _run(
-    s: Scratch, *extra: str, package: str = "my_project", fail: tuple[str, ...] = ()
+    s: Scratch,
+    *extra: str,
+    package: str = "my_project",
+    fail: tuple[str, ...] = (),
+    full: bool = False,
+    real: bool = False,
+    path_prefix: Path | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], str]:
+    """Run the script in the scratch copy.
+
+    Without `full`, only plan steps 2 to 5 run. With `full`, the script runs as a user runs it.
+    With `real`, the real `uv` and `npm` are used instead of the stubs.
+    """
     env = _env()
-    env["PATH"] = f"{s.stubs}{os.pathsep}{env['PATH']}"
-    env["STUB_LOG"] = str(s.log)
+    if real:
+        env.pop("VIRTUAL_ENV", None)
+    else:
+        env["PATH"] = f"{s.stubs}{os.pathsep}{env['PATH']}"
+        env["STUB_LOG"] = str(s.log)
+    if path_prefix is not None:
+        env["PATH"] = f"{path_prefix}{os.pathsep}{env['PATH']}"
     for tool in fail:
         env[f"STUB_FAIL_{tool.upper()}"] = "1"
+    args = _args(package, *extra)
+    if full:
+        command = [sys.executable, str(s.repo / "init_project.py"), *args]
+    else:
+        command = [sys.executable, "-c", _THROUGH_SEEDING, str(s.repo), *args]
     result = subprocess.run(
-        [sys.executable, str(s.repo / "init_project.py"), *_args(package, *extra)],
+        command,
         cwd=s.repo,
         capture_output=True,
         text=True,
@@ -892,3 +931,403 @@ def test_script_names_template_strings_plainly():
     source = (REPO_ROOT / "init_project.py").read_text(encoding="utf-8")
     for template in (*TEMPLATE_STRINGS, "oap-template-dev-tooling", "8greg8"):
         assert template in source
+
+
+# --- self-removal, gate, commit, branch and checklist (plan steps 6 to 10) ----------------------
+
+COMMIT_MESSAGE = "chore: initialize project from OAP template"
+SCRIPT_FILES = ("init_project.py", "tests/test_init_project.py")
+LICENSE_POINTER = "Third-party material in this repository is listed in NOTICE.md."
+
+
+def _stub_gate(s: Scratch, code: int = 0) -> None:
+    """Replace the copy's `scripts/gate.sh` with a stub, committed so the tree stays clean."""
+    gate = s.repo / "scripts" / "gate.sh"
+    gate.write_text(f"#!/bin/sh\necho 'stub gate ran'\nexit {code}\n", encoding="utf-8")
+    gate.chmod(0o755)
+    _git(s.repo, "commit", "-q", "--no-verify", "-am", "stub gate")
+
+
+def _commit_count(repo: Path) -> int:
+    return int(_git(repo, "rev-list", "--count", "HEAD"))
+
+
+def _refs(repo: Path) -> str:
+    return _git(repo, "for-each-ref", "--format=%(refname) %(objectname)")
+
+
+def _run_undo(repo: Path) -> None:
+    subprocess.run(
+        ["bash", "-c", UNDO], cwd=repo, check=True, env=_env(), capture_output=True
+    )
+
+
+def _assert_no_commit_or_branch(
+    s: Scratch, head_before: str, other: str = "main"
+) -> None:
+    assert _git(s.repo, "rev-parse", "HEAD") == head_before
+    assert _git(s.repo, "branch", "--list", other) == ""
+    assert _git(s.repo, "diff", "--cached", "--name-only") == ""
+
+
+def test_dry_run_lists_self_removal_and_steps_7_to_10_in_order(scratch: Scratch):
+    result, out = _run(scratch, "--dry-run", full=True)
+
+    assert result.returncode == 0, out
+    lines = _change_lines(out)
+
+    def index(verb: str, needle: str) -> int:
+        hits = [
+            i
+            for i, line in enumerate(lines)
+            if line.startswith(f"{verb} ") and needle in line
+        ]
+        assert hits, f"`{verb} ... {needle}` missing from change list:\n{out}"
+        return hits[0]
+
+    seeded = index("write", "tests/test_smoke.py")
+    removed_script = index("remove", "init_project.py")
+    removed_tests = index("remove", "tests/test_init_project.py")
+    gate = index("run", "scripts/gate.sh")
+    commit = index("commit", COMMIT_MESSAGE)
+    branch = index("create", "main")
+    checklist = index("print", "checklist")
+    assert "new commit" in lines[branch]
+    assert seeded < removed_script < gate < commit < branch < checklist
+    assert seeded < removed_tests < gate
+    assert _status(scratch.repo) == ""
+    assert (scratch.repo / "init_project.py").is_file()
+    assert _git(scratch.repo, "branch", "--list", "main") == ""
+
+
+def test_dry_run_on_main_creates_develop(tmp_path: Path):
+    s = _build(tmp_path, branch="main")
+
+    result, out = _run(s, "--dry-run", full=True)
+
+    assert result.returncode == 0, out
+    assert any(
+        line.startswith("create ") and "develop" in line and "new commit" in line
+        for line in _change_lines(out)
+    ), out
+
+
+def test_full_run_makes_one_commit_and_both_branches_point_at_it(scratch: Scratch):
+    _stub_gate(scratch)
+    head_before = _git(scratch.repo, "rev-parse", "HEAD")
+    count_before = _commit_count(scratch.repo)
+    refs_before = _refs(scratch.bare)
+    notice = (scratch.repo / "NOTICE.md").read_bytes()
+
+    result, out = _run(scratch, "--yes", "--skip-install", full=True)
+
+    assert result.returncode == 0, out
+    repo = scratch.repo
+    head = _git(repo, "rev-parse", "HEAD")
+    assert head != head_before
+    assert _commit_count(repo) == count_before + 1
+    assert _git(repo, "log", "-1", "--format=%P") == head_before
+    assert _git(repo, "log", "-1", "--format=%B") == COMMIT_MESSAGE
+    assert _git(repo, "rev-parse", "develop") == head
+    assert _git(repo, "rev-parse", "main") == head
+    assert _git(repo, "symbolic-ref", "--short", "HEAD") == "develop"
+    assert _status(repo) == ""
+    assert "stub gate ran" in out
+    assert _stub_calls(scratch) == list(LOCK_COMMANDS)
+    # Self-removal.
+    tracked = set(_git(repo, "ls-files").splitlines())
+    for rel in SCRIPT_FILES:
+        assert not (repo / rel).exists()
+        assert rel not in tracked
+    # Never pushes or tags.
+    assert _refs(scratch.bare) == refs_before
+    assert _git(repo, "tag", "--list") == ""
+    assert _git(scratch.bare, "tag", "--list") == ""
+    # NOTICE.md and the LICENSE pointer line survive the run.
+    assert (repo / "NOTICE.md").read_bytes() == notice
+    license_text = _text(repo, "LICENSE")
+    assert LICENSE_POINTER in license_text.splitlines()
+    assert f"Copyright (c) {datetime.now().astimezone().year} Jane Doe" in license_text
+    assert "8greg8" not in license_text
+
+
+def test_init_commit_message_passes_the_commit_linter(scratch: Scratch, tmp_path: Path):
+    _stub_gate(scratch)
+    result, out = _run(scratch, "--yes", "--skip-install", full=True)
+    assert result.returncode == 0, out
+    message = tmp_path / "message.txt"
+    message.write_text(_git(scratch.repo, "log", "-1", "--format=%B") + "\n")
+
+    lint = subprocess.run(
+        [sys.executable, "scripts/commit_lint.py", str(message)],
+        cwd=scratch.repo,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_env(),
+    )
+
+    assert lint.returncode == 0, lint.stdout + lint.stderr
+
+
+def test_full_run_prints_the_human_checklist(scratch: Scratch):
+    _stub_gate(scratch)
+
+    result, out = _run(scratch, "--yes", "--skip-install", full=True)
+
+    assert result.returncode == 0, out
+    head = _git(scratch.repo, "rev-parse", "HEAD")
+    assert head in out
+    lowered = out.lower()
+    assert any(
+        "push" in line and "develop" in line and "main" in line
+        for line in lowered.splitlines()
+    ), out
+    assert "default branch" in lowered
+    assert "branch protection" in lowered
+    assert "CLAUDE.md" in out
+    assert "## Project" in out
+    assert "first spec" in lowered
+    assert "docs/spec" in out
+    assert "git restore --source=HEAD" not in out
+
+
+def test_full_run_on_main_creates_develop_at_the_commit(tmp_path: Path):
+    s = _build(tmp_path, branch="main")
+    _stub_gate(s)
+
+    result, out = _run(s, "--yes", "--skip-install", full=True)
+
+    assert result.returncode == 0, out
+    head = _git(s.repo, "rev-parse", "HEAD")
+    assert _git(s.repo, "symbolic-ref", "--short", "HEAD") == "main"
+    assert _git(s.repo, "rev-parse", "develop") == head
+    assert _status(s.repo) == ""
+
+
+def test_failing_gate_stops_without_commit_or_branch_and_undo_restores_tree(
+    scratch: Scratch,
+):
+    _stub_gate(scratch, code=1)
+    head_before = _git(scratch.repo, "rev-parse", "HEAD")
+    refs_before = _refs(scratch.bare)
+
+    result, out = _run(scratch, "--yes", "--skip-install", full=True)
+
+    assert result.returncode != 0, out
+    assert "stub gate ran" in out
+    assert UNDO in out, out
+    _assert_no_commit_or_branch(scratch, head_before)
+    assert _refs(scratch.bare) == refs_before
+    assert _status(scratch.repo) != ""
+    _run_undo(scratch.repo)
+    assert _status(scratch.repo) == ""
+    assert _git(scratch.repo, "rev-parse", "HEAD") == head_before
+    for rel in SCRIPT_FILES:
+        assert (scratch.repo / rel).is_file()
+    assert (scratch.repo / "src" / "proj_template").is_dir()
+    assert not (scratch.repo / "src" / "my_project").exists()
+
+
+def test_failing_commit_prints_undo_and_leaves_no_commit_or_branch(scratch: Scratch):
+    _stub_gate(scratch)
+    hooks = scratch.repo.parent / "hooks"
+    hooks.mkdir()
+    hook = hooks / "pre-commit"
+    hook.write_text("#!/bin/sh\necho 'hook says no' >&2\nexit 1\n", encoding="utf-8")
+    hook.chmod(0o755)
+    _git(scratch.repo, "config", "core.hooksPath", str(hooks))
+    head_before = _git(scratch.repo, "rev-parse", "HEAD")
+
+    result, out = _run(scratch, "--yes", "--skip-install", full=True)
+
+    assert result.returncode != 0, out
+    assert "hook says no" in out
+    assert UNDO in out, out
+    assert _git(scratch.repo, "rev-parse", "HEAD") == head_before
+    assert _git(scratch.repo, "branch", "--list", "main") == ""
+    _run_undo(scratch.repo)
+    assert _status(scratch.repo) == ""
+    for rel in SCRIPT_FILES:
+        assert (scratch.repo / rel).is_file()
+
+
+def test_failure_creating_the_branch_prints_hash_and_command_but_not_undo(
+    scratch: Scratch, tmp_path: Path
+):
+    _stub_gate(scratch)
+    real_git = shutil.which("git")
+    assert real_git
+    shim = tmp_path / "gitshim"
+    shim.mkdir()
+    wrapper = shim / "git"
+    wrapper.write_text(
+        "#!/bin/sh\n"
+        'for a in "$@"; do\n'
+        '  if [ "$a" = branch ]; then echo "fatal: simulated failure" >&2; exit 1; fi\n'
+        "done\n"
+        f'exec {real_git} "$@"\n',
+        encoding="utf-8",
+    )
+    wrapper.chmod(0o755)
+
+    result, out = _run(scratch, "--yes", "--skip-install", full=True, path_prefix=shim)
+
+    assert result.returncode != 0, out
+    head = _git(scratch.repo, "rev-parse", "HEAD")
+    assert _git(scratch.repo, "log", "-1", "--format=%s") == COMMIT_MESSAGE
+    assert head in out
+    assert f"git branch main {head}" in out
+    assert "git restore --source=HEAD" not in out
+    assert "git clean" not in out
+    assert _git(scratch.repo, "branch", "--list", "main") == ""
+    assert _status(scratch.repo) == ""
+    # The printed command completes the run.
+    _git(scratch.repo, "branch", "main", head)
+    assert _git(scratch.repo, "rev-parse", "main") == head
+
+
+# --- template README --------------------------------------------------------------------------
+
+
+def test_template_readme_getting_started_describes_the_script_and_checklist():
+    text = _text(REPO_ROOT, "README.md")
+    start = text.index("## Getting started with a new project")
+    end = text.index("\n## ", start + 1)
+    section = text[start:end]
+
+    assert "template" in section
+    assert "python init_project.py" in section
+    assert "--dry-run" in section
+    assert "checklist" in section
+    assert "--name" in section
+    assert "--package" in section
+    # The manual renaming steps are gone.
+    assert "Rename the package" not in section
+    assert "replace `<repo_name>`" not in section
+    # Other sections stay.
+    for heading in ("## What's in here", "## Design principles", "## License"):
+        assert heading in text
+
+
+# --- end to end: a template copy becomes a working project ------------------------------------
+
+
+def _require_lock_tools(repo: Path) -> None:
+    """Skip the case when `uv lock` or `npm install --package-lock-only` cannot run here.
+
+    `npm ci` runs first because `npm install --package-lock-only` still runs the `prepare`
+    script (`husky`), which fails in a copy without `node_modules/`. The probe commands leave
+    tracked files changed, so they are restored afterwards.
+    """
+    env = _env()
+    env.pop("VIRTUAL_ENV", None)
+    for command in (
+        ["npm", "ci"],
+        ["uv", "lock"],
+        ["npm", "install", "--package-lock-only"],
+    ):
+        try:
+            probe = subprocess.run(
+                command,
+                cwd=repo,
+                capture_output=True,
+                text=True,
+                check=False,
+                env=env,
+            )
+        except FileNotFoundError:
+            pytest.skip(f"`{command[0]}` is not installed")
+        if probe.returncode != 0:
+            _git(repo, "checkout", "-q", "--", ".")
+            pytest.skip(
+                f"`{' '.join(command)}` failed (no network?): "
+                f"{(probe.stdout + probe.stderr).strip()[-300:]}"
+            )
+    _git(repo, "checkout", "-q", "--", ".")
+    assert _status(repo) == ""
+
+
+def test_end_to_end_template_copy_becomes_a_working_project(scratch: Scratch):
+    repo = scratch.repo
+    _require_lock_tools(repo)
+    head_before = _git(repo, "rev-parse", "HEAD")
+    count_before = _commit_count(repo)
+
+    result, out = _run(scratch, "--yes", "--skip-install", full=True, real=True)
+
+    assert result.returncode == 0, out
+    assert "gate clean" in out, out
+    head = _git(repo, "rev-parse", "HEAD")
+    assert _commit_count(repo) == count_before + 1
+    assert _git(repo, "log", "-1", "--format=%P") == head_before
+    assert _git(repo, "log", "-1", "--format=%s") == COMMIT_MESSAGE
+    assert _git(repo, "rev-parse", "develop") == head
+    assert _git(repo, "rev-parse", "main") == head
+    assert _status(repo) == ""
+    for rel in SCRIPT_FILES:
+        assert not (repo / rel).exists()
+
+    # No template name survives in a tracked file, uv.lock and package-lock.json included.
+    tracked = [n for n in _git(repo, "ls-files", "-z").split("\0") if n]
+    assert "uv.lock" in tracked
+    hits = {
+        rel: [t for t in TEMPLATE_STRINGS if t in _text(repo, rel)]
+        for rel in tracked
+        if (repo / rel).is_file()
+    }
+    assert {rel: found for rel, found in hits.items() if found} == {}
+
+    # Gitflow works: `main` exists, so a hotfix can start from it.
+    hotfix = subprocess.run(
+        ["bash", "scripts/gitflow.sh", "hotfix", "start", "x"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=_env(),
+    )
+    assert hotfix.returncode == 0, hotfix.stdout + hotfix.stderr
+    worktree = repo.parent / "proj-hotfix-x"
+    assert _git(worktree, "rev-parse", "--abbrev-ref", "HEAD") == "hotfix/x"
+    assert _git(worktree, "rev-parse", "HEAD") == head
+
+    # `task.py new` syncs with origin/develop, so push develop first.
+    _git(repo, "push", "-q", "origin", "develop")
+    first = _script(
+        repo, "task.py", "new", "-t", "First task", "-T", "chore", "-f", "README.md"
+    )
+    assert first.returncode == 0, first.stdout + first.stderr
+    created = sorted(p.name for p in (repo / ".agents" / "tasks").glob("T-*.md"))
+    assert len(created) == 1
+    assert created[0].startswith("T-0001-")
+
+
+def test_end_to_end_failing_gate_leaves_no_commit_or_branch(scratch: Scratch):
+    repo = scratch.repo
+    planted = repo / "tests" / "test_planted_failure.py"
+    planted.write_text(
+        '"""A test that always fails, planted to turn the gate red."""\n\n\n'
+        "def test_planted_failure() -> None:\n"
+        '    raise AssertionError("planted failure")\n',
+        encoding="utf-8",
+    )
+    _git(repo, "add", "tests/test_planted_failure.py")
+    _git(repo, "commit", "-q", "--no-verify", "-m", "test: plant a failing test")
+    _require_lock_tools(repo)
+    head_before = _git(repo, "rev-parse", "HEAD")
+
+    result, out = _run(scratch, "--yes", "--skip-install", full=True, real=True)
+
+    assert result.returncode != 0, out
+    failed = re.findall(r"^FAILED (\S+)", out, re.MULTILINE)
+    assert failed == ["tests/test_planted_failure.py::test_planted_failure"], out
+    assert UNDO in out, out
+    _assert_no_commit_or_branch(scratch, head_before)
+    _run_undo(repo)
+    assert _status(repo) == ""
+    assert _git(repo, "rev-parse", "HEAD") == head_before
+    for rel in SCRIPT_FILES:
+        assert (repo / rel).is_file()
+    assert (repo / "src" / "proj_template").is_dir()
+    assert not (repo / "src" / "my_project").exists()
