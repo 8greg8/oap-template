@@ -106,7 +106,7 @@ no file.
 - [ ] `strategic_model_init_material.md` and `README.md` are unchanged.
 - [ ] The report contains none of the four literals and no work email.
 - [ ] `scripts/gate.sh` passes.
-- [ ] Diff stays within `touches` plus the report.
+- [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 
 ## Workflow
 

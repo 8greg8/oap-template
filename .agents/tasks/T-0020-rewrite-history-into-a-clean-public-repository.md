@@ -55,7 +55,7 @@ point to the new commits. The old repository survives untouched as `oap-template
   command, and run its four checks.
 - Push the rewritten `main` and `develop` to the new `8greg8/oap-template`. Push no other ref and
   no tags.
-- In the new repository, on this task's branch: replace each of the 36 cited old hashes in
+- In the new repository, on this task's branch: replace each cited old hash in
   tracked files with its new hash, from `filter-repo/commit-map`, keeping the cited length.
   Editing other tasks' files, reports and plans is allowed for this mapping only. This overrides
   the Workflow rule against editing another task's file. Then
