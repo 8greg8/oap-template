@@ -40,6 +40,8 @@ the placeholders (`<repo_name>`, mission, architecture) for your actual reposito
    section of `CLAUDE.md`, runs `scripts/gate.sh`, makes one commit, and creates the missing
    `main` or `develop` branch at that commit. It deletes itself and its tests in that commit, never
    pushes, and, if anything fails before the commit, prints the command that restores the checkout.
+   If only a lock command fails (no network), it stops before the commit, leaves the files as they
+   are, and prints the commands that finish the run by hand.
 4. Follow the checklist the script prints: push both branches, set the default branch and branch
    protection on GitHub, fill in the `CLAUDE.md` project section (mission, architecture, domain
    terms), and write the first spec under `docs/spec/`.
