@@ -17,6 +17,7 @@ Usage:
     python .agents/tasks/scripts/task.py new --title "..." --type fix
     python .agents/tasks/scripts/task.py show T-0004
     python .agents/tasks/scripts/task.py set-status T-0004 in_progress
+    python .agents/tasks/scripts/task.py set-status T-0004 review  # needs a valid report
     python .agents/tasks/scripts/task.py validate
 """
 
@@ -49,8 +50,13 @@ from _schema import (
     validate_citations,
     validate_task,
 )
+from report import report_problems
 
 logger = logging.getLogger("task")
+
+#: Statuses a task may only enter once its report exists and validates.
+#: ``open`` and ``in_progress`` are exempt: no report is expected yet.
+REPORT_REQUIRED_STATUSES = frozenset({"review", "blocked", "done", "abandoned"})
 
 
 def render_template(template: Path, values: dict[str, str]) -> str:
@@ -133,12 +139,29 @@ def set_status(task_id: str, status: str) -> Path:
     Returns:
         Path of the updated task file.
 
+    Moving to ``review``, ``blocked``, ``done`` or ``abandoned`` is gated: the
+    task's report must exist and pass the same check as ``report.py validate``.
+    The report is read from the working tree, else from the task's branch via
+    git. A move to ``done`` is checked as ``validate`` checks a done task (the
+    verify line must have passed). A refused transition leaves the task file
+    untouched.
+
     Raises:
-        ValidationError: If the status is unknown or the task does not exist.
+        ValidationError: If the status is unknown, the task does not exist, or
+            the status needs a report that is missing or incomplete.
+        FrontmatterError: If the report's frontmatter cannot be parsed.
     """
     if status not in STATUSES:
         raise ValidationError(f"status {status!r} not in {list(STATUSES)}")
     task = find_task(task_id)
+    if status in REPORT_REQUIRED_STATUSES:
+        problems = report_problems(task, target_status=status)
+        if problems:
+            listed = "\n".join(f"  - {problem}" for problem in problems)
+            raise ValidationError(
+                f"cannot set {task.id} to {status!r}: its report is missing or "
+                f"incomplete\n{listed}"
+            )
     task.meta["status"] = status
     task.path.write_text(serialize(task.meta, task.body), encoding="utf-8")
     return task.path
@@ -240,7 +263,13 @@ def parse_args(argv=None):
     show = sub.add_parser("show", help="Print a task file.")
     show.add_argument("id", help="Task ID, e.g. T-0004.")
 
-    status = sub.add_parser("set-status", help="Change a task's status.")
+    status = sub.add_parser(
+        "set-status",
+        help=(
+            "Change a task's status. review, blocked, done and abandoned "
+            "require a report that passes report.py validate."
+        ),
+    )
     status.add_argument("id", help="Task ID, e.g. T-0004.")
     status.add_argument("status", choices=list(STATUSES), help="New status.")
 

@@ -59,6 +59,9 @@ python .agents/tasks/scripts/report.py lessons --tag <tag>
 python .agents/tasks/scripts/report.py validate T-0004
 ```
 
+`task.py set-status` to `review`, `blocked`, `done` or `abandoned` requires a
+report that passes `report.py validate` (see § Task lifecycle).
+
 `task.py new` files the task directly on `develop`: it syncs the primary
 checkout to `origin/develop`, allocates an ID under an exclusive lock,
 reconciled against the task files actually on disk, writes the file, and
@@ -106,7 +109,10 @@ testing contexts where a real push isn't wanted.
    git show <branch>:.agents/tasks/reports/T-00XX.md
    ```
 6. **Close.** `task.py set-status T-00XX review` (or `blocked`), then
-   `backlog.py reindex` and `report.py harvest`.
+   `backlog.py reindex` and `report.py harvest`. `set-status` enforces the
+   report gate (see § Task lifecycle): it fails unless the task's report passes
+   `report.py validate`. It finds the report in the working tree, or, when run
+   on `develop` before the merge, on the task's branch.
 7. **Merge.** A human reviews and merges the branch into `develop`, per
    `CONTRIBUTING.md`'s branching model, with the merge commit header
    `chore(merge): merge task NNNN into develop`. Whether a PR/MR is opened
@@ -177,6 +183,30 @@ open ──> in_progress ──> review ──> done
 
 Only `done` satisfies a dependency. `blocked` and `abandoned` still require a
 report explaining why.
+
+**The report is an enforced gate.** `task.py set-status` refuses a transition
+to `review`, `blocked`, `done` or `abandoned` unless the task's report exists
+and passes the same check as `report.py validate T-00XX` (no placeholder left
+in a required section, valid outcome, and the other rules `validate` applies).
+On refusal it exits non-zero, names each problem, and leaves the task file
+unchanged. Transitions to `open` and `in_progress` are not gated.
+
+The gate looks for `.agents/tasks/reports/T-00XX.md` in the working tree of
+the checkout the command runs in. If it is absent there, it falls back to the
+task's branch through git: a local or `origin/` branch matching `*/T-00XX-*`
+(local first), read with `git show <branch>:.agents/tasks/reports/T-00XX.md`.
+That is what lets step 6 of the execution loop run on `develop` before the
+merge, when the report exists only on the task branch. The content found is
+validated the same way whichever source it came from. A report in neither place,
+or an unparseable one, is refused.
+
+A move to `done` is checked as `validate` checks a done task: the verify line
+must start with `passed` and name its commit, and the summary must not call the
+verify pending. The touches rule applies once the task's merge commit is
+reachable from `HEAD`, and is skipped before that, exactly as in `validate`.
+`review`, `blocked` and `abandoned` accept a `pending` verify line. The gate
+reuses `report.py`'s validation rather than defining a second one, so the two
+cannot disagree on what counts as a valid report.
 
 ## Writing a good task
 
@@ -272,10 +302,12 @@ it compounds across a merge).
 
 The tooling is tested under `tests/` (`tests/test_task_scripts.py` for task
 filing, IDs, backlog and batching; `tests/test_report_scripts.py` for report
-validation, harvest and `housekeep.py`). Run it the same way as the rest of the
+validation, harvest and `housekeep.py`; `tests/test_set_status_gate.py` for the
+report gate on `set-status`). Run it the same way as the rest of the
 suite, normally through the gate:
 
 ```bash
 scripts/gate.sh
-uv run pytest tests/test_task_scripts.py tests/test_report_scripts.py -v
+uv run pytest tests/test_task_scripts.py tests/test_report_scripts.py \
+    tests/test_set_status_gate.py -v
 ```
