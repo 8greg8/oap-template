@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-14 lesson(s) across 9 section(s). Generated 2026-10-03.
+15 lesson(s) across 9 section(s). Generated 2026-10-03.
 
 ## Tag index
 
@@ -22,7 +22,7 @@ to all lessons that carry it.
 - `commit-lint` — [T-0004](#t-0004-success)
 - `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
 - `docker` — [T-0006](#t-0006-success)
-- `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success), [T-0013](#t-0013-success), [T-0014](#t-0014-success)
+- `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success), [T-0013](#t-0013-success), [T-0014](#t-0014-success), [T-0019](#t-0019-success)
 - `execution-loop` — [T-0001](#t-0001-success)
 - `file-mode` — [T-0009](#t-0009-success)
 - `file-modes` — [T-0007](#t-0007-success)
@@ -37,15 +37,18 @@ to all lessons that carry it.
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success)
 - `merge-authority` — [T-0013](#t-0013-success), [T-0014](#t-0014-success)
 - `method-text` — [T-0014](#t-0014-success)
+- `notice` — [T-0019](#t-0019-success)
 - `nul-safe` — [T-0012](#t-0012-success)
 - `orchestrator` — [T-0005](#t-0005-success), [T-0013](#t-0013-success)
 - `port` — [T-0003](#t-0003-success)
 - `pre-commit` — [T-0008](#t-0008-success)
 - `process` — [T-0005](#t-0005-success)
+- `public-release` — [T-0019](#t-0019-success)
 - `report-gate` — [T-0001](#t-0001-success)
 - `report-validation` — [T-0003](#t-0003-success)
 - `ruff` — [T-0007](#t-0007-success)
 - `scripts` — [T-0012](#t-0012-success)
+- `scrub` — [T-0019](#t-0019-success)
 - `set-status` — [T-0001](#t-0001-success)
 - `shebang` — [T-0009](#t-0009-success)
 - `staged-files` — [T-0012](#t-0012-success)
@@ -108,6 +111,15 @@ The method text is one long-line-per-paragraph file, and its cited line numbers 
 Tags: `docs`, `merge-authority`, `method-text`
 
 Source: [`reports/T-0014.md`](tasks/reports/T-0014.md)
+
+### T-0019 (success)
+
+- Do not guess a short form by taking initials of a project name. Derive it from an existing embedded occurrence, then check the rule counts against the counts the task states. A wrong guess matched nothing and the count mismatch exposed it.
+- A script run by a worktree-isolated agent must write its scratch data to the scratchpad directory by absolute path, so private literals never land in the tree.
+
+Tags: `docs`, `public-release`, `scrub`, `notice`
+
+Source: [`reports/T-0019.md`](tasks/reports/T-0019.md)
 
 ## git
 

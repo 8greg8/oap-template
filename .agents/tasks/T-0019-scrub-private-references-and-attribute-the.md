@@ -1,7 +1,7 @@
 ---
 id: T-0019
 title: Scrub private references and attribute the method text
-status: in_progress
+status: done
 type: docs
 priority: high
 depends_on: []
