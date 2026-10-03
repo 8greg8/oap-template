@@ -11,6 +11,8 @@
 #   scripts/gitflow.sh bugfix  finish <topic>
 #   scripts/gitflow.sh hotfix  start  <topic>
 #   scripts/gitflow.sh hotfix  finish <topic>
+#   scripts/gitflow.sh <docs|chore|fix> start  <T-NNNN-slug>   # task branches, from develop
+#   scripts/gitflow.sh <docs|chore|fix> finish <T-NNNN-slug>
 
 SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck disable=SC1091
@@ -22,7 +24,7 @@ cd "$(repo_root)"
 REPO_NAME="$(basename "$(repo_root)")"
 
 usage() {
-    die "usage: gitflow.sh <feature|bugfix|hotfix> <start|finish> <topic>"
+    die "usage: gitflow.sh <feature|bugfix|hotfix|docs|chore|fix> <start|finish> <topic>"
 }
 
 [[ $# -eq 3 ]] || usage
@@ -32,6 +34,7 @@ case "$kind" in
     feature) prefix="feat"; base="$DEVELOP_BRANCH" ;;
     bugfix)  prefix="bugfix"; base="$DEVELOP_BRANCH" ;;
     hotfix)  prefix="hotfix"; base="$MAIN_BRANCH" ;;
+    docs|chore|fix) prefix="$kind"; base="$DEVELOP_BRANCH" ;;
     *) usage ;;
 esac
 

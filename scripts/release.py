@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Cut a release tag on the main branch. Explicit and deliberate -- never run from a hook.
 
-Per AGENTS.md's "ask first" list, cutting a release tag is a human-in-the-loop action; this
+Per CLAUDE.md's "ask first" list, cutting a release tag is a human-in-the-loop action; this
 script is the tool for that action, not a way to automate around the requirement to invoke it
 on purpose. Without --yes it only previews what it would do.
 

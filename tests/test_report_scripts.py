@@ -385,8 +385,16 @@ def test_housekeep_drift_finds_report_only_on_task_branch(hk_repo, monkeypatch):
 def test_housekeep_worktrees_flags_merged_unremoved_worktree(hk_repo):
     merged = hk_repo.parent / "wt-merged"
     _git(hk_repo, "worktree", "add", "-q", "-b", "feat/T-0001-demo", str(merged))
+    _commit_files(merged, ["src/a.py"], "feat: work")
+    _git(hk_repo, "merge", "-q", "--no-ff", "feat/T-0001-demo", "-m", "merge")
     findings = housekeep_module.check_worktrees()
     assert any(str(merged) in f and "never removed" in f for f in findings)
+
+
+def test_housekeep_worktrees_ignores_empty_branch_at_develop_tip(hk_repo):
+    wt = hk_repo.parent / "wt-empty"
+    _git(hk_repo, "worktree", "add", "-q", "-b", "feat/T-0001-demo", str(wt))
+    assert housekeep_module.check_worktrees() == []
 
 
 def test_housekeep_worktrees_ignores_unmerged_worktree(hk_repo):
