@@ -1,0 +1,24 @@
+{
+  "name": "proj_template",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "upgradePackages": true
+    },
+    "ghcr.io/devcontainers-extra/features/tmux-apt-get:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+  },
+  // Optional: a dotfiles repo applied on first boot. Unset means no dotfiles.
+  // UV_PYTHON_PREFERENCE: the Ubuntu base image ships only python3-minimal (no tomllib),
+  // which breaks the hatchling build; make uv download a complete managed CPython.
+  "containerEnv": {
+    "DOTFILES_REPO": "${localEnv:DOTFILES_REPO}",
+    "UV_PYTHON_PREFERENCE": "only-managed"
+  },
+  "postCreateCommand": "bash .devcontainer/postCreate.sh",
+  "remoteUser": "vscode"
+}
