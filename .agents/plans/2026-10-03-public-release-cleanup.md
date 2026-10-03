@@ -36,7 +36,7 @@ rewritten itself. They are found in the repository as described below.
   in 11 files, and it appears in commit messages such as `0b32945`. L1 contains L3. L3u, the same
   name with the hyphen written as an underscore, is at `.agents/plans/2026-10-03-workflow-sync.md:129`.
 - Short form of L3 (L3s): the lowercase two-letter abbreviation of L3, used as a whole word in
-  prose and path prefixes (for example `L3s:CLAUDE.md`, `L3s's`). About 74 occurrences in 8 of
+  prose and path prefixes (for example `L3s:CLAUDE.md`, `L3s's`). About 71 occurrences, plus 3 of L3V, in 8 of
   those 11 files on `develop`, and some in history. L3V, its uppercase form, is a shell variable
   at `.agents/plans/2026-10-03-workflow-sync.md` lines 315, 317 and 320. L3t is the test name at
   `tests/test_report_scripts.py:287`, which embeds L3s between underscores, so a whole-word
