@@ -18,49 +18,64 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+`init_project.py` resets the copy's task state (plan step 4). After a run, the copy has no task files, reports or plans from this repository, a `.agents/plans/README.md`, `.counter` at `0`, and regenerated `BACKLOG.md` and `LESSONS.md`; `task.py validate` passes and the next `task.py new` allocates `T-0001`.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-03-template-init.md`, accepted by the owner on 2026-10-03 (all eight decisions as recommended). Its § Design is the source of truth for this task's behavior; where this file and the plan differ, stop and report.
+- The script lives at the repository root as `init_project.py` (Decision 7), outside `scripts/`, so it is not under "Ask first". It uses the standard library only.
+- Depends on T-0015, which adds the CLI and step structure.
+- The plan records that a copy with tasks, reports and plans removed and `.counter` at `0` passes `task.py validate` and the gate, and `task.py new` allocates `T-0001`.
+- `LESSONS.md` is generated from the reports by `report.py harvest` (Decision 8), so it is regenerated, not kept.
+- `CLAUDE.md` § Merge authority names `.agents/plans/` as the place for owner approvals.
+- Re-check against `develop` before starting and report any discrepancy.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- Remove `.agents/tasks/T-*.md` and `.agents/tasks/reports/*.md` in the copy.
+- Remove every file in `.agents/plans/` and write `.agents/plans/README.md`: one short paragraph saying owner plans, decisions and approvals go there, citing `CLAUDE.md` § Merge authority.
+- Write `0` to `.agents/tasks/.counter`.
+- Regenerate `BACKLOG.md` with `backlog.py reindex` and `LESSONS.md` with `report.py harvest`, run as subprocesses in the copy.
+- Keep `.agents/tasks/templates/` and `.agents/tasks/scripts/` unchanged.
+- Add every removed file to the dry run's change list.
+- Run the new step inside T-0015's failure handler.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change `scripts/`, `.husky/`, `.agents/tasks/scripts/`, `CLAUDE.md`, `pyproject.toml`, `package.json` or any lock file in this repository. The script edits those files only in the copy it runs against.
+- Do not change the gate, hooks, release tooling, merge rules or the Ask-first list.
+- Do not add a runtime or dev dependency.
+- Do not change the task or report schemas, templates or tooling.
+- Do not implement seeding, self-removal, the gate run, the commit or branch creation.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-03-template-init.md` (step 4, Decision 8)
+- `.agents/README.md`, `.agents/tasks/scripts/backlog.py`, `.agents/tasks/scripts/report.py`, `.agents/tasks/scripts/_ids.py`
+- `init_project.py`, `tests/test_init_project.py` as left by T-0015
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+After `--yes --skip-install` on a copy: no `T-*.md` under `.agents/tasks/`, no report under `.agents/tasks/reports/`, only `README.md` under `.agents/plans/`, `.counter` contains `0`, `BACKLOG.md` lists no tasks, `LESSONS.md` lists no lessons, templates and scripts are byte-identical to the template. Nothing is staged.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+Tests build a scratch copy from the files `git ls-files` lists plus the working-tree `init_project.py` and `tests/test_init_project.py` (uncommitted during development) committed in the copy, so the clean-tree precondition holds, give it a bare remote as `tests/test_gitflow.py` does, and run the script there with `--skip-install` and T-0015's `uv`/`npm` stubs on `PATH`, so no case needs the network. Expected values come from the plan, decided before running anything. Cover each item in Required behavior; `python .agents/tasks/scripts/task.py validate` passes in the copy; `task.py new --no-publish` in the copy writes `T-0001`; the dry run lists the removed files. Run `uv run pytest tests/test_init_project.py -v` and `scripts/gate.sh`.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason.
+None in this task.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] The copy has no task files, reports or plans from this repository, and has `.agents/plans/README.md`.
+- [ ] `.counter` is `0`, and `task.py new --no-publish` in the copy allocates `T-0001`.
+- [ ] `BACKLOG.md` and `LESSONS.md` are regenerated by the task scripts, not written by hand, and `task.py validate` passes in the copy.
+- [ ] `.agents/tasks/templates/` and `.agents/tasks/scripts/` are unchanged in the copy.
+- [ ] The dry run lists every removed file.
+- [ ] `uv run pytest tests/test_init_project.py -v` passes.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches` plus the report.
 
 ## Workflow
 
