@@ -1,7 +1,7 @@
 ---
 id: T-0014
 title: Amend the OAP method text so CLAUDE.md governs merge authority
-status: in_progress
+status: done
 type: docs
 priority: medium
 depends_on: []

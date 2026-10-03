@@ -134,11 +134,14 @@ After the batch, the owner changed the merge rules. Review these as a rule chang
   T-0008 (a note about `.husky/`) and T-0011 (a non-goal about `scripts/gitflow.sh`). They are done
   records and were left unedited, since editing them is outside the orchestrator's permitted
   task-file edits.
-- **Conflict to decide:** `strategic_model_init_material.md`, the OAP method text, lists "merge to
-  protected branches" as a human approval gate and says "treat every merge as a human decision".
-  The new rule departs from it for `develop`. T-0013 does not edit that file. Decide whether to
-  amend the method text or to keep it as the general doctrine, with `CLAUDE.md` as the
-  project-specific override.
+- **Conflict resolved (T-0014):** the OAP method text, `strategic_model_init_material.md`, said
+  "treat every merge as a human decision" and listed "merge to protected branches" as a human gate.
+  The owner decided: amend the method text, `CLAUDE.md` governs. T-0014 added one note under
+  "Approval gates" and amended four lines (1919, 2643, 2687, 2920). The "agent never merges its own
+  work" statements are unchanged. The verifier's cosmetic nit: the note says "verified" without
+  "independent". Accepted. The note hardcodes this repository's rule, so it needs a matching edit if
+  the `CLAUDE.md` merge rule changes. Other "the human" wording in the Decision Brief template is
+  general review doctrine and was left.
 - **Merged:** T-0013 is merged in `develop` (merge commit header `chore(merge): merge task 0013 into
   develop`) after four verify rounds by separate agents. The rule now also says: a task that crosses
   a breaking-change or Ask-first boundary, needed or incidental, is `blocked` for a human; the
@@ -161,5 +164,5 @@ After the batch, the owner changed the merge rules. Review these as a rule chang
 - [ ] Human-gated files read.
 - [ ] Gap 1 closed or accepted, with the bash 3.2 result noted.
 - [ ] Gaps 2 to 4 accepted or turned into tasks.
-- [ ] Merge-by-default rule change (T-0013) accepted, including the conflict with the method text.
+- [ ] Merge-by-default rule change (T-0013) and the method-text amendment (T-0014) accepted.
 - [ ] `scripts/gate.sh` run on `develop` at the review commit.
