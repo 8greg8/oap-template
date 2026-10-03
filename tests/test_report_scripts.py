@@ -335,6 +335,9 @@ def _hk_task(task_id: str, touches: list[str], status: str = "in_progress") -> T
 
 @pytest.fixture
 def hk_repo(tmp_path, monkeypatch):
+    # housekeep's git helper inherits the environment; a git hook exports GIT_DIR etc.
+    for name in _GIT_ENV_VARS_TO_STRIP:
+        monkeypatch.delenv(name, raising=False)
     repo = _seeded_repo(tmp_path / "repo")
     monkeypatch.setattr(housekeep_module, "REPO_ROOT", repo)
     monkeypatch.setattr(_schema, "REPORTS_DIR", repo / ".agents/tasks/reports")
