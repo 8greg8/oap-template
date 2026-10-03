@@ -5,7 +5,7 @@ status: in_progress
 type: fix
 priority: high
 depends_on: []
-touches: [.agents/tasks/scripts]
+touches: [.agents/tasks/scripts, tests/test_task_scripts.py]
 created: 2026-10-03
 report: reports/T-0007.md
 ---
