@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-10 lesson(s) across 8 section(s). Generated 2026-10-03.
+11 lesson(s) across 8 section(s). Generated 2026-10-03.
 
 ## Tag index
 
@@ -15,12 +15,13 @@ Each lesson appears once, under its first tag; the index links every tag
 to all lessons that carry it.
 
 - `agent-rules` — [T-0005](#t-0005-success)
+- `agent-workflow` — [T-0010](#t-0010-success)
 - `backlog` — [T-0002](#t-0002-success)
 - `bash` — [T-0012](#t-0012-success)
 - `commit-lint` — [T-0004](#t-0004-success)
 - `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
 - `docker` — [T-0006](#t-0006-success)
-- `docs` — [T-0005](#t-0005-success)
+- `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success)
 - `execution-loop` — [T-0001](#t-0001-success)
 - `file-mode` — [T-0009](#t-0009-success)
 - `file-modes` — [T-0007](#t-0007-success)
@@ -28,6 +29,7 @@ to all lessons that carry it.
 - `git` — [T-0007](#t-0007-success), [T-0012](#t-0012-success)
 - `git-pathspec` — [T-0008](#t-0008-success)
 - `git-publish` — [T-0002](#t-0002-success)
+- `git-worktree` — [T-0010](#t-0010-success)
 - `gitflow` — [T-0004](#t-0004-success)
 - `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success)
 - `housekeep` — [T-0003](#t-0003-success)
@@ -46,6 +48,7 @@ to all lessons that carry it.
 - `staged-files` — [T-0012](#t-0012-success)
 - `task-scripts` — [T-0009](#t-0009-success)
 - `task-tooling` — [T-0001](#t-0001-success), [T-0002](#t-0002-success)
+- `upstream-tracking` — [T-0010](#t-0010-success)
 - `uv` — [T-0006](#t-0006-success)
 - `worktree` — [T-0002](#t-0002-success)
 
@@ -76,6 +79,15 @@ symlinked into it. `npm ci` is needed before its first commit if the hooks are t
 Tags: `docs`, `agent-rules`, `process`, `orchestrator`
 
 Source: [`reports/T-0005.md`](tasks/reports/T-0005.md)
+
+### T-0010 (success)
+
+- `git worktree add -b <branch> origin/develop` sets the new branch to track `origin/develop`. A bare `git push` then fails under `push.default=simple` because the names differ. `--no-track` leaves no upstream, so the first push still needs `git push -u origin <branch>`.
+- Line numbers quoted in a task's context can drift as other tasks merge. The `AGENTS.md` citations had moved by two lines.
+
+Tags: `docs`, `agent-workflow`, `git-worktree`, `upstream-tracking`
+
+Source: [`reports/T-0010.md`](tasks/reports/T-0010.md)
 
 ## git
 

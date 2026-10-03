@@ -22,3 +22,9 @@ T-0001, T-0008, T-0009, T-0010, T-0011, and any task filed to resolve a finding 
   change named above or filed a task for it under this grant. No force-push, no tag edits, no
   remote branch deletion.
 - A task that fails verification three times is `blocked` and not merged.
+
+## Task-file edits under this grant
+
+The owner's "all merge and decision authorisation is granted" covers the orchestrator's task-file
+edits listed in `CLAUDE.md` § "Batch runs: orchestrator merges": `task.py set-status`, widening a
+task's `touches` with the reason recorded, and a pre-dispatch amendment of a task file.

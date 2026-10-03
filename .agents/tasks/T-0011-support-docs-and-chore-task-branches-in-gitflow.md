@@ -1,11 +1,11 @@
 ---
 id: T-0011
 title: Support docs and chore task branches in gitflow and fix housekeep worktrees
-status: open
+status: in_progress
 type: fix
 priority: low
 depends_on: []
-touches: [scripts/gitflow.sh, .agents/tasks/scripts/housekeep.py, tests/test_report_scripts.py, tests/test_hooks.py]
+touches: [scripts/gitflow.sh, scripts/release.py, CONTRIBUTING.md, .agents/tasks/scripts/housekeep.py, tests/test_gitflow.py, tests/test_report_scripts.py, tests/test_hooks.py]
 created: 2026-10-03
 report: reports/T-0011.md
 ---
@@ -31,18 +31,20 @@ prose in task and report files" section) — required literal content
 
 - `scripts/gitflow.sh`: add task-branch kinds (`docs`, `chore`, `fix`) to start and finish, using `merge_message`, without changing the existing three kinds.
 - `housekeep.py worktrees`: treat a branch with no commits ahead of `develop` as not merged.
-- Tests: a gitflow test using a scratch repo and bare remote, and a `housekeep` test for the empty-branch case, each failing before the change.
+- Tests: a gitflow test in `tests/test_gitflow.py` using a scratch repo and bare remote, and a `housekeep` test for the empty-branch case in `tests/test_report_scripts.py`, each failing before the change.
+- `CONTRIBUTING.md` (Worktrees for agents): replace the hand-written `git worktree add` fallback paragraph so it says `gitflow.sh` now supports `docs`, `chore` and `fix` task branches, keeping the `--no-track` and first-push `-u` guidance only where a hand-written command is still needed. Change nothing else there.
+- `scripts/release.py`: change only the line-4 docstring citation of `AGENTS.md` to `CLAUDE.md`. No code change.
 
 ## Non-goals
 
-- Do not change hooks, `scripts/gate.sh`, `scripts/autofix.sh`, `scripts/commit_lint.py`, `scripts/release.py`, CI or `pyproject.toml`.
+- Do not change hooks, `scripts/gate.sh`, `scripts/autofix.sh`, `scripts/commit_lint.py`, CI or `pyproject.toml`. `scripts/release.py` may change only as stated in Scope.
 - Do not change merge-commit message formats.
-- Do not edit docs; if `CONTRIBUTING.md` needs updating, say so in the report for a separate docs task.
-- This task edits `scripts/gitflow.sh`, which is human-gated under CLAUDE.md: the executor must not start without the owner's explicit approval recorded in the dispatch instruction, and must stop and ask if the change grows beyond branch-kind handling.
+- Do not edit docs other than the `CONTRIBUTING.md` paragraph named in Scope.
+- This task edits `scripts/gitflow.sh`, which is human-gated under CLAUDE.md: the executor must not start without the owner's explicit approval recorded in the dispatch instruction, and must stop and ask if the change grows beyond branch-kind handling and the named `release.py` docstring and `CONTRIBUTING.md` edits. The owner approved all of these for this task under the batch grant in `.agents/plans/2026-10-03-batch-merge-grant.md`.
 
 ## Files to inspect
 
-- `scripts/gitflow.sh`, `scripts/lib/common.sh`
+- `scripts/gitflow.sh`, `scripts/lib/common.sh`, `CONTRIBUTING.md`, `scripts/release.py`
 - `.agents/tasks/scripts/housekeep.py`
 - `tests/test_report_scripts.py`, `tests/test_hooks.py`
 
@@ -56,7 +58,7 @@ New gitflow and housekeep tests, each shown failing before and passing after. Ru
 
 ## Documentation required
 
-None in this task; report the needed `CONTRIBUTING.md` change.
+`CONTRIBUTING.md` as stated in Scope.
 
 ## Acceptance criteria
 
@@ -65,6 +67,7 @@ None in this task; report the needed `CONTRIBUTING.md` change.
 - [ ] A branch with no commits ahead of `develop` is not reported merged by `housekeep.py worktrees`.
 - [ ] New tests failed before the change and pass after.
 - [ ] `scripts/gate.sh` passes.
+- [ ] `CONTRIBUTING.md` no longer calls the hand-written command the only route for task branches, and `scripts/release.py` cites `CLAUDE.md`.
 - [ ] Diff stays within `touches` plus the report.
 
 ## Workflow
