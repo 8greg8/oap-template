@@ -237,6 +237,17 @@ def test_invalid_package_is_refused(scratch: Scratch, package: str):
     assert _status(scratch.repo) == ""
 
 
+@pytest.mark.parametrize("package", ["_x", "x_", "_", "__x", "x__", "_my_project_"])
+def test_package_starting_or_ending_with_underscore_is_refused(
+    scratch: Scratch, package: str
+):
+    result, out = _run(scratch, "--yes", "--skip-install", package=package)
+
+    _assert_refused(scratch, result, out, "--package")
+    assert "underscore" in out, out
+    assert _status(scratch.repo) == ""
+
+
 def test_dirty_tracked_file_is_refused(scratch: Scratch):
     (scratch.repo / "README.md").write_text("edited\n", encoding="utf-8")
 
