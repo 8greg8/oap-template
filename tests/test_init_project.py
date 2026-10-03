@@ -372,8 +372,7 @@ def test_nothing_is_staged_after_the_run(scratch: Scratch):
 
     assert result.returncode == 0, out
     assert _git(scratch.repo, "diff", "--cached", "--name-only") == ""
-    for line in _status(scratch.repo).splitlines():
-        assert line[0] in " ?", f"staged entry: {line!r}"
+    assert "pyproject.toml" in _git(scratch.repo, "diff", "--name-only")
 
 
 def test_template_strings_remain_only_in_allowed_files(scratch: Scratch):
