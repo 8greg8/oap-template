@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-12 lesson(s) across 9 section(s). Generated 2026-10-03.
+13 lesson(s) across 9 section(s). Generated 2026-10-03.
 
 ## Tag index
 
@@ -22,7 +22,7 @@ to all lessons that carry it.
 - `commit-lint` — [T-0004](#t-0004-success)
 - `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
 - `docker` — [T-0006](#t-0006-success)
-- `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success)
+- `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success), [T-0013](#t-0013-success)
 - `execution-loop` — [T-0001](#t-0001-success)
 - `file-mode` — [T-0009](#t-0009-success)
 - `file-modes` — [T-0007](#t-0007-success)
@@ -35,8 +35,9 @@ to all lessons that carry it.
 - `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success)
 - `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success)
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success)
+- `merge-authority` — [T-0013](#t-0013-success)
 - `nul-safe` — [T-0012](#t-0012-success)
-- `orchestrator` — [T-0005](#t-0005-success)
+- `orchestrator` — [T-0005](#t-0005-success), [T-0013](#t-0013-success)
 - `port` — [T-0003](#t-0003-success)
 - `pre-commit` — [T-0008](#t-0008-success)
 - `process` — [T-0005](#t-0005-success)
@@ -51,6 +52,7 @@ to all lessons that carry it.
 - `task-tooling` — [T-0001](#t-0001-success), [T-0002](#t-0002-success)
 - `upstream-tracking` — [T-0010](#t-0010-success)
 - `uv` — [T-0006](#t-0006-success)
+- `workflow` — [T-0013](#t-0013-success)
 - `worktree` — [T-0002](#t-0002-success)
 
 ## devcontainer
@@ -89,6 +91,14 @@ Source: [`reports/T-0005.md`](tasks/reports/T-0005.md)
 Tags: `docs`, `agent-workflow`, `git-worktree`, `upstream-tracking`
 
 Source: [`reports/T-0010.md`](tasks/reports/T-0010.md)
+
+### T-0013 (success)
+
+The merge-authority wording lives in `CLAUDE.md`, `.agents/README.md`, `CONTRIBUTING.md` and the task template. A later change to merge rules should grep all four, plus `.agents/plans/`, for the section names it renames.
+
+Tags: `docs`, `merge-authority`, `orchestrator`, `workflow`
+
+Source: [`reports/T-0013.md`](tasks/reports/T-0013.md)
 
 ## git
 

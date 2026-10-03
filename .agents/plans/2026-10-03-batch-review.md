@@ -139,8 +139,22 @@ After the batch, the owner changed the merge rules. Review these as a rule chang
   The new rule departs from it for `develop`. T-0013 does not edit that file. Decide whether to
   amend the method text or to keep it as the general doctrine, with `CLAUDE.md` as the
   project-specific override.
-- **Check:** after T-0013 merges, `grep -n -i "opt-in\|never the default" CLAUDE.md .agents/README.md`
-  should find nothing that still makes a grant the precondition.
+- **Merged:** T-0013 is merged in `develop` (merge commit header `chore(merge): merge task 0013 into
+  develop`) after four verify rounds by separate agents. The rule now also says: a task that crosses
+  a breaking-change or Ask-first boundary, needed or incidental, is `blocked` for a human; the
+  verifier must report whether it does; an owner decision is recorded as the owner's written
+  approval, cited in the report, per change; and the verifier is neither the executor, a fix-round
+  executor, nor the merging orchestrator.
+- **Accepted gaps (verifier findings):** (1) Husky and CI changes named in a task's Scope follow
+  normal autonomy, so an agent-filed task naming `.husky/` or `.github/workflows/` can merge without
+  a human unless it is also breaking. (2) A note under `.agents/plans/` does not prove the owner
+  wrote it. (3) Standalone, non-task changes are not covered by the new default, so the
+  breaking-change gate lives only in the task-branch flow. (4) An agent judges whether a change is
+  breaking. Decide whether any of these needs a stricter rule.
+- **Stale references:** `.agents/plans/2026-10-03-batch-merge-grant.md` and the closed T-0005 and
+  T-0010 reports still cite the renamed sections "Batch runs: orchestrator merges" and
+  "Orchestrator merges (opt-in per batch)". They are records and were left unedited.
+- **Check:** `grep -n -i "opt-in\|never the default" CLAUDE.md .agents/README.md` finds nothing.
 
 ## Sign-off
 

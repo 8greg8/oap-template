@@ -1,7 +1,7 @@
 ---
 id: T-0013
 title: Make orchestrator merge into develop the default
-status: in_progress
+status: done
 type: docs
 priority: high
 depends_on: []
