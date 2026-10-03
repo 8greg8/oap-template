@@ -5,7 +5,7 @@ status: review
 type: chore
 priority: high
 depends_on: [T-0003, T-0005]
-touches: [CLAUDE.md, .agents/README.md, .agents/tasks/scripts/task.py, .agents/tasks/scripts/report.py, .agents/tasks/scripts/housekeep.py, .agents/tasks/templates/task.md]
+touches: [CLAUDE.md, .agents/README.md, .agents/tasks/scripts/task.py, .agents/tasks/scripts/report.py, .agents/tasks/scripts/housekeep.py, .agents/tasks/templates/task.md, tests/test_set_status_gate.py]
 created: 2026-09-16
 report: reports/T-0001.md
 ---
