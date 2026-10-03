@@ -21,30 +21,32 @@ rewritten itself. They are found in the repository as described below.
 
 ## Findings (scan of 2026-10-03)
 
-- Secrets: none. gitleaks over all 102 commits on all branches and detect-secrets over the working
+- Secrets: none. gitleaks over all commits on all branches and detect-secrets over the working
   tree reported no findings.
-- Work email: all 50 owner-authored commits carry the owner's work address as author and committer.
+- Work email: all 51 owner-authored commits carry the owner's work address as author and committer.
   It should be the owner's private Gmail address. The other commits are authored by
   `Claude <noreply@anthropic.com>` and stay as they are.
 - Local path (L1): the absolute home-directory path in `.agents/LESSONS.md:139` and
   `.agents/tasks/reports/T-0004.md:85`.
 - Downstream project name (L2): the backticked project name in
-  `.agents/tasks/T-0001-*.md` lines 25, 56 and 86, and in the body of commit `0b32945`.
+  `.agents/tasks/T-0001-*.md` lines 25, 56 and 86, and in the body of commit `b973ccf`.
 - Source project name (L3): the project named in the title of
-  `.agents/plans/2026-10-03-workflow-sync.md`. It appears 37 times in 11 files on `develop`, and
-  in commit messages. L1 contains L3.
-- Session trailers: 65 commit messages end with a `Claude-Session:` line.
+  `.agents/plans/2026-10-03-workflow-sync.md`. On `develop` it is on 37 lines (45 occurrences)
+  in 11 files, and it appears in commit messages such as `0b32945`. L1 contains L3. L3u, the same
+  name with the hyphen written as an underscore, is at `.agents/plans/2026-10-03-workflow-sync.md:129`.
+- Session trailers: about 65 commit messages end with a `Claude-Session:` line. The number grows
+  with each session commit.
 - Method text: `strategic_model_init_material.md` is "Orchestrated Agentic Programming", version
   1.0.1, by Janez Perš, published as SLAIF workshop material at
   <https://edu.slaif.si/trainings/workshop-orchestrated-agentic-programming>. Neither the file
   nor the page shows a license. The page renders client-side and could not be read from the
   session container.
-- Commit hash citations: 36 hashes of this repository's own commits are cited in task and report
-  files. The rewrite changes every hash.
+- Commit hash citations: about 37 hashes of this repository's own commits are cited in task,
+  report and plan files. The rewrite changes every hash.
 
 ## Replacements
 
-The same three replacements apply to the tree (T-0019) and to all history (T-0020). Because
+The same four replacements apply to the tree (T-0019) and to all history (T-0020). Because
 they match, the rewritten `develop` tree must be identical to the `develop` tree after T-0019.
 
 | Literal | Replacement |
@@ -52,8 +54,9 @@ they match, the rewritten `develop` tree must be identical to the `develop` tree
 | P1: the home-directory prefix in front of L3 inside L1, ending in `/` | `/path/to/` |
 | L2 | `downstream-project` |
 | L3 | `source-project` |
+| L3u | `source_project` |
 
-L1 therefore becomes `/path/to/source-project`. All three are plain-text rules. filter-repo
+L1 therefore becomes `/path/to/source-project`. All four are plain-text rules. filter-repo
 applies plain-text rules before regex rules, so a rule must not depend on another having run
 first. A dry run showed that a regex rule for all of L1 never matched once L3 had been replaced.
 
@@ -70,7 +73,8 @@ first. A dry run showed that a regex rule for all of L1 never matched once L3 ha
 
 ## Step 2 (T-0020): rewrite history into the new repository
 
-Preconditions: T-0015 to T-0019 are merged, no other task branch is open, and the owner has
+The mirror must be a full clone from GitHub; `git rev-parse --is-shallow-repository` must print
+`false`. Preconditions: T-0015 to T-0019 are merged, no other task branch is open, and the owner has
 renamed this repository to `oap-template-archive` and created an empty private
 `8greg8/oap-template`.
 
@@ -84,9 +88,10 @@ git filter-repo --mailmap ../mailmap \
 ```
 
 filter-repo updates abbreviated hashes cited in commit messages on its own. A dry run of this
-exact command on a mirror of all branches (2026-10-03, placeholder address) rewrote all 50 owner
-commits and left no match for any literal or the work-email domain in contents or messages, and
-no `Claude-Session:` line in messages.
+exact command with all four rules, on a full mirror of all branches (2026-10-03, placeholder
+address), rewrote all 51 owner commits and left no match for any literal or the work-email domain
+in contents or messages, and no `Claude-Session:` line in messages. An independent verify
+reproduced it.
 
 Before pushing, check:
 - Author and committer addresses are only the private address and `noreply@anthropic.com`.
@@ -96,7 +101,7 @@ Before pushing, check:
 - gitleaks over the rewritten history reports no leaks.
 - `git diff <old develop> <new develop>` is empty.
 
-Then push `main` and `develop` only. Then one commit on `develop` maps the 36 cited hashes from
+Then push `main` and `develop` only. Then one commit on `develop` maps the cited hashes from
 old to new using `filter-repo/commit-map`, and the scan above is re-run on the new repository.
 
 ## Step 3 (owner): publish
