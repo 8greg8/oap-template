@@ -4,8 +4,8 @@ title: Enforce report writing as a pipeline gate, not an agent courtesy
 status: open
 type: chore
 priority: high
-depends_on: []
-touches: [AGENTS.md, .agents/README.md, .agents/tasks/scripts/task.py, .agents/tasks/scripts/report.py, .agents/tasks/scripts/housekeep.py, .agents/tasks/templates/task.md]
+depends_on: [T-0003, T-0005]
+touches: [CLAUDE.md, .agents/README.md, .agents/tasks/scripts/task.py, .agents/tasks/scripts/report.py, .agents/tasks/scripts/housekeep.py, .agents/tasks/templates/task.md]
 created: 2026-09-16
 report: reports/T-0001.md
 ---
@@ -29,6 +29,11 @@ half).
 
 ## Context / current verified state
 
+- Amended 2026-10-03 by the workflow-sync bootstrap (`.agents/plans/2026-10-03-workflow-sync.md`
+  §3.1). This task now runs after T-0003, which replaces `report.py` and `housekeep.py`,
+  and T-0005, which makes `CLAUDE.md` the router and turns `AGENTS.md` into a redirect.
+  The points below describe the repository before those tasks. Re-verify each against
+  `develop` before starting, and reuse T-0003's `report.py validate`.
 - `AGENTS.md` (this repo) states "Every task ends with a report... Run
   `report.py validate T-00XX` before considering the task finished," and
   `.agents/README.md` repeats this and says "Only `done` satisfies a dependency.
@@ -63,7 +68,7 @@ half).
 - Reuse `report.py`'s existing validation logic (import/call it, or factor the shared
   check into `_schema.py`) rather than re-implementing the placeholder check a second
   time.
-- Update `.agents/README.md`'s "The execution loop" close step and `AGENTS.md`'s
+- Update `.agents/README.md`'s "The execution loop" close step and `CLAUDE.md`'s
   "Every task ends with a report" bullet to describe this as an enforced gate rather
   than a step an agent must remember.
 
@@ -89,7 +94,7 @@ half).
   belongs here for reuse)
 - `.agents/tasks/scripts/housekeep.py` (`drift`, for how it currently detects a
   report-less `done` task, so the new gate and the existing drift check don't disagree)
-- `.agents/README.md`, `AGENTS.md`
+- `.agents/README.md`, `CLAUDE.md`
 
 ## Required behavior
 
@@ -111,7 +116,7 @@ succeeds; `set-status` to `in_progress`/`open` is unaffected by report state. Ru
 
 ## Documentation required
 
-`AGENTS.md` and `.agents/README.md` as described in Scope, so the docs describe the
+`CLAUDE.md` and `.agents/README.md` as described in Scope, so the docs describe the
 actual (enforced) behavior instead of an honor-system convention. Since this is the
 template, this doc change also propagates to every project generated from it going
 forward.
@@ -126,7 +131,7 @@ forward.
       when the report is present and fully filled in.
 - [ ] `task.py set-status <ID> open` and `in_progress` are unaffected by report state.
 - [ ] New/extended tests cover the above and pass: `uv run pytest tests/`.
-- [ ] `AGENTS.md` and `.agents/README.md` describe this as an enforced gate.
+- [ ] `CLAUDE.md` and `.agents/README.md` describe this as an enforced gate.
 
 ## Workflow
 
