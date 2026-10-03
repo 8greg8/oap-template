@@ -60,7 +60,9 @@ In brief:
   considering the task finished. This is an enforced gate, not a convention:
   `task.py set-status` refuses `review`, `blocked`, `done` and `abandoned` with a non-zero exit
   unless `.agents/tasks/reports/T-00XX.md` exists and passes the same check as
-  `report.py validate`. `open` and `in_progress` are not gated.
+  `report.py validate`. It reads the report from the working tree, or from the task's branch via
+  git when it is not there; a move to `done` is checked as `validate` checks a done task.
+  `open` and `in_progress` are not gated.
 - **When executing a task from the backlog, push but do not merge.** Commit the report on the
   task's own branch and push it; leave the merge to `develop` and any PR/MR to the orchestrator or
   human, per `.agents/README.md`'s execution loop. This overrides the general autonomy below, which

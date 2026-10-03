@@ -141,7 +141,10 @@ def set_status(task_id: str, status: str) -> Path:
 
     Moving to ``review``, ``blocked``, ``done`` or ``abandoned`` is gated: the
     task's report must exist and pass the same check as ``report.py validate``.
-    A refused transition leaves the task file untouched.
+    The report is read from the working tree, else from the task's branch via
+    git. A move to ``done`` is checked as ``validate`` checks a done task (the
+    verify line must have passed). A refused transition leaves the task file
+    untouched.
 
     Raises:
         ValidationError: If the status is unknown, the task does not exist, or
@@ -152,7 +155,7 @@ def set_status(task_id: str, status: str) -> Path:
         raise ValidationError(f"status {status!r} not in {list(STATUSES)}")
     task = find_task(task_id)
     if status in REPORT_REQUIRED_STATUSES:
-        problems = report_problems(task)
+        problems = report_problems(task, target_status=status)
         if problems:
             listed = "\n".join(f"  - {problem}" for problem in problems)
             raise ValidationError(

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import fnmatch
 import logging
 import os
 import re
@@ -26,7 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _frontmatter import FrontmatterError, read
+from _frontmatter import FrontmatterError, parse, read
 from _schema import (
     INTEGRATION_BRANCH,
     LESSONS_FILE,
@@ -294,38 +295,137 @@ def validate_report(
     return problems
 
 
-def report_problems(task: Task, repo_root: Path = REPO_ROOT) -> list[str]:
+def _git_lines(args: list[str], repo_root: Path) -> list[str]:
+    """Run a read-only git command; return its output lines, or none on failure."""
+    try:
+        result = subprocess.run(
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=repo_root,
+            env=_git_env(),
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    return result.stdout.splitlines()
+
+
+def branch_report_text(
+    task: Task, report_rel: str, repo_root: Path = REPO_ROOT
+) -> tuple[str, str] | None:
+    """Read a task's report from the task's own branch, via git.
+
+    Looks at local branches (``refs/heads``) and ``origin/`` branches whose name
+    matches ``*/<ID>-*``. Local branches are tried first, then ``origin/``, each
+    in name order; the first that holds the report file wins.
+
+    Args:
+        task: The task whose report is wanted.
+        report_rel: Repo-relative POSIX path of the report file.
+        repo_root: Repository to search.
+
+    Returns:
+        ``(branch, text)`` for the first matching branch holding the report, or
+        ``None`` when no matching branch has it (or git is unavailable).
+    """
+    pattern = f"*/{task.id.upper()}-*"
+    refs = _git_lines(
+        ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes/origin"],
+        repo_root,
+    )
+    candidates = [
+        (ref, ref.removeprefix("refs/heads/"), ref.removeprefix("refs/heads/"))
+        for ref in sorted(r for r in refs if r.startswith("refs/heads/"))
+    ] + [
+        (
+            ref,
+            ref.removeprefix("refs/remotes/origin/"),
+            ref.removeprefix("refs/remotes/"),
+        )
+        for ref in sorted(r for r in refs if r.startswith("refs/remotes/origin/"))
+    ]
+    for ref, name, display in candidates:
+        if not fnmatch.fnmatchcase(name, pattern):
+            continue
+        try:
+            shown = subprocess.run(
+                ["git", "show", f"{ref}:{report_rel}"],
+                capture_output=True,
+                text=True,
+                check=True,
+                cwd=repo_root,
+                env=_git_env(),
+            )
+        except (OSError, subprocess.CalledProcessError):
+            continue
+        return display, shown.stdout
+    return None
+
+
+def report_problems(
+    task: Task, repo_root: Path = REPO_ROOT, target_status: str | None = None
+) -> list[str]:
     """Check that a task has a complete report, as ``report.py validate`` would.
 
     Used by ``task.py set-status`` to gate transitions that require a report.
-    It applies :func:`validate_report` to the report file at
-    ``task.report_path`` and adds the one problem ``validate`` cannot raise for
-    a file it never loads: the report does not exist.
+    The report is read from the working tree at ``task.report_path``; if that
+    file is absent, from the task's branch via :func:`branch_report_text`. The
+    content is checked with :func:`validate_report`, whichever source it came
+    from. If neither source has it, the one problem ``validate`` cannot raise
+    for a file it never loads is returned: the report does not exist.
+
+    ``validate_report`` applies the verify and touches rules only to a task
+    whose status is ``done``. With ``target_status`` set, they are evaluated
+    for a copy of the task carrying that status, so a transition to ``done`` is
+    judged as ``validate`` will judge the task once it is done. The rules
+    themselves are unchanged. The touches rule needs the task's merge commit in
+    ``repo_root``; it is skipped, as ``validate`` skips it, while there is none.
 
     Args:
         task: The task whose report is checked.
-        repo_root: Repository used by the touches check.
+        repo_root: Repository used by the branch lookup and the touches check.
+        target_status: Status the task is about to take; defaults to its own.
 
     Returns:
         A list of human-readable problems; empty means the report exists and
         validates.
 
     Raises:
-        FrontmatterError: If the report file exists but its frontmatter cannot
-            be parsed.
+        FrontmatterError: If the report's frontmatter cannot be parsed. The
+            message names the file, or the branch and path, it came from.
     """
     path = task.report_path
     shown = path.relative_to(repo_root) if path.is_relative_to(repo_root) else path
-    if not path.is_file():
-        return [f"no report at {shown}; create it with `report.py new {task.id}`"]
-    meta, body = read(path)
-    report = Report(path=path, meta=meta, body=body)
+    if path.is_file():
+        meta, body = read(path)
+        source = path
+    else:
+        found = branch_report_text(task, Path(shown).as_posix(), repo_root)
+        if found is None:
+            return [
+                (
+                    f"no report at {shown} or on a branch matching "
+                    f"'*/{task.id}-*'; create it with `report.py new {task.id}`"
+                )
+            ]
+        branch, text = found
+        source = Path(f"{branch}:{Path(shown).as_posix()}")
+        try:
+            meta, body = parse(text)
+        except FrontmatterError as exc:
+            raise FrontmatterError(f"{source}: {exc}") from None
+    report = Report(path=source, meta=meta, body=body)
+    judged = task
+    if target_status is not None and target_status != task.status:
+        judged = Task(task.path, {**task.meta, "status": target_status}, task.body)
+    label = source if source is not path else shown
     problems = [
-        f"{shown}: {problem}" for problem in validate_report(report, task, repo_root)
+        f"{label}: {problem}" for problem in validate_report(report, judged, repo_root)
     ]
     if report.task_id and report.task_id.upper() != task.id.upper():
         problems.append(
-            f"{shown}: 'task' frontmatter is {report.task_id!r}, not {task.id!r}"
+            f"{label}: 'task' frontmatter is {report.task_id!r}, not {task.id!r}"
         )
     return problems
 
