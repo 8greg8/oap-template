@@ -99,10 +99,13 @@ are being followed exactly.
   across a major version.
 - Any change to `pyproject.toml` `[tool]` sections governing lint/type/test behavior (what
   `ruff`/`ty`/`pytest` actually check). This gates every agent's work, so changes need a human in
-  the loop. This does **not** cover Husky hook config (`.husky/`, hook-runner wiring in
-  `package.json`, commit-message-linter config, `scripts/`) or `.github/workflows/` CI pipeline
-  files. Those follow normal task autonomy when a task file's own Scope already names them; they
-  govern *when* the existing gate runs, not what it checks. An agent that wants to touch
+  the loop. The same holds for changes to `scripts/` (gate commands in `scripts/config/gate.sh`,
+  `scripts/gate.sh`, lint/type/test config, `scripts/commit_lint.py`, release tooling such as
+  `scripts/release.py`): they control what the gate checks and how releases are cut, so they
+  still need a human. This does **not** cover Husky hook config (`.husky/`, hook-runner wiring in
+  `package.json`, commit-message-linter config) or `.github/workflows/` CI pipeline files. Those
+  follow normal task autonomy when a task file's own Scope already names them; they govern
+  *when* the existing gate runs, not what it checks. An agent that wants to touch
   Husky or CI-workflow config outside what its current task file scopes still needs a task file
   first, per § "Working unit: the task".
 - Restructuring `src/<repo_name>/` into multiple `uv` workspace packages (see
