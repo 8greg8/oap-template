@@ -73,7 +73,8 @@ TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
   `CONTRIBUTING.md`, not a task-driven branch.
 - Commit only files related to this task, using Conventional Commits.
 - Write the report to `.agents/tasks/reports/{id}.md` and commit it on this branch.
-- Push the branch. **Do not merge.** Do not open a pull request.
+- Push the branch. **Do not merge.** Do not open a pull request. The orchestrator merges after an
+  independent verify by a different agent.
 - Do not hand-edit `.agents/tasks/BACKLOG.md` or any other task's file — the
   orchestrator owns backlog state. Regenerating `BACKLOG.md` with `backlog.py
   reindex` to reflect this task's own status change is expected, and is not an

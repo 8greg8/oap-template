@@ -64,10 +64,10 @@ In brief:
   git when it is not there; a move to `done` is checked as `validate` checks a done task.
   `open` and `in_progress` are not gated.
 - **When executing a task from the backlog, push but do not merge.** Commit the report on the
-  task's own branch and push it; leave the merge to `develop` and any PR/MR to the orchestrator or
-  human, per `.agents/README.md`'s execution loop. This overrides the general autonomy below, which
-  covers a standalone (non-batched) change with no task file. Only an owner grant for a named
-  batch changes this (§ "Batch runs: orchestrator merges").
+  task's own branch and push it. Never merge your own work and never verify your own change; leave
+  the merge to `develop` and any PR/MR to the orchestrator, per `.agents/README.md`'s execution
+  loop and § "Merge authority: orchestrator merges by default". This overrides the general
+  autonomy below, which covers a standalone change with no task file.
 - **Repair work is narrower than feature work.** If a task is fixing a specific broken PR or failing
   check, don't fold in new feature behavior — repair only what's named, report the exact cause and
   fix.
@@ -83,8 +83,8 @@ Within a single task, an agent proceeds end-to-end without stopping for confirma
 - Adding a dev-only dependency (linting/testing tooling) needed to do the above.
 - Writing the commit per Conventional Commits rules in `CONTRIBUTING.md`.
 - Merging to the branch's correct target (`develop` or `main`) and pushing, per branch type —
-  **unless** this is a task dispatched from `.agents/tasks/`, in which case push only and leave the
-  merge to the orchestrator/human (see § Working unit: the task).
+  **unless** this is a task dispatched from `.agents/tasks/`, in which case the executor pushes
+  only and the orchestrator merges (see § Working unit: the task and § Merge authority).
 - Removing a worktree and deleting its local branch once that branch is confirmed merged into its
   target (`git worktree remove`, `git branch -d`). This is routine cleanup, not a destructive
   action requiring confirmation; `git branch -d` refuses on an unmerged branch, so the check is
@@ -204,20 +204,34 @@ For blind authoring, `.devcontainer/spec-blind/` is a second dev container confi
 shadows `src/` with an empty tmpfs, so the implementation cannot be read. It is for authoring
 only; tests cannot run there. See `.devcontainer/README.md`.
 
-## Batch runs: orchestrator merges
+## Merge authority: orchestrator merges by default
 
-By default an executor pushes its task branch and a human merges it. The owner may grant the
-orchestrator merge authority for a named batch of tasks, in writing (a plan under
-`.agents/plans/` or the dispatch instruction). The grant is opt-in per batch, covers only that
-batch, and is never the default. Every rule under "Ask first" still applies; a task that can only
-be finished by crossing one is set `blocked`.
+The orchestrator merges a task branch into `develop` by default. No written grant is needed. The
+one precondition is a passed independent verify of the pushed branch by an agent other than the
+executor (fresh context; see § Verification is not optional).
 
-Under a grant, the orchestrator follows `.agents/README.md` § "The execution loop", including the
-orchestrator-merge steps. It never merges without a passed independent verify and never
-force-pushes. Orchestrator edits to task files are limited to these three: `task.py set-status`;
-widening a task's `touches`, with the reason recorded in the task's report; and, before
-dispatch, amending a task file with the findings of a pre-batch review, on a `docs/`
-branch.
+- An executor never merges its own work and never verifies its own change.
+- The orchestrator follows `.agents/README.md` § "The execution loop", including the merge steps.
+  It never merges without a passed independent verify and never force-pushes.
+- After the merge it reruns the full gate (`scripts/gate.sh`) on `develop`. If that is red after
+  the push, it reverts the merge as a new commit and blocks the task.
+- A task that fails verification three times is `blocked` and is not merged.
+- Orchestrator edits to task files are limited to these three: `task.py set-status`; widening a
+  task's `touches`, with the reason recorded in the task's report; and, before dispatch, amending
+  a task file with the findings of a pre-batch review, on a `docs/` branch.
+- A human decides only two kinds of case: a breaking change, and every item under "Ask first".
+  A task that can only be finished by crossing either is `blocked`.
+- Merges into `main`, release tags and releases remain human steps. This default does not cover
+  them.
+
+A **breaking change** is a change that is, or should be, marked breaking under Conventional
+Commits (`!` or a `BREAKING CHANGE:` footer): it changes a contract that downstream projects of
+this template rely on, without backward compatibility. Examples: the CLI arguments or exit codes of
+the tools under `.agents/tasks/scripts/` and `scripts/`, the task and report file schemas, hook
+behavior, and the branching or merge rules.
+
+Task files do not restate "Ask first" approvals and do not add "must not start without approval"
+clauses. This file governs.
 
 ## File boundaries
 

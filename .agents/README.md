@@ -113,13 +113,16 @@ testing contexts where a real push isn't wanted.
    report gate (see § Task lifecycle): it fails unless the task's report passes
    `report.py validate`. It finds the report in the working tree, or, when run
    on `develop` before the merge, on the task's branch.
-7. **Merge.** A human reviews and merges the branch into `develop`, per
-   `CONTRIBUTING.md`'s branching model, with the merge commit header
-   `chore(merge): merge task NNNN into develop`. Whether a PR/MR is opened
-   automatically depends on whether a git-host CLI (`gh`, `glab`, etc.) is
-   available in the environment. Where it isn't, a task ends at *branch
-   pushed, report committed*, and opening the PR/MR stays a human step, same
-   as agents never merging their own work (see `CLAUDE.md`).
+7. **Verify, resolve, merge.** The orchestrator merges the branch into `develop` by default,
+   with no per-batch grant (`CLAUDE.md` § "Merge authority: orchestrator merges by default"). It
+   does so only after a verify by an agent other than the executor has passed, per
+   § "Verify, resolve, merge" below, and with the merge commit header
+   `chore(merge): merge task NNNN into develop` (`CONTRIBUTING.md`'s branching model). A human
+   decides only a breaking change (defined in `CLAUDE.md`) and every "Ask first" item; a task that
+   needs either is `blocked`. Merges into `main`, release tags and releases remain human steps.
+   Whether a PR/MR is opened automatically depends on whether a git-host CLI (`gh`, `glab`, etc.)
+   is available in the environment. Where it isn't, no PR/MR is needed: the orchestrator merges
+   locally and pushes `develop`. Executors never merge their own work (see `CLAUDE.md`).
 8. **Clean up.** Whoever performed the merge in step 7 also removes the
    now-merged branch's worktree (`git worktree remove <path>`) and deletes
    the local branch (`git branch -d <branch>`, which refuses on an unmerged
@@ -128,19 +131,15 @@ testing contexts where a real push isn't wanted.
    the executor. `housekeep.py worktrees` (see § Housekeeping) exists to catch
    this step being skipped.
 
-### Orchestrator merges (opt-in per batch)
+### Verify, resolve, merge
 
-Merging is a human step unless the owner has granted merge authority for a
-named batch (`CLAUDE.md` § "Batch runs: orchestrator merges"). The grant is
-never the default and covers only the batch it names. When it has been
-granted, step 7 becomes:
+Step 7 runs as follows, for every task:
 
-7. **Verify, resolve, merge.**
    - A separate fresh agent verifies the pushed branch: the full gate
      (`scripts/gate.sh`), every acceptance criterion checked against the
      files, `git diff --name-only` against `touches`, and, for test changes,
      that each expected value comes from spec text. It reports every failure
-     and fixes nothing.
+     and fixes nothing. It is never the executor of the task.
    - On a failure, a fresh executor fixes the findings on the same branch and
      a new verifier checks again. After three failed rounds the task is
      `blocked` and is not merged.
