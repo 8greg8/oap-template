@@ -5,7 +5,7 @@ status: in_progress
 type: fix
 priority: low
 depends_on: []
-touches: [scripts/gitflow.sh, scripts/release.py, CONTRIBUTING.md, .agents/tasks/scripts/housekeep.py, tests/test_gitflow.py, tests/test_report_scripts.py, tests/test_hooks.py]
+touches: [scripts/gitflow.sh, scripts/release.py, scripts/README.md, CONTRIBUTING.md, .agents/tasks/scripts/housekeep.py, tests/test_gitflow.py, tests/test_report_scripts.py, tests/test_hooks.py]
 created: 2026-10-03
 report: reports/T-0011.md
 ---
