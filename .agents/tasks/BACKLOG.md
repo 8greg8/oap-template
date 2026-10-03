@@ -6,7 +6,7 @@
 
 12 task(s). Generated 2026-10-03.
 
-| open: 3 | in_progress: 1 | blocked: 0 | review: 1 | done: 7 | abandoned: 0 |
+| open: 3 | in_progress: 0 | blocked: 0 | review: 1 | done: 8 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -21,7 +21,7 @@
 | T-0007 | [Make task scripts executable](T-0007-make-task-scripts-executable.md) | done | high | fix | — | [report](reports/T-0007.md) |
 | T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
 | T-0008 | [Fix pre-commit re-staging for unusual filenames](T-0008-fix-pre-commit-re-staging-for-unusual-filenames.md) | done | medium | fix | — | [report](reports/T-0008.md) |
-| T-0012 | [Make staged-file handling NUL-safe in gate and autofix scripts](T-0012-make-staged-file-handling-nul-safe-in-gate-and.md) | in_progress | medium | fix | — | — |
+| T-0012 | [Make staged-file handling NUL-safe in gate and autofix scripts](T-0012-make-staged-file-handling-nul-safe-in-gate-and.md) | done | medium | fix | — | [report](reports/T-0012.md) |
 | T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | open | low | chore | — | — |
 | T-0010 | [Fix agent-doc wording and stale AGENTS.md references](T-0010-fix-agent-doc-wording-and-stale-agents-md.md) | open | low | docs | — | — |
 | T-0011 | [Support docs and chore task branches in gitflow and fix housekeep worktrees](T-0011-support-docs-and-chore-task-branches-in-gitflow.md) | open | low | fix | — | — |

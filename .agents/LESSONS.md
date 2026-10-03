@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-7 lesson(s) across 6 section(s). Generated 2026-10-03.
+8 lesson(s) across 7 section(s). Generated 2026-10-03.
 
 ## Tag index
 
@@ -16,25 +16,29 @@ to all lessons that carry it.
 
 - `agent-rules` — [T-0005](#t-0005-success)
 - `backlog` — [T-0002](#t-0002-success)
+- `bash` — [T-0012](#t-0012-success)
 - `commit-lint` — [T-0004](#t-0004-success)
 - `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
 - `docker` — [T-0006](#t-0006-success)
 - `docs` — [T-0005](#t-0005-success)
 - `file-modes` — [T-0007](#t-0007-success)
 - `gate` — [T-0004](#t-0004-success)
-- `git` — [T-0007](#t-0007-success)
+- `git` — [T-0007](#t-0007-success), [T-0012](#t-0012-success)
 - `git-pathspec` — [T-0008](#t-0008-success)
 - `git-publish` — [T-0002](#t-0002-success)
 - `gitflow` — [T-0004](#t-0004-success)
 - `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success)
 - `housekeep` — [T-0003](#t-0003-success)
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success)
+- `nul-safe` — [T-0012](#t-0012-success)
 - `orchestrator` — [T-0005](#t-0005-success)
 - `port` — [T-0003](#t-0003-success)
 - `pre-commit` — [T-0008](#t-0008-success)
 - `process` — [T-0005](#t-0005-success)
 - `report-validation` — [T-0003](#t-0003-success)
 - `ruff` — [T-0007](#t-0007-success)
+- `scripts` — [T-0012](#t-0012-success)
+- `staged-files` — [T-0012](#t-0012-success)
 - `task-tooling` — [T-0002](#t-0002-success)
 - `uv` — [T-0006](#t-0006-success)
 - `worktree` — [T-0002](#t-0002-success)
@@ -108,6 +112,16 @@ Source: [`reports/T-0008.md`](tasks/reports/T-0008.md)
 Tags: `report-validation`, `housekeep`, `port`
 
 Source: [`reports/T-0003.md`](tasks/reports/T-0003.md)
+
+## scripts
+
+### T-0012 (success)
+
+- `git diff --cached --name-only` without `-z` C-quotes only names with a double quote, backslash, control character or non-ASCII byte. Spaces and single quotes pass through, so a test with only those names proves nothing about quoting.
+
+Tags: `scripts`, `bash`, `git`, `nul-safe`, `staged-files`
+
+Source: [`reports/T-0012.md`](tasks/reports/T-0012.md)
 
 ## task-tooling
 

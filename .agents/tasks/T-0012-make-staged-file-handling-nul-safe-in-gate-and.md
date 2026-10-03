@@ -1,7 +1,7 @@
 ---
 id: T-0012
 title: Make staged-file handling NUL-safe in gate and autofix scripts
-status: in_progress
+status: done
 type: fix
 priority: medium
 depends_on: []
