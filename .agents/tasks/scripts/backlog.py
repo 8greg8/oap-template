@@ -79,25 +79,34 @@ def ready_tasks(tasks: Sequence[Task]) -> list[Task]:
     return sorted(candidates, key=sort_key)
 
 
-def parallel_batch(tasks: Sequence[Task], limit: int) -> list[Task]:
+def parallel_batch(
+    tasks: Sequence[Task], limit: int, active: Sequence[Task] = ()
+) -> list[Task]:
     """Select a set of ready tasks whose file scopes do not overlap.
 
-    Greedy by priority: the highest-priority ready task is always taken, then
+    Greedy by priority: the highest-priority ready task is taken first, then
     each subsequent candidate is accepted only if its ``touches`` list is
-    disjoint from every task already in the batch. This is what makes it safe to
-    run the batch as parallel worktrees without creating merge conflicts.
+    disjoint from every task already in the batch. A candidate whose ``touches``
+    overlap a task that is already ``in_progress`` or in ``review`` (not yet
+    merged) is excluded outright. This is what makes it safe to run the batch as
+    parallel worktrees without creating merge conflicts.
 
     Args:
         tasks: Candidate tasks, typically the output of :func:`ready_tasks`.
         limit: Maximum batch size.
+        active: Tasks already in flight; only those with status ``in_progress``
+            or ``review`` exclude candidates.
 
     Returns:
         A conflict-free batch of at most ``limit`` tasks.
     """
+    running = [task for task in active if task.status in ("in_progress", "review")]
     batch: list[Task] = []
     for task in tasks:
         if len(batch) >= limit:
             break
+        if any(tasks_conflict(task, other) for other in running):
+            continue
         if any(tasks_conflict(task, chosen) for chosen in batch):
             continue
         batch.append(task)
@@ -123,7 +132,7 @@ def render_backlog(tasks: Sequence[Task]) -> str:
         "",
         "# Task Backlog",
         "",
-        f"{len(ordered)} task(s). Generated {dt.datetime.now(tz=dt.timezone.utc).date().isoformat()}.",
+        f"{len(ordered)} task(s). Generated {dt.datetime.now().astimezone().date().isoformat()}.",
         "",
         "| "
         + " | ".join(f"{status}: {counts.get(status, 0)}" for status in STATUSES)
@@ -138,8 +147,9 @@ def render_backlog(tasks: Sequence[Task]) -> str:
 
     for task in ordered:
         deps = ", ".join(task.depends_on) or "—"
-        if task.report_path.exists():
-            report = f"[report](reports/{task.id}.md)"
+        report_rel = str(task.meta.get("report") or f"reports/{task.id}.md")
+        if (TASKS_DIR / report_rel).exists():
+            report = f"[report]({report_rel})"
         else:
             report = "—"
         title = f"[{task.title}]({task.path.name})"
@@ -156,7 +166,7 @@ def render_backlog(tasks: Sequence[Task]) -> str:
         for task in dispatchable:
             scope = ", ".join(f"`{item}`" for item in task.touches) or "*(unscoped)*"
             lines.append(f"- **{task.id}** {task.title} — {scope}")
-        batch = parallel_batch(dispatchable, 3)
+        batch = parallel_batch(dispatchable, 3, ordered)
         lines += [
             "",
             "Suggested conflict-free parallel batch: "
@@ -278,7 +288,7 @@ def main(argv=None):
     if args.command == "ready":
         dispatchable = ready_tasks(tasks)
         if args.parallel:
-            dispatchable = parallel_batch(dispatchable, args.parallel)
+            dispatchable = parallel_batch(dispatchable, args.parallel, tasks)
         for task in dispatchable:
             if args.verbose:
                 scope = ", ".join(task.touches) or "(unscoped)"

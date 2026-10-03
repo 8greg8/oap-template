@@ -4,6 +4,15 @@
 Run without a virtualenv; this tool is stdlib-only on purpose so it works in a
 fresh git worktree that has never been ``uv sync``-ed.
 
+``new`` files the task directly on ``develop``: it syncs the primary checkout
+to ``origin/develop``, allocates an ID, writes the file, commits, and pushes
+in one step -- no branch or worktree needed to create a task, and a
+concurrent publish from another checkout is resolved automatically by
+reallocating the next free ID and retrying (see ``_git_publish.py``). It must
+therefore be run from the primary checkout on ``develop``; pass
+``--no-publish`` to just write the file locally (e.g. for scripting/testing)
+instead.
+
 Usage:
     python .agents/tasks/scripts/task.py new --title "..." --type fix
     python .agents/tasks/scripts/task.py show T-0004
@@ -23,6 +32,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _frontmatter import FrontmatterError, serialize
+from _git_publish import PublishError, publish_task
 from _ids import allocate_id
 from _schema import (
     PRIORITIES,
@@ -105,7 +115,7 @@ def create_task(
             "priority": priority,
             "depends_on": ", ".join(item.strip().upper() for item in depends_on),
             "touches": ", ".join(item.strip() for item in touches),
-            "created": dt.datetime.now(tz=dt.timezone.utc).date().isoformat(),
+            "created": dt.datetime.now().astimezone().date().isoformat(),
             "slug": slug,
         },
     )
@@ -149,6 +159,16 @@ def _collect_problems() -> list[str]:
             problems.append(str(exc))
 
     known_ids = [task.id for task in tasks]
+    live: dict[str, str] = {}
+    for task in tasks:
+        if task.status == "abandoned":
+            continue
+        first = live.setdefault(task.id, task.path.name)
+        if first != task.path.name:
+            problems.append(
+                f"{task.path.name}: duplicate id {task.id} (also {first}); "
+                "only abandoned tasks may share an id"
+            )
     for task in tasks:
         for problem in validate_task(task, known_ids):
             problems.append(f"{task.path.name}: {problem}")
@@ -207,6 +227,15 @@ def parse_args(argv=None):
         metavar="PATH",
         help="Repo-relative paths this task will modify.",
     )
+    new.add_argument(
+        "--no-publish",
+        action="store_true",
+        help=(
+            "Write the task file locally only; skip the sync/commit/push to "
+            "develop. For scripting or testing contexts only -- the normal "
+            "flow publishes immediately."
+        ),
+    )
 
     show = sub.add_parser("show", help="Print a task file.")
     show.add_argument("id", help="Task ID, e.g. T-0004.")
@@ -237,13 +266,20 @@ def main(argv=None):
 
     try:
         if args.command == "new":
-            path = create_task(
-                title=args.title,
-                task_type=args.type,
-                priority=args.priority,
-                depends_on=args.depends_on,
-                touches=args.touches,
-            )
+
+            def _create() -> Path:
+                return create_task(
+                    title=args.title,
+                    task_type=args.type,
+                    priority=args.priority,
+                    depends_on=args.depends_on,
+                    touches=args.touches,
+                )
+
+            if args.no_publish:
+                path = _create()
+            else:
+                path = publish_task(_create)
             print(path.relative_to(TASKS_DIR.parent.parent))
             return 0
 
@@ -258,7 +294,8 @@ def main(argv=None):
 
         if args.command == "list-ids":
             for task in load_tasks():
-                print(task.id)
+                if task.status != "abandoned":
+                    print(task.id)
             return 0
 
         if args.command == "validate":
@@ -281,7 +318,7 @@ def main(argv=None):
             print("All tasks valid.")
             return 0
 
-    except (ValidationError, FrontmatterError) as exc:
+    except (ValidationError, FrontmatterError, PublishError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 
