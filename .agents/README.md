@@ -119,7 +119,7 @@ testing contexts where a real push isn't wanted.
    § "Verify, resolve, merge" below, and with the merge commit header
    `chore(merge): merge task NNNN into develop` (`CONTRIBUTING.md`'s branching model). A human
    decides only a breaking change (defined in `CLAUDE.md`) and every "Ask first" item; a task that
-   needs either is `blocked`. Merges into `main`, release tags and releases remain human steps.
+   needs either is `blocked`. This default does not extend to `main`, release tags or releases.
    Whether a PR/MR is opened automatically depends on whether a git-host CLI (`gh`, `glab`, etc.)
    is available in the environment. Where it isn't, no PR/MR is needed: the orchestrator merges
    locally and pushes `develop`. Executors never merge their own work (see `CLAUDE.md`).

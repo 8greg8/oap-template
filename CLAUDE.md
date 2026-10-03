@@ -221,8 +221,10 @@ executor (fresh context; see § Verification is not optional).
   a task file with the findings of a pre-batch review, on a `docs/` branch.
 - A human decides only two kinds of case: a breaking change, and every item under "Ask first".
   A task that can only be finished by crossing either is `blocked`.
-- Merges into `main`, release tags and releases remain human steps. This default does not cover
-  them.
+- This default covers only merging task branches into `develop`. It does not extend to `main`,
+  release tags or releases.
+- The standalone, non-task Autonomy entry above (including its `main`-bound hotfix merge) is
+  unchanged by this default.
 
 A **breaking change** is a change that is, or should be, marked breaking under Conventional
 Commits (`!` or a `BREAKING CHANGE:` footer): it changes a contract that downstream projects of
