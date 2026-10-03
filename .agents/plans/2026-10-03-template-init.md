@@ -110,8 +110,9 @@ Standard library only, like the task scripts, so it runs before any dependency i
 1. Print the full change list. `--dry-run` stops here. Otherwise ask for `--yes`.
 2. Install tooling unless `--skip-install`: `npm ci` and `uv sync`, so hooks work.
 3. Rename, as in § Names. Set the LICENSE holder and year. Regenerate `uv.lock` with `uv lock`
-   and `package-lock.json` with `npm install --package-lock-only`. Never hand-edit either. If
-   offline, print the two commands and continue.
+   and `package-lock.json` with `npm install --package-lock-only --ignore-scripts` (lock
+   regeneration needs no lifecycle scripts). Never hand-edit either. If either command fails, print
+   both commands and continue; step 8 then refuses to commit (amended 2026-10-03, T-0018).
 4. Reset task state. Remove `T-*.md` and `reports/*.md`. Remove every file in `.agents/plans/`
    and add `.agents/plans/README.md` saying owner plans and approvals go there (`CLAUDE.md` § Merge
    authority names that directory, and git does not keep an empty one). Write `0` to
@@ -125,6 +126,9 @@ Standard library only, like the task scripts, so it runs before any dependency i
 6. Remove template residue: the script and `tests/test_init_project.py`.
 7. Run `scripts/gate.sh`. Stop on red without committing.
 8. Stage everything (`git add -A`) and commit once: `chore: initialize project from OAP template`.
+   If a lock command failed in step 3, do not commit: stop here, exit non-zero, leave the tree as
+   it is, and print the failed commands and the commands to finish by hand (amended 2026-10-03,
+   T-0018).
 9. Create the missing `main` or `develop` branch at the new commit, so both branches hold the
    initialized project. Local only. The preconditions already checked that it does not exist.
 10. Print the human checklist: push both branches, set the default branch and protection on
