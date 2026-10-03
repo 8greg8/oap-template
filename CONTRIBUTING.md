@@ -58,7 +58,7 @@ time with `git push -u origin <branch>`; a bare `git push` works after that.
   repo uses. In the single-agent flow, `scripts/gitflow.sh <kind> finish <topic>` does this after
   merging (see § Agent verify/resolve workflow, step 6). In the batched orchestrator flow
   (`.agents/README.md`'s execution loop), the subagent that created the worktree is gone by the
-  time a human or orchestrator merges, so whoever performs that merge also runs
+  time the orchestrator merges, so whoever performs that merge also runs
   `git worktree remove <path>` and `git branch -d <branch>` as part of the same step. `git branch
   -d` refuses on an unmerged branch, so this is safe by construction.
 - `develop` and `main` are never checked out in a secondary worktree, only in the primary

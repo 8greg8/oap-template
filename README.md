@@ -12,12 +12,12 @@ the placeholders (`<repo_name>`, mission, architecture) for your actual reposito
 
 | File / folder | Purpose |
 |---|---|
-| [`CLAUDE.md`](CLAUDE.md) | The entry point for any coding agent working in this repo — autonomy boundaries, what needs asking first, spec-first test rules, batch-run authority, and how the task workflow below fits together. [`AGENTS.md`](AGENTS.md) is a one-line redirect to it. |
+| [`CLAUDE.md`](CLAUDE.md) | The entry point for any coding agent working in this repo — autonomy boundaries, what needs asking first, spec-first test rules, merge authority, and how the task workflow below fits together. [`AGENTS.md`](AGENTS.md) is a one-line redirect to it. |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Branching (Gitflow), commit conventions, semantic versioning, and the verify/resolve/merge workflow every change follows. |
 | [`PYTHON_CONVENTIONS.md`](PYTHON_CONVENTIONS.md) | Project layout (`uv` workspace, `src/` layout), commands, dependency management, testing, and code style. |
 | [`DEV_TOOLING_SPEC.md`](DEV_TOOLING_SPEC.md) | Spec for the `scripts/` + `.husky/` + `package.json` bundle: deterministic lint/typecheck/test gates, commit-message validation, SemVer release tagging, and Gitflow helpers — copy-pasteable into any repo. |
 | [`.agents/`](.agents/README.md) | Tooling for running work as discrete, PR-sized **tasks**: task files as work orders, reports as evidence, a generated backlog, and harvested lessons-learned memory. See `.agents/README.md`. |
-| [`.agents/plans/`](.agents/plans/) | Dated plans: the owner's written decisions and authorizations for a body of work, including any per-batch grant of orchestrator merge authority. |
+| [`.agents/plans/`](.agents/plans/) | Dated plans: the owner's written decisions and approvals for a body of work, and other task-independent notes. |
 | [`.devcontainer/`](.devcontainer/README.md) | Dev container with `uv`, Node and Claude Code, hooks installed on first boot. `.devcontainer/spec-blind/` is a second configuration that hides `src/` for authoring spec-first tests (authoring only; tests cannot run there). |
 | [`strategic_model_init_material.md`](strategic_model_init_material.md) | The full OAP reference manual this template's workflow is derived from. |
 
