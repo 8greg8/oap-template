@@ -1,0 +1,30 @@
+{
+  // Same container as ../devcontainer.json, with src/ hidden so spec-first tests can be
+  // written without reading the implementation (CLAUDE.md, "Spec-first test authoring").
+  // For authoring only: the project is not installed and tests cannot run here.
+  // Run them in the default container or on the host. The tmpfs only changes the
+  // container's view; the host's src/ is untouched.
+  "name": "proj_template (spec-blind)",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "configureZshAsDefaultShell": true,
+      "upgradePackages": true
+    },
+    "ghcr.io/devcontainers-extra/features/tmux-apt-get:1": {},
+    "ghcr.io/anthropics/devcontainer-features/claude-code:1": {}
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "workspaceFolder": "/workspace",
+  "mounts": ["type=tmpfs,target=/workspace/src"],
+  // UV_PYTHON_PREFERENCE: see ../devcontainer.json.
+  "containerEnv": {
+    "DOTFILES_REPO": "${localEnv:DOTFILES_REPO}",
+    "UV_PYTHON_PREFERENCE": "only-managed"
+  },
+  "postCreateCommand": "bash .devcontainer/postCreate.sh --blind",
+  "remoteUser": "vscode"
+}
