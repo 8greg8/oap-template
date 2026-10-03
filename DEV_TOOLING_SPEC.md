@@ -127,10 +127,12 @@ are expanded with the `${files[@]+"${files[@]}"}` guard so `set -u` does not abo
 
 ## Hooks
 
-- `pre-commit`: exits 0 when nothing is staged. Exits 0 with a message when every staged file
-  is under `.agents/` and none is under `.agents/tasks/scripts/` (task filing, status changes,
-  reports, `BACKLOG.md`). Otherwise runs `autofix.sh --staged`, re-stages only the files that
-  were already staged, then `gate.sh --staged`. Tests are left to `pre-push`.
+- `pre-commit`: exits 0 when nothing is staged. Exits 0 with a message when every staged path
+  (listed with `--no-renames`, so a rename into `.agents/` also counts its old path) is under
+  `.agents/` and none is under `.agents/tasks/scripts/` (task filing, status changes, reports,
+  `BACKLOG.md`). Otherwise runs `autofix.sh --staged`, re-stages only the files that were
+  already staged (NUL-delimited, as literal paths, so any filename works), then
+  `gate.sh --staged`. Tests are left to `pre-push`.
 - `pre-push`: reads git's `<local ref> <local sha> <remote ref> <remote sha>` lines and lists
   the files of each pushed commit (`git log --name-only --no-renames
   --diff-merges=first-parent`). It skips the gate only when every pushed commit touches
