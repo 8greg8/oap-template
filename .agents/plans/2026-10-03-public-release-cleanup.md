@@ -1,138 +1,116 @@
 # Plan: clean the repository before making it public
 
-Status: proposed. Owner decisions D1 to D4 below are open.
+Status: accepted. Tasks T-0019 and T-0020.
+
+**Owner decisions (2026-10-03, session instruction):** the method text is treated as MIT-licensed
+public material of the SLAIF project, with its funding acknowledgement. History is kept and
+rewritten (D2). The workflow-sync source project's name and the `Claude-Session:` commit trailers
+are removed as well (D3). The new repository keeps the name `oap-template` and the current one
+becomes `oap-template-archive` (D4). This is the owner's written approval for the history
+rewrite in T-0020.
 
 ## Goal
 
 The repository can be made public without exposing the owner's work email, a local filesystem
-path or the name of a private downstream project. The third-party method text is
-clearly attributed and is not covered by this repository's MIT license. This holds for every
-commit and branch, not only the current tree.
+path, the name of a private downstream project, the name of the workflow-sync source project or
+session links. The third-party method text is attributed to its author. This holds for every
+commit, not only the current tree.
+
+This plan does not quote the literals it removes. A file that quoted them would have to be
+rewritten itself. They are found in the repository as described below.
 
 ## Findings (scan of 2026-10-03)
 
 - Secrets: none. gitleaks over all 102 commits on all branches and detect-secrets over the working
   tree reported no findings.
 - Work email: all 50 owner-authored commits carry the owner's work address as author and committer.
-  The owner's private Gmail address is the intended one. The other 71 commits are authored by
+  It should be the owner's private Gmail address. The other commits are authored by
   `Claude <noreply@anthropic.com>` and stay as they are.
-- Local path: an absolute home-directory path to the `source-project` checkout appears in
-  `.agents/LESSONS.md` and `.agents/tasks/reports/T-0004.md`, and in 11 diff lines in history.
-- Downstream project name: named three times in `.agents/tasks/T-0001-*.md`, eight times in
-  history, and once in the body of commit `0b32945`.
-- Method text: `strategic_model_init_material.md` is the workshop material "Orchestrated Agentic
-  Programming" by Janez Perš, from
-  <https://edu.slaif.si/trainings/workshop-orchestrated-agentic-programming>. The file has no
-  license notice. The repository `LICENSE` (MIT, "8greg8", the owner's GitHub account) does not
-  say that it excludes this file.
+- Local path (L1): the absolute home-directory path in `.agents/LESSONS.md:139` and
+  `.agents/tasks/reports/T-0004.md:85`.
+- Downstream project name (L2): the backticked project name in
+  `.agents/tasks/T-0001-*.md` lines 25, 56 and 86, and in the body of commit `0b32945`.
+- Source project name (L3): the project named in the title of
+  `.agents/plans/2026-10-03-workflow-sync.md`. It appears 37 times in 11 files on `develop`, and
+  in commit messages. L1 contains L3.
+- Session trailers: 65 commit messages end with a `Claude-Session:` line.
+- Method text: `strategic_model_init_material.md` is "Orchestrated Agentic Programming", version
+  1.0.1, by Janez Perš, published as SLAIF workshop material at
+  <https://edu.slaif.si/trainings/workshop-orchestrated-agentic-programming>. Neither the file
+  nor the page shows a license. The page renders client-side and could not be read from the
+  session container.
 - Commit hash citations: 36 hashes of this repository's own commits are cited in task and report
-  files. Any history rewrite changes every hash, so these citations go stale.
+  files. The rewrite changes every hash.
 
-Out of scope here, unless the owner says otherwise (see D3): `source-project` as a name (98 mentions,
-mostly in the workflow-sync plan and T-0002 to T-0006), `Claude-Session:` trailers on 60
-commits, and the plan files that quote owner instructions.
+## Replacements
 
-## Approach
+The same three replacements apply to the tree (T-0019) and to all history (T-0020). Because
+they match, the rewritten `develop` tree must be identical to the `develop` tree after T-0019.
 
-Content fixes land first on `develop` as one ordinary task. Then a history rewrite produces a
-clean copy that carries the same fixes back through every commit. The rewrite is pushed to a
-new repository. The existing private repository is never force-pushed, and it stays as an
-archive.
+| Literal | Replacement |
+|---|---|
+| P1: the home-directory prefix in front of L3 inside L1, ending in `/` | `/path/to/` |
+| L2 | `downstream-project` |
+| L3 | `source-project` |
 
-### Step 1: content fixes on `develop` (one `docs` task)
+L1 therefore becomes `/path/to/source-project`. All three are plain-text rules. filter-repo
+applies plain-text rules before regex rules, so a rule must not depend on another having run
+first. A dry run showed that a regex rule for all of L1 never matched once L3 had been replaced.
 
-1. Replace the absolute path in `.agents/LESSONS.md` and `.agents/tasks/reports/T-0004.md`
-   with a generic one: "use the absolute path of the sibling checkout".
-2. Replace the downstream project name in T-0001 with "a downstream project". Keep the meaning
-   of all three sentences. The Non-goals item stays a Non-goal and is reworded only.
-3. Attribute the method text and keep it out of the MIT grant:
-   - Add a "Third-party material" section to `README.md`. It names the file, its author,
-     title, version and source URL, and states that the MIT license does not cover it.
-   - Add one line under the MIT text in `LICENSE`: "`strategic_model_init_material.md` is
-     third-party material, copyright its author, and is not covered by this license. See
-     README.md."
-   - Leave the file itself unchanged, including the author's name and email in its front
-     matter. They are the author's own attribution.
-4. Gate passes. Independent verify, then merge per `.agents/README.md`.
+## Step 1 (T-0019): fix the tree on `develop`
 
-This task touches `LICENSE`, `README.md`, `.agents/LESSONS.md`, one task file and one report.
-No `scripts/` or `[tool]` changes, so nothing is in "Ask first".
+- Apply the replacements to every tracked file that contains a literal.
+- Add `NOTICE.md`. It names the method text's file, title, version, author and source URL,
+  states that the file is included under the MIT License as public SLAIF workshop material and
+  that its copyright stays with the author, and quotes the acknowledgement: "We acknowledge the
+  support of the EC/EuroHPC JU and the Slovenian Ministry of HESI via the project SLAIF (grant
+  number 101254461)."
+- Add one line to `LICENSE` that points to `NOTICE.md` for third-party material.
+- `README.md` is not touched, because T-0018 owns it.
 
-### Step 2: rewrite history into a clean copy
+## Step 2 (T-0020): rewrite history into the new repository
 
-Run only once nothing is in flight: every task branch is merged or abandoned, and T-0015 to
-T-0018 are done or parked. A branch made before the rewrite cannot be merged into the new
-history.
+Preconditions: T-0015 to T-0019 are merged, no other task branch is open, and the owner has
+renamed this repository to `oap-template-archive` and created an empty private
+`8greg8/oap-template`.
 
-In a fresh mirror clone in a scratch directory, outside this repository:
+In a mirror clone in a scratch directory, with a mailmap and a replacements file kept outside
+the repository:
 
 ```bash
-git clone --mirror git@github.com:8greg8/oap-template.git oap-clean.git
-cd oap-clean.git
-# mailmap: maps the work address to the private address. Kept outside the repo.
-# replace.txt: maps the local path and the downstream name to their Step 1 wording.
-# Kept outside the repo, so the literals are not committed again.
-git filter-repo --mailmap ../mailmap --replace-text ../replace.txt \
-  --replace-message ../replace.txt
+git filter-repo --mailmap ../mailmap \
+  --replace-text ../replace.txt --replace-message ../replace.txt \
+  --message-callback 'import re; return re.sub(rb"\n*Claude-Session: [^\n]*", b"", message)'
 ```
 
-filter-repo updates abbreviated hashes cited in commit messages on its own, but not hashes in
-file contents. Step 3 handles those. A dry run of this command on a scratch mirror (2026-10-03,
-placeholder address) rewrote all 50 owner commits, left no match for either literal or the
-work-email domain, and gitleaks reported no leaks.
+filter-repo updates abbreviated hashes cited in commit messages on its own. A dry run of this
+exact command on a mirror of all branches (2026-10-03, placeholder address) rewrote all 50 owner
+commits and left no match for any literal or the work-email domain in contents or messages, and
+no `Claude-Session:` line in messages.
 
-Check before pushing:
-- `git log --all --format='%ae %ce' | sort -u` lists only the private address and
-  `noreply@anthropic.com`.
-- `git log --all -p` and `git log --all --format=%B` contain neither literal from
-  `replace.txt`, and neither does the work-email domain.
+Before pushing, check:
+- Author and committer addresses are only the private address and `noreply@anthropic.com`.
+- `git log --all -p` and `git log --all --format=%B` contain no literal and no work-email
+  domain, and no message line starts with `Claude-Session:`. Plan text that names the trailer is
+  expected.
 - gitleaks over the rewritten history reports no leaks.
-- The final tree of `develop` is identical to the Step 1 merge result:
-  `git diff <old develop> <new develop>` is empty.
+- `git diff <old develop> <new develop>` is empty.
 
-### Step 3: publish
+Then push `main` and `develop` only. Then one commit on `develop` maps the 36 cited hashes from
+old to new using `filter-repo/commit-map`, and the scan above is re-run on the new repository.
 
-1. Rename the current repository to `oap-template-archive` (stays private).
-2. Create a new, empty, private `8greg8/oap-template` and push `main` and `develop` from the
-   rewritten mirror. Do not push merged task branches.
-3. Add one commit on `develop` that rewrites the 36 cited hashes in task and report files from
-   old to new, using `filter-repo/commit-map` from Step 2. Merge `develop` into `main`, or point
-   `main` at it, per the template-init plan's decision 1.
-4. Apply the GitHub settings from the template-init plan: default branch, template flag.
-5. Re-run the scan from this plan on the new repository. Only then switch it to public.
+## Step 3 (owner): publish
 
-### Step 4: stop it recurring
-
-- The owner sets `git config --global user.email` to the private address on every machine
-  that commits here. Sessions that commit as Claude are unaffected.
-- Optional: enable GitHub's "Block command line pushes that expose my email" and use the
-  GitHub noreply address.
-
-## Alternative: single-commit copy
-
-Push one squashed commit of the Step 1 `develop` tree to the new repository instead of the
-rewritten history. It is simpler, and Step 3.3 is not needed. But the task and report files
-then cite commits that do not exist anywhere public, and the record of how the template was
-built is lost. Use this only if D2 is "no history".
-
-## Owner decisions
-
-- **D1. Method text.** Republishing it publicly needs the author's permission or a license that
-  allows it. This could not be checked from here, because the workshop site was unreachable. If
-  neither exists, drop the file from the clean copy (add `--path
-  strategic_model_init_material.md --invert-paths` to Step 2) and link to the workshop page
-  instead. Recommended: ask the author, and hold Step 3.5 until it is settled.
-- **D2. History.** Rewritten history (recommended, Steps 2 and 3) or a single commit
-  (Alternative).
-- **D3. Further scrubbing.** Keep `source-project` mentions and `Claude-Session:` trailers as they
-  are (recommended), or add them to `replace.txt`. Stripping trailers needs a message callback,
-  not `--replace-message`.
-- **D4. Repository name.** The new repository keeps the name `oap-template` and the old one
-  becomes `oap-template-archive` (recommended), or the new one gets a new name.
+1. Apply the GitHub settings from the template-init plan (default branch, template flag).
+2. Switch `oap-template` to public. `oap-template-archive` stays private.
+3. Set `git config --global user.email` to the private address on every machine that commits
+   here. Optionally enable "Block command line pushes that expose my email".
+4. Re-clone. Local clones of the old repository cannot be pulled into the new one.
 
 ## Risks
 
-- A history rewrite cannot be undone once the new repository is public. Forks and caches keep
-  whatever was public. Step 3.5 is the last point where it can be fixed cheaply.
-- Every hash changes. Local clones of the old repository must be re-cloned from the new one, not
-  pulled.
+- After the switch to public, forks and caches keep whatever was public. The scan before the
+  switch is the last cheap fix point.
+- A task branch made before the rewrite cannot be merged into the new history.
+- Sessions add `Claude-Session:` trailers to new commits by default. Unless a rule says
+  otherwise, commits made after the rewrite carry them again.
