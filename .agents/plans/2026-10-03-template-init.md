@@ -1,7 +1,8 @@
 # Plan: make the repo usable as a template (init script)
 
-Status: proposed. Nothing in this plan is built. It needs the owner's decisions in § Decisions
-before the tasks are filed. Amended 2026-10-03 after review: § Review changes lists what changed.
+Status: proposed. Nothing in this plan is built. It needs the owner's decisions in
+§ Decisions for the owner before the tasks are filed. Amended 2026-10-03 after review;
+§ Review changes lists what changed.
 
 ## Goal
 
@@ -83,7 +84,8 @@ python init_project.py --name "My Project" --package my_project \
 Standard library only, like the task scripts, so it runs before any dependency is installed.
 
 **Preconditions (refuse with a clear message):**
-- Working tree clean, on `develop` or `main`, and `origin` set.
+- Working tree clean, with no untracked files (the undo's `git clean -fd` would delete them), on
+  `develop` or `main`, and `origin` set.
 - `src/proj_template/` still exists, so the script has not run before.
 - `--package` is a valid lowercase Python identifier and differs from `proj_template`.
 - The branch step 9 would create (`main` or `develop`) does not exist yet, locally or on `origin`.
@@ -129,8 +131,8 @@ Standard library only, like the task scripts, so it runs before any dependency i
 - Every file it removes is listed in the dry run first.
 - Before the commit (step 8) it stages nothing: files are moved and written with plain file
   operations, not `git mv` or `git add`.
-- On any failure before step 8, it exits non-zero and has created no branch or commit. The message
-  prints the undo command:
+- On any failure before or during step 8, it exits non-zero and has created no branch or
+  commit. The message prints the undo command:
   `git restore --source=HEAD --staged --worktree . && git clean -fd && rm -rf src/<package>`.
   The `rm` removes the new package directory, which can survive `git clean -fd` because the gate
   run leaves an ignored `__pycache__/` in it. Installed dependencies (`node_modules/`, `.venv/`)
