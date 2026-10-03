@@ -64,9 +64,11 @@ run_gate() {
     fi
 }
 
-# staged_files: staged paths (added, copied, modified, renamed) matching STAGED_GLOB.
+# staged_files: staged paths (added, copied, modified, renamed) matching STAGED_GLOB, each
+# followed by a NUL. Without -z git C-quotes names holding a quote or non-ASCII character, and a
+# newline in a name would split it. Read the output with `while IFS= read -r -d '' f`.
 staged_files() {
-    git diff --cached --name-only --diff-filter=ACMR -- "${STAGED_GLOB:-*}"
+    git diff --cached -z --name-only --diff-filter=ACMR -- "${STAGED_GLOB:-*}"
 }
 
 # run_on_files <name> <command-string> [files...]: run_gate with the files appended as

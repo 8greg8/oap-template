@@ -29,7 +29,7 @@ cd "$(repo_root)"
 # ${files[@]+...} guard used below.
 files=()
 if [[ "$staged" == true ]]; then
-    while IFS= read -r f; do files+=("$f"); done < <(staged_files)
+    while IFS= read -r -d '' f; do files+=("$f"); done < <(staged_files)
     if [[ ${#files[@]} -eq 0 ]]; then
         ok "no staged files match $STAGED_GLOB -- nothing to check"
         exit 0

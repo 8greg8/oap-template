@@ -26,7 +26,7 @@ cd "$(repo_root)"
 # Bash 3.2: no mapfile; empty arrays are expanded with the ${files[@]+...} guard.
 files=()
 if [[ "$staged" == true ]]; then
-    while IFS= read -r f; do files+=("$f"); done < <(staged_files)
+    while IFS= read -r -d '' f; do files+=("$f"); done < <(staged_files)
     [[ ${#files[@]} -gt 0 ]] || { ok "no staged files match $STAGED_GLOB"; exit 0; }
 fi
 
