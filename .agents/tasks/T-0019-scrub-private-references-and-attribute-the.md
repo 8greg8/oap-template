@@ -35,7 +35,7 @@ matches it byte for byte.
     `.agents/LESSONS.md`, tasks T-0002 to T-0006 and reports T-0002 to T-0005.
   - L3u, L3 with the hyphen written as an underscore: `.agents/plans/2026-10-03-workflow-sync.md:129`.
   - L3s, the lowercase two-letter abbreviation of L3 as a whole word (for example `L3s:CLAUDE.md`,
-    `L3s's`): about 74 occurrences in 8 of those 11 files. L3V, its uppercase form, is a shell
+    `L3s's`): about 71 occurrences, plus 3 of L3V, in 8 of those 11 files. L3V, its uppercase form, is a shell
     variable at `.agents/plans/2026-10-03-workflow-sync.md` lines 315, 317 and 320.
   - L3t, the test function name at `tests/test_report_scripts.py:287`, which embeds L3s between
     underscores. Nothing else references it.
