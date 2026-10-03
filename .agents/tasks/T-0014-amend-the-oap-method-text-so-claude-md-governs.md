@@ -1,7 +1,7 @@
 ---
 id: T-0014
 title: Amend the OAP method text so CLAUDE.md governs merge authority
-status: open
+status: in_progress
 type: docs
 priority: medium
 depends_on: []
@@ -18,49 +18,55 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+`strategic_model_init_material.md` (the OAP method text) no longer contradicts this repository's merge rules. Where the text treats every merge as a human decision, it says that a project's `CLAUDE.md` governs, and that in this repository the orchestrator merges task branches into `develop` by default.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Owner instruction, 2026-10-03: "Amend the method text; CLAUDE.md governs". It follows T-0013, which made orchestrator merge into `develop` the default (`CLAUDE.md` § "Merge authority: orchestrator merges by default").
+- T-0013's report records the conflict: line 1917 ("Approval gates") lists "merge to protected branches" as a human approval, and line 2641 says "treat every merge as a human decision".
+- Other lines in the method text that mention human merge authority or merge decisions, to check: 1624, 1717, 2606, 2684, 2685, 2918. Lines 576, 725, 1123, 2794 say the agent must not merge its own PR; they stay true.
+- The file is ~3100 lines, mostly general doctrine. Re-check every line cited against the file and report any discrepancy.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- Add one short note, in the place a reader meets the human gates first (near "Approval gates" or the doctrine chapter, executor's choice), saying: this text is general doctrine; a project's `CLAUDE.md` governs where it differs; in this repository `CLAUDE.md` lets the orchestrator merge verified task branches into `develop` by default, with a human deciding only breaking changes and "Ask first" items, and merges into `main`, tags and releases staying human.
+- Amend each sentence that states a merge into `develop` always needs a human (line 2641 and any other found among the lines above) so it reads as the general default with that override, without weakening the rule that an agent never merges its own work or verifies its own change.
+- Keep the "Approval gates" list as the general doctrine, adding only a pointer to the note.
+- Keep the document's style and length discipline: no new section longer than a short paragraph.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change `CLAUDE.md`, `.agents/`, `CONTRIBUTING.md`, `README.md`, scripts, hooks or tests.
+- Do not rewrite the method's doctrine, its failure-mode chapter, or any guidance on human review of evidence beyond the sentences named in Scope.
+- Do not remove the statements that an agent never merges its own PR.
+- Do not reformat the file or touch its front matter, bibliography or build directives.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `strategic_model_init_material.md`, around the lines named in Context
+- `CLAUDE.md` § "Merge authority: orchestrator merges by default" (read only)
+- `.agents/tasks/reports/T-0013.md` (read only)
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+Docs only. After the change, no sentence in `strategic_model_init_material.md` says that a merge into `develop` must always be a human decision, and the file states once that a project's `CLAUDE.md` governs. The agent-never-merges-its-own-work statements are unchanged.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+Run `scripts/gate.sh` and `python .agents/tasks/scripts/task.py validate`. Run `grep -n -i "every merge\|merge to protected\|merge authority\|merge decision" strategic_model_init_material.md` and report each hit with a judgment. If the file has a build or link check, run it; otherwise report `not run`.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason.
+The changed method text is the deliverable.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] The file states once that a project's `CLAUDE.md` governs where it differs from the general doctrine, and names this repository's rule.
+- [ ] No sentence says a merge into `develop` must always be a human decision.
+- [ ] Every line named in Context is checked, and each is amended or judged still correct in the report.
+- [ ] The agent-never-merges-its-own-work statements are unchanged.
+- [ ] Only `strategic_model_init_material.md` and the report change.
+- [ ] `scripts/gate.sh` passes.
 
 ## Workflow
 
