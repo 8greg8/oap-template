@@ -53,9 +53,9 @@ them is `scripts/config/gate.sh`.
 ```
 package.json                # minimal: husky devDependency + "prepare" script only
 .husky/
-  pre-commit                 # scripts/autofix.sh --check-only=false, then scripts/gate.sh
+  pre-commit                 # staged files only, no tests: autofix.sh --staged, re-stage, gate.sh --staged
   commit-msg                 # scripts/commit_lint.py "$1"
-  pre-push                   # scripts/gate.sh
+  pre-push                   # full scripts/gate.sh; skipped when every pushed commit is .agents/ records
 scripts/
   README.md                  # how to install this bundle into a new/existing repo
   config/
@@ -113,6 +113,34 @@ Stops at the first failing gate (fail-fast) and exits non-zero. Exit 0 only when
 This is what `pre-push` runs, what the verify/resolve loop's independent verifier runs, and what a
 CI job would run — one script, one source of truth.
 
+Flags:
+
+- `--fast` skips `TEST_CMD`. Never the final check.
+- `--staged` runs lint, format check and typecheck on the staged files that match
+  `STAGED_GLOB` (a pathspec in `scripts/config/gate.sh`, default `*.py`), and never runs tests.
+  It exits 0 when no staged file matches. `LINT_CMD`, `FORMAT_CHECK_CMD`, `TYPECHECK_CMD` and
+  the `*_FIX_CMD`s therefore must accept file paths as trailing arguments; with no arguments
+  they check the whole repo. `pre-commit` uses this mode.
+
+`gate.sh` and `autofix.sh` run under bash 3.2 (macOS default): no `mapfile`, and empty arrays
+are expanded with the `${files[@]+"${files[@]}"}` guard so `set -u` does not abort.
+
+## Hooks
+
+- `pre-commit`: exits 0 when nothing is staged. Exits 0 with a message when every staged file
+  is under `.agents/` and none is under `.agents/tasks/scripts/` (task filing, status changes,
+  reports, `BACKLOG.md`). Otherwise runs `autofix.sh --staged`, re-stages only the files that
+  were already staged, then `gate.sh --staged`. Tests are left to `pre-push`.
+- `pre-push`: reads git's `<local ref> <local sha> <remote ref> <remote sha>` lines and lists
+  the files of each pushed commit (`git log --name-only --no-renames
+  --diff-merges=first-parent`). It skips the gate only when every pushed commit touches
+  nothing but `.agents/` and nothing under `.agents/tasks/scripts/`. A deleted ref pushes no
+  commits. A new remote branch, or a range git cannot list, always runs the full
+  `gate.sh`.
+- `commit-msg`: `commit_lint.py`, below.
+
+Code under `.agents/tasks/scripts/` is tooling, not a record, so it never takes the skip.
+
 ## `scripts/autofix.sh`
 
 Runs `LINT_FIX_CMD` then `FORMAT_FIX_CMD` — the safe, deterministic auto-corrections (not
@@ -128,15 +156,18 @@ message file). Stdlib-only Python, no `npm` commit-lint dependency needed. Enfor
 
 - Header matches `^(?P<type>\w+)(\((?P<scope>[^)]+)\))?(?P<bang>!)?: (?P<subject>.+)$`.
 - `type` is one of: `feat fix docs style refactor perf test build ci chore revert`.
-- `subject` is non-empty, does not end with a period, and the header is ≤100 chars.
+- `subject` is non-empty, does not end with a period, and every line (header, body, footer) is
+  ≤100 chars. Everything below git's scissors line (`# ------ >8 ------`, written by
+  `git commit -v`) is ignored, because the hook sees the file before git strips it.
 - If `bang` (`!`) is present, the message body must contain a `BREAKING CHANGE:` footer — enforces
   `CONTRIBUTING.md`'s rule that breaking changes are marked both ways, not just one.
 - If the body contains a `BREAKING CHANGE:` footer, `bang` must also be present (same rule, other
   direction).
 - Git's own auto-generated merge commit messages (`Merge branch 'x' into y`, `Merge pull request
-  #N ...`) are exempt — they don't follow Conventional Commits and aren't meant to (same
-  convention `commitlint` uses by default). Without this exemption, `gitflow.sh`'s `finish`
-  subcommands couldn't complete a merge.
+  #N ...`) stay exempt for merges git writes itself (same convention `commitlint` uses by
+  default). This repo's own merges, made by `gitflow.sh finish`, use the Conventional form
+  `chore(merge): merge task NNNN into develop` (for a `<type>/T-NNNN-<slug>` branch) or
+  `chore(merge): merge <branch> into <base>`; they are linted like any other commit.
 
 Exits non-zero with a specific, actionable message (which rule failed, what was found) on any
 violation — Husky then blocks the commit.
@@ -196,6 +227,11 @@ scripts/gitflow.sh hotfix finish <topic>   # merge into main, back-merge main in
 
 `finish` subcommands refuse to run if `scripts/gate.sh` fails on the branch being merged — the gate
 is not bypassable through the gitflow helper.
+
+`finish` writes the merge commit with `merge_message` (in `scripts/lib/common.sh`):
+`chore(merge): merge task NNNN into <base>` for a `<type>/T-NNNN-<slug>` branch, otherwise
+`chore(merge): merge <branch> into <base>`; the hotfix back-merge uses the second form. The
+task form is what `.agents/tasks/scripts/report.py` looks up to find a task's merge commit.
 
 ## How this composes with the existing verify/resolve loop
 

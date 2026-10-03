@@ -8,13 +8,15 @@ Rules enforced (see CONTRIBUTING.md § Commits):
   - Header matches: type(scope)!: subject
   - type is one of the Conventional Commits types below.
   - subject is non-empty and does not end with a period.
-  - Header line is <=100 chars.
+  - Header, body and footer lines are each <=100 chars.
+  - Everything below git's scissors line (`git commit -v`) is ignored.
   - If the header has `!`, the body must contain a `BREAKING CHANGE:` footer, and vice versa --
     a breaking change must be marked both ways, never just one.
 
 Git's own auto-generated merge commit messages ("Merge branch 'x' into y", "Merge pull request
-#N ...") are exempt -- they don't follow Conventional Commits and aren't meant to; this matches
-commitlint's default behavior.
+#N ...") stay exempt for merges git writes itself; this matches commitlint's default behavior.
+This repo's own merges (scripts/gitflow.sh) use the Conventional form
+`chore(merge): merge task NNNN into develop`, which is linted like any other header.
 """
 
 from __future__ import annotations
@@ -44,18 +46,29 @@ HEADER_RE = re.compile(
     r"^(?P<type>[a-zA-Z]+)(\((?P<scope>[^)]+)\))?(?P<bang>!)?: (?P<subject>.+)$"
 )
 MAX_HEADER_LEN = 100
+MAX_LINE_LEN = 100
+SCISSORS_RE = re.compile(r"^# -+ >8 -+$")
 
 
 def strip_comments(message: str) -> str:
-    """Drop Git's `# ...` comment lines (left by `-v`/verbose commit templates).
+    """Drop Git's `# ...` comment lines and everything below its scissors line.
+
+    `git commit -v` appends the staged diff below a scissors line; the commit-msg hook sees
+    the file before git strips it, and the diff's long lines must not be linted.
 
     Args:
         message: Raw commit message file contents.
 
     Returns:
-        The message with comment lines removed.
+        The message with comment lines and the scissors section removed.
     """
-    return "\n".join(line for line in message.splitlines() if not line.startswith("#"))
+    kept: list[str] = []
+    for line in message.splitlines():
+        if SCISSORS_RE.match(line):
+            break
+        if not line.startswith("#"):
+            kept.append(line)
+    return "\n".join(kept)
 
 
 def lint(message: str) -> list[str]:
@@ -79,6 +92,13 @@ def lint(message: str) -> list[str]:
         errors.append(
             f"header is {len(header)} chars, must be <= {MAX_HEADER_LEN}: {header!r}"
         )
+
+    for number, line in enumerate(lines[1:], start=2):
+        if len(line) > MAX_LINE_LEN:
+            errors.append(
+                f"line {number} is {len(line)} chars, must be <= {MAX_LINE_LEN}: "
+                f"{line[:40]!r}..."
+            )
 
     match = HEADER_RE.match(header)
     if not match:

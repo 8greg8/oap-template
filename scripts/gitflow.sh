@@ -70,12 +70,12 @@ finish() {
 
     section "merging $branch into $base"
     git checkout "$base"
-    git merge --no-ff "$branch" -m "Merge branch '$branch' into $base"
+    git merge --no-ff "$branch" -m "$(merge_message "$branch" "$base")"
 
     if [[ "$kind" == "hotfix" ]]; then
         section "back-merging $MAIN_BRANCH into $DEVELOP_BRANCH"
         git checkout "$DEVELOP_BRANCH"
-        git merge --no-ff "$MAIN_BRANCH" -m "Merge branch '$MAIN_BRANCH' into $DEVELOP_BRANCH"
+        git merge --no-ff "$MAIN_BRANCH" -m "$(merge_message "$MAIN_BRANCH" "$DEVELOP_BRANCH")"
         warn "remember: scripts/release.py to tag $MAIN_BRANCH per CONTRIBUTING.md § Versioning"
     fi
 
