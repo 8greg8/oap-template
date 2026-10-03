@@ -18,49 +18,50 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+The agent docs say one consistent thing about who may edit task files, the hand-written task-branch command does not break a bare `git push`, and `DEV_TOOLING_SPEC.md` no longer cites `AGENTS.md` for rules that now live in `CLAUDE.md`.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- T-0005's independent verify (2026-10-03) found: `CLAUDE.md` (Batch runs section) says the orchestrator "never edits a task file except through `task.py set-status`", while `.agents/README.md` (orchestrator-merge steps) lets it widen a task's `touches` and record why, and the pre-batch review step amends task files.
+- `CONTRIBUTING.md` (Worktrees for agents) gives `git worktree add ... -b <type>/T-NNNN-<slug> origin/develop`. Branching from a remote-tracking ref sets the upstream to `origin/develop`; with `push.default=simple` a bare `git push` then refuses. Untested; reproduce before changing.
+- `DEV_TOOLING_SPEC.md` lines 7, 45, 203 and 241 cite `AGENTS.md` for the Ask-first and verification rules. `AGENTS.md` is now a redirect to `CLAUDE.md`.
+- Re-check each against current files and report any discrepancy.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- Reconcile the wording in `CLAUDE.md` and `.agents/README.md` so the permitted orchestrator edits to task files are listed once and identically.
+- Reproduce the upstream-tracking problem in a scratch repo; if real, add `--no-track` (or `git push -u origin <branch>`) to the command in `CONTRIBUTING.md`, and say so in the report.
+- Replace the four `AGENTS.md` citations in `DEV_TOOLING_SPEC.md` with `CLAUDE.md`.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change `scripts/release.py` (its line-4 docstring also cites `AGENTS.md`); `scripts/` is human-gated and needs the owner's explicit approval as a separate task.
+- Do not change any rule's meaning, including the Ask-first list.
+- Do not edit code, hooks, `pyproject.toml` or any task file.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `CLAUDE.md`, `.agents/README.md`, `CONTRIBUTING.md`, `DEV_TOOLING_SPEC.md`
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+Docs only. Every changed sentence keeps its previous meaning except the two corrected inconsistencies.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+Run `scripts/gate.sh` and `python .agents/tasks/scripts/task.py validate`. Show the reproduction of the push behavior with exact commands and output.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason.
+The changed docs are the deliverable.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] `CLAUDE.md` and `.agents/README.md` list the same orchestrator edits to task files.
+- [ ] The push-tracking behavior is reproduced or shown not to occur, and `CONTRIBUTING.md` matches the finding.
+- [ ] `grep -n AGENTS.md DEV_TOOLING_SPEC.md` returns nothing.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches` plus the report.
 
 ## Workflow
 

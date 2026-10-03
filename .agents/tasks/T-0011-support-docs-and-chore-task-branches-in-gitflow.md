@@ -18,49 +18,54 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+`scripts/gitflow.sh` can start and finish `docs/`, `chore/` and `fix/` task branches, not only `feat/`, `bugfix/` and `hotfix/`, and `housekeep.py worktrees` no longer calls a branch with no commits merged.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- T-0005's independent verify found `gitflow.sh` derives the branch from the kind (feat/bugfix/hotfix), so it cannot start or finish a `docs/` task branch. `CONTRIBUTING.md` (Worktrees for agents) documents a hand-written `git worktree add` fallback and says nothing else changes about finish, which is misleading.
+- `merge_message` in `scripts/lib/common.sh` already handles any `<type>/T-NNNN-` branch name.
+- `housekeep.py`'s `is_branch_merged` is ancestor-based, so a branch tip equal to `develop` counts as merged; T-0005's own worktree was flagged before its first commit.
+- Re-check both against current code and report any discrepancy.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- `scripts/gitflow.sh`: add task-branch kinds (`docs`, `chore`, `fix`) to start and finish, using `merge_message`, without changing the existing three kinds.
+- `housekeep.py worktrees`: treat a branch with no commits ahead of `develop` as not merged.
+- Tests: a gitflow test using a scratch repo and bare remote, and a `housekeep` test for the empty-branch case, each failing before the change.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change hooks, `scripts/gate.sh`, `scripts/autofix.sh`, `scripts/commit_lint.py`, `scripts/release.py`, CI or `pyproject.toml`.
+- Do not change merge-commit message formats.
+- Do not edit docs; if `CONTRIBUTING.md` needs updating, say so in the report for a separate docs task.
+- This task edits `scripts/gitflow.sh`, which is human-gated under CLAUDE.md: the executor must not start without the owner's explicit approval recorded in the dispatch instruction, and must stop and ask if the change grows beyond branch-kind handling.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `scripts/gitflow.sh`, `scripts/lib/common.sh`
+- `.agents/tasks/scripts/housekeep.py`
+- `tests/test_report_scripts.py`, `tests/test_hooks.py`
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+`gitflow.sh <kind> start <name>` and `finish` work for the new kinds with the same worktree, symlink and hook behavior as `feat`. An empty branch is not reported merged. Scripts run under bash 3.2.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+New gitflow and housekeep tests, each shown failing before and passing after. Run `scripts/gate.sh`. If Docker is available, also run the new paths under `docker run bash:3.2`.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason.
+None in this task; report the needed `CONTRIBUTING.md` change.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] `gitflow.sh` starts and finishes a `docs/T-NNNN-x` branch end to end in a scratch repo.
+- [ ] Existing `feat`, `bugfix` and `hotfix` behavior is unchanged.
+- [ ] A branch with no commits ahead of `develop` is not reported merged by `housekeep.py worktrees`.
+- [ ] New tests failed before the change and pass after.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches` plus the report.
 
 ## Workflow
 
