@@ -7,15 +7,20 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-8 entr(ies) across 8 tag(s). Generated 2026-10-03.
+13 entr(ies) across 13 tag(s). Generated 2026-10-03.
 
 ## Tags
 
 - [`backlog`](#backlog) — 1 entr(ies)
+- [`commit-lint`](#commit-lint) — 1 entr(ies)
 - [`devcontainer`](#devcontainer) — 1 entr(ies)
 - [`file-modes`](#file-modes) — 1 entr(ies)
+- [`gate`](#gate) — 1 entr(ies)
 - [`git`](#git) — 1 entr(ies)
 - [`git-publish`](#git-publish) — 1 entr(ies)
+- [`gitflow`](#gitflow) — 1 entr(ies)
+- [`hooks`](#hooks) — 1 entr(ies)
+- [`husky`](#husky) — 1 entr(ies)
 - [`ruff`](#ruff) — 1 entr(ies)
 - [`task-tooling`](#task-tooling) — 1 entr(ies)
 - [`worktree`](#worktree) — 1 entr(ies)
@@ -28,6 +33,15 @@ starting — these are repo-specific traps that already cost someone time.
 - Worktree-isolated Bash refuses commands whose text mentions git alongside other constructs; run git commands as separate plain calls and put multi-line Python in a scratchpad file.
 
 Source: [`reports/T-0002.md`](tasks/reports/T-0002.md)
+
+## commit-lint
+
+### T-0004 (success)
+
+- A worktree shares `core.hooksPath` with the primary checkout, so hooks run from the primary checkout's `.husky/_` (files from the checked-out branch there), not the worktree's edited hooks.
+- The sibling `../source-project` path does not resolve from inside `.claude/worktrees/<id>/`; use the absolute path `/path/to/source-project`.
+
+Source: [`reports/T-0004.md`](tasks/reports/T-0004.md)
 
 ## devcontainer
 
@@ -47,6 +61,15 @@ Source: [`reports/T-0007.md`](tasks/reports/T-0007.md)
 
 Source: [`reports/T-0007.md`](tasks/reports/T-0007.md)
 
+## gate
+
+### T-0004 (success)
+
+- A worktree shares `core.hooksPath` with the primary checkout, so hooks run from the primary checkout's `.husky/_` (files from the checked-out branch there), not the worktree's edited hooks.
+- The sibling `../source-project` path does not resolve from inside `.claude/worktrees/<id>/`; use the absolute path `/path/to/source-project`.
+
+Source: [`reports/T-0004.md`](tasks/reports/T-0004.md)
+
 ## git
 
 ### T-0007 (success)
@@ -64,6 +87,33 @@ Source: [`reports/T-0007.md`](tasks/reports/T-0007.md)
 - Worktree-isolated Bash refuses commands whose text mentions git alongside other constructs; run git commands as separate plain calls and put multi-line Python in a scratchpad file.
 
 Source: [`reports/T-0002.md`](tasks/reports/T-0002.md)
+
+## gitflow
+
+### T-0004 (success)
+
+- A worktree shares `core.hooksPath` with the primary checkout, so hooks run from the primary checkout's `.husky/_` (files from the checked-out branch there), not the worktree's edited hooks.
+- The sibling `../source-project` path does not resolve from inside `.claude/worktrees/<id>/`; use the absolute path `/path/to/source-project`.
+
+Source: [`reports/T-0004.md`](tasks/reports/T-0004.md)
+
+## hooks
+
+### T-0004 (success)
+
+- A worktree shares `core.hooksPath` with the primary checkout, so hooks run from the primary checkout's `.husky/_` (files from the checked-out branch there), not the worktree's edited hooks.
+- The sibling `../source-project` path does not resolve from inside `.claude/worktrees/<id>/`; use the absolute path `/path/to/source-project`.
+
+Source: [`reports/T-0004.md`](tasks/reports/T-0004.md)
+
+## husky
+
+### T-0004 (success)
+
+- A worktree shares `core.hooksPath` with the primary checkout, so hooks run from the primary checkout's `.husky/_` (files from the checked-out branch there), not the worktree's edited hooks.
+- The sibling `../source-project` path does not resolve from inside `.claude/worktrees/<id>/`; use the absolute path `/path/to/source-project`.
+
+Source: [`reports/T-0004.md`](tasks/reports/T-0004.md)
 
 ## ruff
 
