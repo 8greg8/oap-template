@@ -137,7 +137,7 @@ def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
 
 
 def check_package_name(package: str) -> None:
-    """Refuse a `--package` that is not a lowercase Python identifier or is the template's.
+    """Refuse a `--package` that is not a lowercase identifier, edges on `_`, or is the template's.
 
     Args:
         package: The value of `--package`.
@@ -152,6 +152,11 @@ def check_package_name(package: str) -> None:
     ):
         raise PreconditionError(
             f"--package {package!r} is not a valid lowercase Python identifier"
+        )
+    if package.startswith("_") or package.endswith("_"):
+        raise PreconditionError(
+            f"--package {package!r} must not start or end with an underscore "
+            "(the derived distribution name would be invalid)"
         )
     if package == TEMPLATE_PACKAGE:
         raise PreconditionError(f"--package must differ from {TEMPLATE_PACKAGE}")
@@ -424,7 +429,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument("--yes", action="store_true", help="Apply the changes.")
     parser.add_argument(
-        "--skip-install", action="store_true", help="Skip `npm ci` and `uv sync`."
+        "--skip-install",
+        action="store_true",
+        help=(
+            "Skip `npm ci` and `uv sync`. The lock commands still run; without installed "
+            "dependencies they may fail and are then printed."
+        ),
     )
     return parser.parse_args(argv)
 
