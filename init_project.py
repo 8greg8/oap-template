@@ -9,9 +9,9 @@ Run once, from the primary checkout of a repository made from the template:
 Standard library only, so it runs before any dependency is installed. It never pushes, tags or
 stages anything: files are moved and written with plain file operations.
 
-This version covers plan steps 1 to 4: the change list, the tooling install, the rename, and the
-task state reset. Later steps (seeding, self-removal, gate, commit, branch, checklist) are added to
-`STEPS`.
+This version covers plan steps 1 to 5: the change list, the tooling install, the rename, the
+task state reset, and the seeded project files. Later steps (self-removal, gate, commit, branch,
+checklist) are added to `STEPS`.
 """
 
 from __future__ import annotations
@@ -40,6 +40,12 @@ DEVCONTAINER = ".devcontainer/devcontainer.json"
 DEVCONTAINER_SPEC_BLIND = ".devcontainer/spec-blind/devcontainer.json"
 LICENSE = "LICENSE"
 TEST_FILES = ("tests/test_greet.py", "tests/test_farewell.py")
+README = "README.md"
+CLAUDE_MD = "CLAUDE.md"
+SPEC_README = "docs/spec/README.md"
+SMOKE_TEST = "tests/test_smoke.py"
+# The `## Project` section goes directly before this heading, the first `##` of the template.
+PROJECT_SECTION_ANCHOR = "## Working unit: the task"
 
 TASKS_DIR = ".agents/tasks"
 REPORTS_DIR = f"{TASKS_DIR}/reports"
@@ -54,6 +60,57 @@ PLANS_README_TEXT = (
     "`CLAUDE.md` § Merge authority names `.agents/plans/` as the place for the owner's "
     "written approvals.\n"
 )
+
+README_TEXT = """\
+# {display}
+
+{description}
+
+## Where to start
+
+- [`CLAUDE.md`](CLAUDE.md): the entry point for coding agents, with the project's mission,
+  architecture and rules.
+- [`.agents/README.md`](.agents/README.md): the task, report and backlog workflow.
+
+## Checks
+
+Run the gate before every commit:
+
+```bash
+scripts/gate.sh
+```
+"""
+PROJECT_SECTION_TEXT = """\
+## Project
+
+**{display}.** {description}
+
+<!-- Mission: why this project exists, who it serves, and what success looks like. -->
+
+<!-- Architecture: the main components, how they fit together, and the key design decisions. -->
+
+<!-- Domain terms: the words this project uses with a specific meaning, one definition each. -->
+
+"""
+SPEC_README_TEXT = """\
+# Specification
+
+The specification for this project lives in this directory.
+
+The spec-first test rule in `CLAUDE.md` ("Spec-first test authoring") reads from it: when a
+task derives behavior from the specification, the files here are the source of truth, ahead of
+the code under `src/`.
+"""
+PACKAGE_INIT_TEXT = '"""The `{package}` package."""\n'
+SMOKE_TEST_TEXT = """\
+\"\"\"Smoke test: the package imports.\"\"\"
+
+import {package}
+
+
+def test_package_imports() -> None:
+    assert {package}.__name__ == "{package}"
+"""
 
 # The task scripts regenerate the two derived files; they run as subprocesses in the copy.
 REGENERATE_COMMANDS: tuple[tuple[str, ...], ...] = (
@@ -276,7 +333,13 @@ def plan_changes(ctx: Context) -> list[str]:
         f"write  {COUNTER_FILE}: 0",
         f"regen  {BACKLOG_FILE} via `backlog.py reindex`",
         f"regen  {LESSONS_FILE} via `report.py harvest`",
+        f"replace {README}: fresh project README titled {json.dumps(names.display)}",
+        f"edit   {CLAUDE_MD}: insert `## Project` before `{PROJECT_SECTION_ANCHOR}`",
+        f"write  {SPEC_README}",
+        f"replace src/{names.package}/__init__.py: docstring only (drops greet, farewell)",
     ]
+    changes += [f"remove {rel}" for rel in TEST_FILES]
+    changes.append(f"write  {SMOKE_TEST}: imports {names.package}")
     return changes
 
 
@@ -485,11 +548,51 @@ def step_reset_tasks(ctx: Context) -> None:
             )
 
 
+def step_seed_files(ctx: Context) -> None:
+    """Step 5: seed the project files and replace the sample code with a smoke test.
+
+    Writes a fresh README, inserts the `## Project` section into `CLAUDE.md` before the first
+    `##` section and leaves every other line alone, adds `docs/spec/README.md`, makes the
+    package a docstring-only module, removes the sample tests and adds `tests/test_smoke.py`.
+
+    Raises:
+        StepError: If `CLAUDE.md` does not have the anchor heading exactly once.
+    """
+    root, names = ctx.root, ctx.names
+    section = PROJECT_SECTION_TEXT.format(
+        display=names.display, description=ctx.description
+    )
+    # Checked first: a failure here leaves the earlier seeded files unwritten.
+    _edit(
+        root,
+        CLAUDE_MD,
+        rf"^{re.escape(PROJECT_SECTION_ANCHOR)}$",
+        f"{section}{PROJECT_SECTION_ANCHOR}",
+    )
+    (root / README).write_bytes(
+        README_TEXT.format(display=names.display, description=ctx.description).encode(
+            "utf-8"
+        )
+    )
+    spec = root / SPEC_README
+    spec.parent.mkdir(parents=True, exist_ok=True)
+    spec.write_bytes(SPEC_README_TEXT.encode("utf-8"))
+    (root / "src" / names.package / "__init__.py").write_bytes(
+        PACKAGE_INIT_TEXT.format(package=names.package).encode("utf-8")
+    )
+    for rel in TEST_FILES:
+        (root / rel).unlink()
+    (root / SMOKE_TEST).write_bytes(
+        SMOKE_TEST_TEXT.format(package=names.package).encode("utf-8")
+    )
+
+
 # Plan steps 2 to 8 run here, inside the failure handler. Later tasks append their steps.
 STEPS: tuple[Callable[[Context], None], ...] = (
     step_install,
     step_rename,
     step_reset_tasks,
+    step_seed_files,
 )
 
 
@@ -582,7 +685,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     print(
-        "Done: renamed the template names and reset the task state. Nothing is staged."
+        "Done: renamed the template names, reset the task state and seeded the project "
+        "files. Nothing is staged."
     )
     return 0
 

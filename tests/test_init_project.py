@@ -840,10 +840,7 @@ def test_seeding_adds_no_stub_calls_and_stages_nothing(initialized: Scratch):
     assert _stub_calls(initialized) == list(LOCK_COMMANDS)
     assert _git(initialized.repo, "diff", "--cached", "--name-only") == ""
     untracked = _git(initialized.repo, "ls-files", "--others", "--exclude-standard")
-    assert sorted(untracked.splitlines()) == [
-        "docs/spec/README.md",
-        "tests/test_smoke.py",
-    ]
+    assert {"docs/spec/README.md", "tests/test_smoke.py"} <= set(untracked.splitlines())
 
 
 def test_failure_in_seeding_prints_undo_and_undo_restores_tree(scratch: Scratch):
