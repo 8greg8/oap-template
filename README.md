@@ -23,17 +23,30 @@ the placeholders (`<repo_name>`, mission, architecture) for your actual reposito
 
 ## Getting started with a new project
 
-1. Rename the package: replace `<repo_name>` throughout `PYTHON_CONVENTIONS.md` with your actual
-   package name, and lay out `src/<repo_name>/` accordingly.
-2. Fill in the project-specific parts of `CLAUDE.md` (mission, architecture, domain) — the process
-   sections (autonomy, task workflow, file boundaries) are already ready to use as-is. Put the
-   specification under `docs/spec/`; the spec-first test rule in `CLAUDE.md` refers to it.
-3. Set up the `uv` workspace (`uv init` / `pyproject.toml`) per `PYTHON_CONVENTIONS.md`.
-4. Wire up Husky-managed git hooks per `CONTRIBUTING.md`'s verify/resolve workflow: edit
-   `scripts/config/gate.sh` for your stack's lint/typecheck/test commands, then `npm install`
-   (its `prepare` step installs the hooks; see [`DEV_TOOLING_SPEC.md`](DEV_TOOLING_SPEC.md) and
-   [`scripts/README.md`](scripts/README.md)). Run `scripts/gate.sh` to check the result. Or open
-   the repo in the dev container, whose first-boot script runs `uv sync` and `npm ci` for you.
+1. Create a new repository from this template on GitHub and clone it. Create it without ticking
+   "Include all branches", because branches created from a template have unrelated histories (the
+   script refuses if the other branch already exists on `origin`). Run the next steps in that
+   clone, which must be clean, on `develop` or `main`, and have `origin` set.
+2. Preview the changes. This lists every file the script edits, removes or writes, and the three
+   names it derives from `--package` (import package, distribution name, npm name). It changes
+   nothing.
+
+   ```bash
+   python init_project.py --name "My Project" --package my_project \
+       --owner "Jane Doe" --description "One sentence." --dry-run
+   ```
+
+3. Run the same command with `--yes` instead of `--dry-run`. It installs the tooling (`npm ci`,
+   `uv sync`; `--skip-install` skips this), renames the template names, regenerates the lock files,
+   empties the task history, writes a fresh project README, seeds `docs/spec/` and the `## Project`
+   section of `CLAUDE.md`, runs `scripts/gate.sh`, makes one commit, and creates the missing
+   `main` or `develop` branch at that commit. It deletes itself and its tests in that commit, never
+   pushes, and, if anything fails before the commit, prints the command that restores the checkout.
+   If only a lock command fails (no network), it stops before the commit, leaves the files as they
+   are, and prints the commands that finish the run by hand.
+4. Follow the checklist the script prints: push both branches, set the default branch and branch
+   protection on GitHub, fill in the `CLAUDE.md` project section (mission, architecture, domain
+   terms), and write the first spec under `docs/spec/`.
 5. Start working via tasks: file them with `task.py new` from the primary checkout on `develop`;
    see `.agents/README.md` for the full command reference (`task.py new`, `backlog.py ready`,
    `report.py new`, `housekeep.py all`).
