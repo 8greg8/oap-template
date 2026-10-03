@@ -4,8 +4,9 @@ Status: accepted. Tasks T-0019 and T-0020.
 
 **Owner decisions (2026-10-03, session instruction):** the method text is treated as MIT-licensed
 public material of the SLAIF project, with its funding acknowledgement. History is kept and
-rewritten (D2). The workflow-sync source project's name and the `Claude-Session:` commit trailers
-are removed as well (D3). The new repository keeps the name `oap-template` and the current one
+rewritten (D2). The workflow-sync source project's name, including its two-letter short form, and
+the `Claude-Session:` commit trailers are removed as well (D3). No rule is added to stop future
+sessions from adding `Claude-Session:` trailers. The new repository keeps the name `oap-template` and the current one
 becomes `oap-template-archive` (D4). This is the owner's written approval for the history
 rewrite in T-0020.
 
@@ -34,6 +35,11 @@ rewritten itself. They are found in the repository as described below.
   `.agents/plans/2026-10-03-workflow-sync.md`. On `develop` it is on 37 lines (45 occurrences)
   in 11 files, and it appears in commit messages such as `0b32945`. L1 contains L3. L3u, the same
   name with the hyphen written as an underscore, is at `.agents/plans/2026-10-03-workflow-sync.md:129`.
+- Short form of L3 (L3s): the lowercase two-letter abbreviation of L3, used as a whole word in
+  prose and path prefixes (for example `L3s:CLAUDE.md`, `L3s's`). About 70 occurrences in the
+  same 11 files on `develop`, and some in history. L3V, its uppercase form, is a shell variable at
+  `.agents/plans/2026-10-03-workflow-sync.md` lines 315, 317 and 320. A search of all history
+  found the short form only in prose and in that variable, never in lock files or hashes.
 - Session trailers: about 65 commit messages end with a `Claude-Session:` line. The number grows
   with each session commit.
 - Method text: `strategic_model_init_material.md` is "Orchestrated Agentic Programming", version
@@ -46,7 +52,7 @@ rewritten itself. They are found in the repository as described below.
 
 ## Replacements
 
-The same four replacements apply to the tree (T-0019) and to all history (T-0020). Because
+The same replacements apply to the tree (T-0019) and to all history (T-0020). Because
 they match, the rewritten `develop` tree must be identical to the `develop` tree after T-0019.
 
 | Literal | Replacement |
@@ -55,10 +61,16 @@ they match, the rewritten `develop` tree must be identical to the `develop` tree
 | L2 | `downstream-project` |
 | L3 | `source-project` |
 | L3u | `source_project` |
+| L3V followed by `=..` | `SRC=..` |
+| `"$` L3V `"` | `"$SRC"` |
+| L3s as a whole word, lowercase only (regex `\b<L3s>\b`, case-sensitive) | `source-project` |
 
-L1 therefore becomes `/path/to/source-project`. All four are plain-text rules. filter-repo
-applies plain-text rules before regex rules, so a rule must not depend on another having run
-first. A dry run showed that a regex rule for all of L1 never matched once L3 had been replaced.
+L1 therefore becomes `/path/to/source-project`. All rules but the last are plain text.
+filter-repo applies every plain-text rule before any regex rule. The last rule depends on that
+order: it must run after L3 is replaced, or it would turn L3 into `source-project-system`.
+T-0019 applies the rules to the tree in the same order. No plain-text rule depends on another;
+a dry run showed that a regex rule for all of L1 never matched once L3 had been replaced, which
+is why P1 is a prefix rule.
 
 ## Step 1 (T-0019): fix the tree on `develop`
 
@@ -88,10 +100,11 @@ git filter-repo --mailmap ../mailmap \
 ```
 
 filter-repo updates abbreviated hashes cited in commit messages on its own. A dry run of this
-exact command with all four rules, on a full mirror of all branches (2026-10-03, placeholder
+exact command with all seven rules, on a full mirror of all branches (2026-10-03, placeholder
 address), rewrote all 51 owner commits and left no match for any literal or the work-email domain
-in contents or messages, and no `Claude-Session:` line in messages. An independent verify
-reproduced it.
+in contents or messages, and no `Claude-Session:` line in messages. The rewritten plan's shell
+lines read `SRC=../source-project` and `"$SRC"`. An independent verify reproduced the four-rule
+version.
 
 Before pushing, check:
 - Author and committer addresses are only the private address and `noreply@anthropic.com`.
