@@ -118,9 +118,34 @@ Read these as judgment calls you may overrule:
 - **T-0012 was filed by the orchestrator** after T-0008's verify found that quote and non-ASCII
   names still failed in the real scripts. It was completed in this batch.
 
+## Process changes after the batch (T-0013)
+
+After the batch, the owner changed the merge rules. Review these as a rule change, not as code.
+
+- **Owner instruction:** "Merge into develop must be by default granted to agents. The independent
+  verification must be done by another agent. Human is involved only if breaking changes."
+- **What changes:** the orchestrator merges a verified task branch into `develop` by default, with
+  no per-batch grant. An executor never merges or verifies its own work. A human decides only for
+  breaking changes and for the existing Ask-first items. Merges into `main`, tags and releases
+  stay human. T-0013 writes this into `CLAUDE.md`, `.agents/README.md`, `CONTRIBUTING.md` and the
+  task template, and defines "breaking change" once in `CLAUDE.md`.
+- **Dropped clauses:** the owner agreed to drop per-task "must not start without approval" clauses.
+  New task files omit them, because `CLAUDE.md` governs. Two closed task files still carry one:
+  T-0008 (a note about `.husky/`) and T-0011 (a non-goal about `scripts/gitflow.sh`). They are done
+  records and were left unedited, since editing them is outside the orchestrator's permitted
+  task-file edits.
+- **Conflict to decide:** `strategic_model_init_material.md`, the OAP method text, lists "merge to
+  protected branches" as a human approval gate and says "treat every merge as a human decision".
+  The new rule departs from it for `develop`. T-0013 does not edit that file. Decide whether to
+  amend the method text or to keep it as the general doctrine, with `CLAUDE.md` as the
+  project-specific override.
+- **Check:** after T-0013 merges, `grep -n -i "opt-in\|never the default" CLAUDE.md .agents/README.md`
+  should find nothing that still makes a grant the precondition.
+
 ## Sign-off
 
 - [ ] Human-gated files read.
 - [ ] Gap 1 closed or accepted, with the bash 3.2 result noted.
 - [ ] Gaps 2 to 4 accepted or turned into tasks.
+- [ ] Merge-by-default rule change (T-0013) accepted, including the conflict with the method text.
 - [ ] `scripts/gate.sh` run on `develop` at the review commit.
