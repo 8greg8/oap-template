@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 import shutil
 import subprocess
 from pathlib import Path
@@ -326,6 +327,61 @@ def test_pre_commit_restages_only_staged_files_after_autofix(repo: Path) -> None
     staged_diff = _git(repo, "diff", "--cached", "--", "src/app.py")
     assert "+x = 3" in staged_diff
     assert _git(repo, "diff", "--cached", "--name-only") == "src/app.py"
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["sp ace.py", 'quo"te.py', "it's.py", "čšž.py", "new\nline.py"],
+    ids=["space", "double-quote", "single-quote", "non-ascii", "newline"],
+)
+def test_pre_commit_restages_unusual_filenames_after_autofix(
+    repo: Path, name: str
+) -> None:
+    _write(repo, {name: "x = 2\n"})
+    _git(repo, "add", "--", name)
+    result, gate, _ = _run_pre_commit(
+        repo, fix_body=f"printf 'x = 3\\n' >> {shlex.quote(name)}"
+    )
+    assert result.returncode == 0, result.stderr
+    assert gate.exists()
+    assert _git(repo, "show", f":{name}") == "x = 2\nx = 3"
+
+
+def test_pre_commit_restage_treats_glob_characters_literally(repo: Path) -> None:
+    """A staged `a[1].py` must not sweep in the unstaged, modified `a1.py` via pathspec globbing."""
+    _commit(repo, {"a1.py": "x = 1\n"})
+    _write(repo, {"a[1].py": "x = 2\n", "a1.py": "x = 9\n"})
+    _git(repo, "add", "--", ":(literal)a[1].py")
+    assert _git(repo, "diff", "--cached", "--name-only") == "a[1].py"
+    result, _, _ = _run_pre_commit(repo, fix_body="printf 'x = 3\\n' >> 'a[1].py'")
+    assert result.returncode == 0, result.stderr
+    assert _git(repo, "show", ":a[1].py") == "x = 2\nx = 3"
+    assert _git(repo, "diff", "--cached", "--name-only") == "a[1].py"
+
+
+def test_pre_commit_rename_into_agents_runs_gate(repo: Path) -> None:
+    _git(repo, "mv", "src/app.py", ".agents/app.py")
+    result, gate, _ = _run_pre_commit(repo)
+    assert result.returncode == 0, result.stderr
+    assert gate.exists()
+    assert "skipping gate" not in result.stdout
+
+
+def test_pre_commit_rename_within_agents_skips_gate(repo: Path) -> None:
+    _git(repo, "mv", ".agents/tasks/T-0001.md", ".agents/tasks/T-0009.md")
+    result, gate, fix = _run_pre_commit(repo)
+    assert result.returncode == 0, result.stderr
+    assert not gate.exists()
+    assert not fix.exists()
+    assert "skipping gate" in result.stdout
+
+
+def test_pre_commit_deleting_file_outside_agents_runs_gate(repo: Path) -> None:
+    """Parity with pre-push, which lists deletions too: removing src/ code is not a records-only commit."""
+    _git(repo, "rm", "-q", "src/app.py")
+    result, gate, _ = _run_pre_commit(repo)
+    assert result.returncode == 0, result.stderr
+    assert gate.exists()
 
 
 # --- gate.sh / autofix.sh --staged --------------------------------------------

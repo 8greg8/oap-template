@@ -3,7 +3,14 @@
 # only .agents/ records (task filing, status changes, reports, BACKLOG.md) skips the hook,
 # so `task.py new` and the orchestrator's state commits stay fast. The tooling code under
 # .agents/tasks/scripts/ is never skipped.
-staged=$(git diff --cached --name-only --diff-filter=ACMR)
+#
+# The skip decision lists every staged path with --no-renames and no --diff-filter, as
+# .husky/pre-push does: a file renamed into .agents/ shows as a deletion outside it plus an
+# addition inside, and the deletion keeps the gate on. Path lists are NUL-delimited (-z), so
+# spaces, quotes, newlines and non-ASCII bytes in a name are never quoted or split. The
+# decision list is turned into lines only to match prefixes; a newline inside a name can add
+# lines but never hides a path outside .agents/, so it can only keep the gate on.
+staged=$(git diff --cached -z --name-only --no-renames | tr '\0' '\n')
 [ -n "$staged" ] || exit 0
 
 if ! printf '%s\n' "$staged" | grep -q -v '^\.agents/' \
@@ -14,7 +21,14 @@ fi
 
 scripts/autofix.sh --staged
 
-# Re-stage only what was already staged. `git add -u` would sweep in unrelated dirty files.
-printf '%s\n' "$staged" | xargs git add --
+# Re-stage only what was already staged (autofix edits the working tree, not the index), as
+# literal paths. `git add -u` would sweep in unrelated dirty files, and a glob character in
+# a name (`a[1].py`) would do the same unless pathspecs are literal. Deleted paths have
+# nothing to re-stage, and with no path left xargs is not run, so a deletion-only commit
+# never reaches `git add` with an empty list.
+if git diff --cached --name-only --diff-filter=ACMR --no-renames | grep -q .; then
+    git diff --cached -z --name-only --diff-filter=ACMR --no-renames \
+        | GIT_LITERAL_PATHSPECS=1 xargs -0 git add --
+fi
 
 exec scripts/gate.sh --staged
