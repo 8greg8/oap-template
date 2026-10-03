@@ -57,7 +57,10 @@ In brief:
   interface between what the agent did and what anyone — human or another agent — can verify
   afterward. Use exact status words (passed / failed / skipped / not run / blocked) instead of
   vague claims like "all tests passed" or "looks good." Run `report.py validate T-00XX` before
-  considering the task finished.
+  considering the task finished. This is an enforced gate, not a convention:
+  `task.py set-status` refuses `review`, `blocked`, `done` and `abandoned` with a non-zero exit
+  unless `.agents/tasks/reports/T-00XX.md` exists and passes the same check as
+  `report.py validate`. `open` and `in_progress` are not gated.
 - **When executing a task from the backlog, push but do not merge.** Commit the report on the
   task's own branch and push it; leave the merge to `develop` and any PR/MR to the orchestrator or
   human, per `.agents/README.md`'s execution loop. This overrides the general autonomy below, which

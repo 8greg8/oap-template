@@ -26,7 +26,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _frontmatter import FrontmatterError
+from _frontmatter import FrontmatterError, read
 from _schema import (
     INTEGRATION_BRANCH,
     LESSONS_FILE,
@@ -291,6 +291,42 @@ def validate_report(
             problems.append(f"section '## {heading}' still contains a placeholder")
     if task is not None:
         problems += validate_done_rules(report, task, repo_root)
+    return problems
+
+
+def report_problems(task: Task, repo_root: Path = REPO_ROOT) -> list[str]:
+    """Check that a task has a complete report, as ``report.py validate`` would.
+
+    Used by ``task.py set-status`` to gate transitions that require a report.
+    It applies :func:`validate_report` to the report file at
+    ``task.report_path`` and adds the one problem ``validate`` cannot raise for
+    a file it never loads: the report does not exist.
+
+    Args:
+        task: The task whose report is checked.
+        repo_root: Repository used by the touches check.
+
+    Returns:
+        A list of human-readable problems; empty means the report exists and
+        validates.
+
+    Raises:
+        FrontmatterError: If the report file exists but its frontmatter cannot
+            be parsed.
+    """
+    path = task.report_path
+    shown = path.relative_to(repo_root) if path.is_relative_to(repo_root) else path
+    if not path.is_file():
+        return [f"no report at {shown}; create it with `report.py new {task.id}`"]
+    meta, body = read(path)
+    report = Report(path=path, meta=meta, body=body)
+    problems = [
+        f"{shown}: {problem}" for problem in validate_report(report, task, repo_root)
+    ]
+    if report.task_id and report.task_id.upper() != task.id.upper():
+        problems.append(
+            f"{shown}: 'task' frontmatter is {report.task_id!r}, not {task.id!r}"
+        )
     return problems
 
 
