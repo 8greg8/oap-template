@@ -36,8 +36,12 @@ scripts/gitflow.sh hotfix  start <topic>    # branch hotfix/<topic> from main
 
 `gitflow.sh` creates `feat/`, `bugfix/` and `hotfix/` branches. A task branch whose
 Conventional Commits type is something else (`docs/T-0005-<slug>`, `chore/T-0007-<slug>`) is
-created with `git worktree add ../<repo>-<type>-<topic> -b <type>/T-NNNN-<slug> origin/develop`
-after `git fetch`; nothing else about the rules below changes.
+created with
+`git worktree add ../<repo>-<type>-<topic> --no-track -b <type>/T-NNNN-<slug> origin/develop`
+after `git fetch`; nothing else about the rules below changes. `--no-track` stops the branch
+from inheriting `origin/develop` as its upstream, which would make a bare `git push` fail with a
+branch-name mismatch. Push the new branch the first time with `git push -u origin <branch>`; a
+bare `git push` works after that.
 
 - Name worktree directories `<repo>-<branch-type>-<topic>` so concurrent worktrees are identifiable
   (`gitflow.sh` does this).

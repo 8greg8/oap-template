@@ -162,14 +162,15 @@ Rules for every batch:
   one is `blocked`.
 - Executors never regenerate `BACKLOG.md` or `LESSONS.md` on a task branch;
   the orchestrator does it on `develop` when it changes a status.
-- Only the orchestrator may widen a task's `touches`, and it records why in
-  the report.
+- Orchestrator edits to task files are limited to these three: `task.py set-status`;
+  widening a task's `touches`, with the reason recorded in the task's report; and, before
+  dispatch, amending a task file with the findings of a pre-batch review, on a `docs/`
+  branch.
 - A worktree not made by `scripts/gitflow.sh` needs `npm ci` before its first
   commit, so the hooks run.
 - Commit body lines stay at or under 100 characters.
 - Optionally, before dispatch, a fresh agent reviews the batch's task files
-  against the repository. Its findings are amended into the task files on a
-  `docs/` branch.
+  against the repository.
 
 ## Task lifecycle
 
