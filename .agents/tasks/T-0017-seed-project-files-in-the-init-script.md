@@ -1,7 +1,7 @@
 ---
 id: T-0017
 title: Seed project files in the init script
-status: in_progress
+status: done
 type: feat
 priority: medium
 depends_on: [T-0016]

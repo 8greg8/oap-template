@@ -1,7 +1,7 @@
 ---
 id: T-0018
 title: Finish the init script with gate, commit, branch and self-removal
-status: open
+status: in_progress
 type: feat
 priority: medium
 depends_on: [T-0017]

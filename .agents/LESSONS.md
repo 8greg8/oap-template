@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-17 lesson(s) across 10 section(s). Generated 2026-10-03.
+18 lesson(s) across 10 section(s). Generated 2026-10-03.
 
 ## Tag index
 
@@ -35,7 +35,7 @@ to all lessons that carry it.
 - `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success)
 - `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success)
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success)
-- `init-script` — [T-0015](#t-0015-success), [T-0016](#t-0016-success)
+- `init-script` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success)
 - `merge-authority` — [T-0013](#t-0013-success), [T-0014](#t-0014-success)
 - `method-text` — [T-0014](#t-0014-success)
 - `notice` — [T-0019](#t-0019-success)
@@ -51,14 +51,15 @@ to all lessons that carry it.
 - `ruff` — [T-0007](#t-0007-success)
 - `scripts` — [T-0012](#t-0012-success)
 - `scrub` — [T-0019](#t-0019-success)
+- `seeding` — [T-0017](#t-0017-success)
 - `set-status` — [T-0001](#t-0001-success)
 - `shebang` — [T-0009](#t-0009-success)
 - `staged-files` — [T-0012](#t-0012-success)
 - `task-scripts` — [T-0009](#t-0009-success)
 - `task-state` — [T-0016](#t-0016-success)
 - `task-tooling` — [T-0001](#t-0001-success), [T-0002](#t-0002-success)
-- `template` — [T-0015](#t-0015-success), [T-0016](#t-0016-success)
-- `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success)
+- `template` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success)
+- `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success)
 - `upstream-tracking` — [T-0010](#t-0010-success)
 - `uv` — [T-0006](#t-0006-success)
 - `workflow` — [T-0013](#t-0013-success)
@@ -192,6 +193,15 @@ Source: [`reports/T-0015.md`](tasks/reports/T-0015.md)
 Tags: `init-script`, `template`, `task-state`, `tests`
 
 Source: [`reports/T-0016.md`](tasks/reports/T-0016.md)
+
+### T-0017 (success)
+
+- A new text block inserted before an anchor heading round-trips byte for byte only if it ends with a blank line and the edit helper replaces the heading line itself; test the round trip by cutting from the section start to the anchor.
+- When a later step deletes files an earlier step edits, the earlier step's observable assertions move to the later step's replacement files. Check the existing tests for this before adding a deleting step.
+
+Tags: `init-script`, `template`, `seeding`, `tests`
+
+Source: [`reports/T-0017.md`](tasks/reports/T-0017.md)
 
 ## report-validation
 

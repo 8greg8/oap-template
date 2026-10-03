@@ -6,7 +6,7 @@
 
 20 task(s). Generated 2026-10-03.
 
-| open: 2 | in_progress: 1 | blocked: 0 | review: 0 | done: 17 | abandoned: 0 |
+| open: 1 | in_progress: 1 | blocked: 0 | review: 0 | done: 18 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -28,8 +28,8 @@
 | T-0014 | [Amend the OAP method text so CLAUDE.md governs merge authority](T-0014-amend-the-oap-method-text-so-claude-md-governs.md) | done | medium | docs | — | [report](reports/T-0014.md) |
 | T-0015 | [Add init script CLI, preconditions, names and rename step](T-0015-add-init-script-cli-preconditions-names-and.md) | done | medium | feat | — | [report](reports/T-0015.md) |
 | T-0016 | [Reset task state in the init script](T-0016-reset-task-state-in-the-init-script.md) | done | medium | feat | T-0015 | [report](reports/T-0016.md) |
-| T-0017 | [Seed project files in the init script](T-0017-seed-project-files-in-the-init-script.md) | in_progress | medium | feat | T-0016 | — |
-| T-0018 | [Finish the init script with gate, commit, branch and self-removal](T-0018-finish-the-init-script-with-gate-commit-branch.md) | open | medium | feat | T-0017 | — |
+| T-0017 | [Seed project files in the init script](T-0017-seed-project-files-in-the-init-script.md) | done | medium | feat | T-0016 | [report](reports/T-0017.md) |
+| T-0018 | [Finish the init script with gate, commit, branch and self-removal](T-0018-finish-the-init-script-with-gate-commit-branch.md) | in_progress | medium | feat | T-0017 | — |
 | T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | done | low | chore | — | [report](reports/T-0009.md) |
 | T-0010 | [Fix agent-doc wording and stale AGENTS.md references](T-0010-fix-agent-doc-wording-and-stale-agents-md.md) | done | low | docs | — | [report](reports/T-0010.md) |
 | T-0011 | [Support docs and chore task branches in gitflow and fix housekeep worktrees](T-0011-support-docs-and-chore-task-branches-in-gitflow.md) | done | low | fix | — | [report](reports/T-0011.md) |
@@ -41,4 +41,3 @@
 ## Waiting on dependencies
 
 - **T-0020** Rewrite history into a clean public repository copy — needs T-0015, T-0016, T-0017, T-0018, T-0019
-- **T-0018** Finish the init script with gate, commit, branch and self-removal — needs T-0017
