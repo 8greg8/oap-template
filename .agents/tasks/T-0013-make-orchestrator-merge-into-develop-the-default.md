@@ -5,7 +5,7 @@ status: in_progress
 type: docs
 priority: high
 depends_on: []
-touches: [CLAUDE.md, .agents/README.md, CONTRIBUTING.md, .agents/tasks/templates/task.md]
+touches: [CLAUDE.md, .agents/README.md, CONTRIBUTING.md, .agents/tasks/templates/task.md, README.md]
 created: 2026-10-03
 report: reports/T-0013.md
 ---
