@@ -31,7 +31,7 @@ point to the new commits. The old repository survives untouched as `oap-template
   truth. Where this file and the plan differ, stop and report.
 - Depends on T-0015 to T-0019. T-0019 makes the tree free of the literals, so the rewrite must
   leave the `develop` tree unchanged.
-- The literals (P1, L2, L3, L3u) are defined in the plan and T-0019 without quoting them. After T-0019
+- The literals (P1, L2, L3, L3u, L3s, L3V) are defined in the plan and T-0019 without quoting them. After T-0019
   they exist only in history. Read them from `develop` before T-0019's merge commit
   (for example `git show <merge>^1:.agents/LESSONS.md`).
 - The owner's work address is the committer address on 51 commits (`git log --format='%ae'`).
@@ -68,7 +68,7 @@ point to the new commits. The old repository survives untouched as `oap-template
 - Do not change repository visibility, the default branch or the template flag. That is the
   owner's step 3.
 - Do not push merged task branches or tags to the new repository.
-- Do not edit file content during the rewrite beyond the four replacements. The tree check must
+- Do not edit file content during the rewrite beyond the plan's replacements. The tree check must
   stay empty.
 - Do not commit `mailmap`, `replace.txt`, the private address, the work address or any literal.
 - Do not change `scripts/`, `.husky/`, `CLAUDE.md`, `pyproject.toml` or any lock file.
@@ -106,7 +106,7 @@ None needed. The plan already describes the result.
 - [ ] Preconditions are recorded in the report; the task is blocked if any failed.
 - [ ] `git diff <archive develop> <rewritten develop>` was empty before the hash-update commit.
 - [ ] Author and committer addresses are only the private address and `noreply@anthropic.com`.
-- [ ] No pushed commit's content or message contains P1, L2, L3, L3u or the work-email domain.
+- [ ] No pushed commit's content or message contains P1, L2, L3, L3u, L3s or L3V as a whole word, or the work-email domain.
 - [ ] No pushed commit message has a `Claude-Session:` line.
 - [ ] gitleaks reports no leaks on a fresh clone of the new repository.
 - [ ] Only `main`, `develop` and this task's branch exist on the new repository.
