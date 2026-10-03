@@ -50,6 +50,7 @@ scripts/gitflow.sh feature start <topic>    # worktree + branch from develop
 scripts/gitflow.sh feature finish <topic>   # gate, merge to develop, clean up worktree
 scripts/gitflow.sh bugfix  start|finish <topic>
 scripts/gitflow.sh hotfix  start|finish <topic>   # from/into main, with back-merge to develop
+scripts/gitflow.sh docs|chore|fix start|finish <T-NNNN-slug>   # task branches, from/into develop
 ```
 
 ## What each hook does

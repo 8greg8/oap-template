@@ -373,13 +373,23 @@ def list_worktrees() -> list[dict[str, str]]:
 def is_branch_merged(branch: str, base: str = INTEGRATION_BRANCH) -> bool:
     """Report whether ``branch`` is already an ancestor of ``base``.
 
+    A branch whose tip equals ``base``'s tip has no commits of its own yet (a freshly
+    created task branch), so it counts as not merged.
+
     Args:
         branch: Branch to check.
         base: Branch to check ancestry against.
 
     Returns:
-        ``True`` if ``branch`` has already been merged into ``base``.
+        ``True`` if ``branch`` has commits and has already been merged into ``base``.
     """
+    branch_tip = _git("rev-parse", "--verify", "--quiet", f"{branch}^{{commit}}")
+    base_tip = _git("rev-parse", "--verify", "--quiet", f"{base}^{{commit}}")
+    if (
+        branch_tip.returncode == 0
+        and branch_tip.stdout.strip() == base_tip.stdout.strip()
+    ):
+        return False
     return _git("merge-base", "--is-ancestor", branch, base).returncode == 0
 
 
@@ -388,8 +398,8 @@ def check_worktrees() -> list[str]:
 
     Flags two independent problems:
 
-    - A secondary worktree whose branch is already merged into ``develop``
-      but was never removed with ``git worktree remove`` (the cleanup step
+    - A secondary worktree whose branch has commits and is already merged into
+      ``develop`` but was never removed with ``git worktree remove`` (the cleanup step
       documented in ``.agents/README.md``'s execution loop and
       ``CONTRIBUTING.md``'s Worktrees section).
     - Any worktree holding `develop`/`main` checked out that is not the
