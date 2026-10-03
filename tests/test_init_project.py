@@ -1084,6 +1084,14 @@ def test_full_run_prints_the_human_checklist(scratch: Scratch):
         for line in lowered.splitlines()
     ), out
     assert "default branch" in lowered
+    # The default branch is named `develop`, with the reason and the role of `main`.
+    default_line = next(
+        line for line in lowered.splitlines() if "default branch" in line
+    )
+    assert "`develop`" in default_line, default_line
+    assert "task.py" in default_line, default_line
+    assert "origin/develop" in default_line, default_line
+    assert "main" in default_line and "release" in default_line, default_line
     assert "branch protection" in lowered
     assert "CLAUDE.md" in out
     assert "## Project" in out
@@ -1304,6 +1312,10 @@ def test_template_readme_getting_started_describes_the_script_and_checklist():
     assert "template" in section
     assert "python init_project.py" in section
     assert "--dry-run" in section
+    # Create the repository without "Include all branches": unrelated histories otherwise.
+    assert "Include all branches" in section
+    assert "without" in section
+    assert "unrelated histories" in section
     assert "checklist" in section
     assert "--name" in section
     assert "--package" in section
