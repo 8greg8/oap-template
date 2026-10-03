@@ -7,17 +7,19 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-5 lesson(s) across 5 section(s). Generated 2026-10-03.
+6 lesson(s) across 6 section(s). Generated 2026-10-03.
 
 ## Tag index
 
 Each lesson appears once, under its first tag; the index links every tag
 to all lessons that carry it.
 
+- `agent-rules` — [T-0005](#t-0005-success)
 - `backlog` — [T-0002](#t-0002-success)
 - `commit-lint` — [T-0004](#t-0004-success)
 - `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
 - `docker` — [T-0006](#t-0006-success)
+- `docs` — [T-0005](#t-0005-success)
 - `file-modes` — [T-0007](#t-0007-success)
 - `gate` — [T-0004](#t-0004-success)
 - `git` — [T-0007](#t-0007-success)
@@ -26,7 +28,9 @@ to all lessons that carry it.
 - `hooks` — [T-0004](#t-0004-success)
 - `housekeep` — [T-0003](#t-0003-success)
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success)
+- `orchestrator` — [T-0005](#t-0005-success)
 - `port` — [T-0003](#t-0003-success)
+- `process` — [T-0005](#t-0005-success)
 - `report-validation` — [T-0003](#t-0003-success)
 - `ruff` — [T-0007](#t-0007-success)
 - `task-tooling` — [T-0002](#t-0002-success)
@@ -48,6 +52,18 @@ to all lessons that carry it.
 Tags: `devcontainer`, `uv`, `husky`, `docker`
 
 Source: [`reports/T-0006.md`](tasks/reports/T-0006.md)
+
+## docs
+
+### T-0005 (success)
+
+`scripts/gitflow.sh` cannot create `docs/` or `chore/` task branches, so a task branch of those
+types needs a hand-written `git worktree add ... origin/develop`, and `node_modules` is not
+symlinked into it. `npm ci` is needed before its first commit if the hooks are to run.
+
+Tags: `docs`, `agent-rules`, `process`, `orchestrator`
+
+Source: [`reports/T-0005.md`](tasks/reports/T-0005.md)
 
 ## git
 
