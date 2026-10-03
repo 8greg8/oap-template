@@ -31,7 +31,7 @@ UNDO = (
     "git restore --source=HEAD --staged --worktree . && git clean -fd "
     "&& rm -rf src/my_project"
 )
-LOCK_COMMANDS = ("uv lock", "npm install --package-lock-only")
+LOCK_COMMANDS = ("uv lock", "npm install --package-lock-only --ignore-scripts")
 TEMPLATE_STRINGS = ("proj_template", "proj-template", "oap-template")
 # Files the task allows to still name the template after `--yes --skip-install` with stubs.
 ALLOWED_HITS = {
@@ -1187,6 +1187,111 @@ def test_failure_creating_the_branch_prints_hash_and_command_but_not_undo(
     assert _git(scratch.repo, "rev-parse", "main") == head
 
 
+# --- a failed lock command stops before the commit -----------------------------------------------
+
+FINISH_MARKER = "To finish by hand"
+
+
+def _finish_lines(out: str) -> list[str]:
+    """Return the non-empty lines after the finish marker, the last block of the output."""
+    lines = out.splitlines()
+    start = next(i for i, line in enumerate(lines) if FINISH_MARKER in line)
+    return [line.strip() for line in lines[start + 1 :] if line.strip()]
+
+
+@pytest.mark.parametrize(
+    ("failing", "failed_commands"),
+    [
+        (("uv",), [LOCK_COMMANDS[0]]),
+        (("npm",), [LOCK_COMMANDS[1]]),
+        (("uv", "npm"), list(LOCK_COMMANDS)),
+    ],
+)
+def test_failed_lock_command_stops_before_the_commit_and_prints_finish_commands(
+    scratch: Scratch, failing: tuple[str, ...], failed_commands: list[str]
+):
+    _stub_gate(scratch)
+    head_before = _git(scratch.repo, "rev-parse", "HEAD")
+    refs_before = _refs(scratch.bare)
+
+    result, out = _run(scratch, "--yes", "--skip-install", full=True, fail=failing)
+
+    assert result.returncode != 0, out
+    # The remaining steps ran through the gate, then the run stopped.
+    assert "stub gate ran" in out
+    assert _git(scratch.repo, "rev-parse", "HEAD") == head_before
+    assert _git(scratch.repo, "branch", "--list", "main") == ""
+    assert _git(scratch.repo, "diff", "--cached", "--name-only") == ""
+    assert _refs(scratch.bare) == refs_before
+    # The tree is valid, so it is left as it is and no undo command is offered.
+    assert "git restore --source=HEAD" not in out
+    assert "git clean" not in out
+    assert (scratch.repo / "src" / "my_project").is_dir()
+    for rel in SCRIPT_FILES:
+        assert not (scratch.repo / rel).exists()
+    assert _status(scratch.repo) != ""
+    # The message names the failed commands, then the exact commands to finish.
+    assert _finish_lines(out) == [
+        *failed_commands,
+        "git add -A",
+        f'git commit -m "{COMMIT_MESSAGE}"',
+        "git branch main",
+    ]
+    stopped = out[: out.index(FINISH_MARKER)]
+    for command in failed_commands:
+        assert command in stopped, out
+
+
+def test_finish_commands_after_a_lock_failure_complete_the_run(scratch: Scratch):
+    _stub_gate(scratch)
+    head_before = _git(scratch.repo, "rev-parse", "HEAD")
+    count_before = _commit_count(scratch.repo)
+    result, out = _run(scratch, "--yes", "--skip-install", full=True, fail=("uv",))
+    assert result.returncode != 0, out
+
+    env = _env()
+    env["PATH"] = f"{scratch.stubs}{os.pathsep}{env['PATH']}"
+    env["STUB_LOG"] = str(scratch.log)
+    for command in _finish_lines(out):
+        subprocess.run(
+            ["bash", "-c", command],
+            cwd=scratch.repo,
+            check=True,
+            capture_output=True,
+            env=env,
+        )
+
+    head = _git(scratch.repo, "rev-parse", "HEAD")
+    assert _commit_count(scratch.repo) == count_before + 1
+    assert _git(scratch.repo, "log", "-1", "--format=%P") == head_before
+    assert _git(scratch.repo, "log", "-1", "--format=%s") == COMMIT_MESSAGE
+    assert _git(scratch.repo, "rev-parse", "main") == head
+    assert _status(scratch.repo) == ""
+
+
+def test_finish_commands_name_develop_when_the_run_started_on_main(tmp_path: Path):
+    s = _build(tmp_path, branch="main")
+    _stub_gate(s)
+
+    result, out = _run(s, "--yes", "--skip-install", full=True, fail=("npm",))
+
+    assert result.returncode != 0, out
+    assert _finish_lines(out)[-1] == "git branch develop"
+    assert _git(s.repo, "branch", "--list", "develop") == ""
+
+
+def test_failed_lock_command_with_a_red_gate_still_prints_the_undo_command(
+    scratch: Scratch,
+):
+    _stub_gate(scratch, code=1)
+
+    result, out = _run(scratch, "--yes", "--skip-install", full=True, fail=("uv",))
+
+    assert result.returncode != 0, out
+    assert UNDO in out, out
+    assert FINISH_MARKER not in out
+
+
 # --- template README --------------------------------------------------------------------------
 
 
@@ -1214,18 +1319,16 @@ def test_template_readme_getting_started_describes_the_script_and_checklist():
 
 
 def _require_lock_tools(repo: Path) -> None:
-    """Skip the case when `uv lock` or `npm install --package-lock-only` cannot run here.
+    """Skip the case when the script's two lock commands cannot run here.
 
-    `npm ci` runs first because `npm install --package-lock-only` still runs the `prepare`
-    script (`husky`), which fails in a copy without `node_modules/`. The probe commands leave
-    tracked files changed, so they are restored afterwards.
+    The commands are the script's own (`--ignore-scripts` keeps `husky` out of it, so a copy
+    without `node_modules/` works). They leave tracked files changed, so those are restored.
     """
     env = _env()
     env.pop("VIRTUAL_ENV", None)
     for command in (
-        ["npm", "ci"],
         ["uv", "lock"],
-        ["npm", "install", "--package-lock-only"],
+        ["npm", "install", "--package-lock-only", "--ignore-scripts"],
     ):
         try:
             probe = subprocess.run(
