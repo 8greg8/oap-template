@@ -12,6 +12,7 @@ from __future__ import annotations
 import ast
 import json
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -467,6 +468,216 @@ def test_failure_in_rename_exits_nonzero_prints_undo_and_undo_restores_tree(
     assert _status(scratch.repo) == ""
     assert (scratch.repo / "src" / "proj_template").is_dir()
     assert not (scratch.repo / "src" / "my_project").exists()
+
+
+# --- task state reset (plan step 4) -------------------------------------------------------------
+
+TASK_SCRIPTS = ".agents/tasks/scripts"
+
+
+def _tracked_in(repo: Path, *pathspec: str) -> list[str]:
+    out = _git(repo, "ls-files", "-z", "--", *pathspec)
+    return sorted(n for n in out.split("\0") if n)
+
+
+def _task_state_files(repo: Path) -> list[str]:
+    """Return the files the plan says step 4 removes, as they exist before the run."""
+    tasks = [
+        n
+        for n in _tracked_in(repo, ".agents/tasks")
+        if re.fullmatch(r"\.agents/tasks/T-[^/]*\.md", n)
+    ]
+    reports = [
+        n
+        for n in _tracked_in(repo, ".agents/tasks/reports")
+        if re.fullmatch(r"\.agents/tasks/reports/[^/]*\.md", n)
+    ]
+    plans = _tracked_in(repo, ".agents/plans")
+    return tasks + reports + plans
+
+
+def _expected_in(files: list[str], directory: str) -> list[str]:
+    return [n for n in files if n.startswith(directory + "/")]
+
+
+def _script(repo: Path, name: str, *args: str) -> subprocess.CompletedProcess[str]:
+    env = _env()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    return subprocess.run(
+        [sys.executable, f"{TASK_SCRIPTS}/{name}", *args],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+
+
+@pytest.fixture
+def initialized(scratch: Scratch) -> Scratch:
+    before = _task_state_files(scratch.repo)
+    assert before, "the scratch copy should carry task state to remove"
+    result, out = _run(scratch, "--yes", "--skip-install")
+    assert result.returncode == 0, out
+    return scratch
+
+
+def test_dry_run_lists_every_removed_task_state_file_and_changes_nothing(
+    scratch: Scratch,
+):
+    expected = _task_state_files(scratch.repo)
+    assert any("/reports/" in n for n in expected)
+    assert any(n.startswith(".agents/plans/") for n in expected)
+    assert any(re.search(r"/T-\d{4}-", n) for n in expected)
+
+    result, out = _run(scratch, "--dry-run")
+
+    assert result.returncode == 0, out
+    for rel in expected:
+        assert rel in out, f"{rel} missing from change list:\n{out}"
+    assert ".agents/plans/README.md" in out
+    assert ".agents/tasks/.counter" in out
+    assert "BACKLOG.md" in out
+    assert "LESSONS.md" in out
+    assert _status(scratch.repo) == ""
+    for rel in expected:
+        assert (scratch.repo / rel).is_file()
+
+
+def test_no_task_files_remain(initialized: Scratch):
+    tasks_dir = initialized.repo / ".agents" / "tasks"
+    assert sorted(p.name for p in tasks_dir.glob("T-*.md")) == []
+
+
+def test_no_reports_remain(initialized: Scratch):
+    reports = initialized.repo / ".agents" / "tasks" / "reports"
+    assert sorted(p.name for p in reports.glob("*.md")) == []
+
+
+def test_plans_directory_holds_only_a_readme_naming_claude_md_merge_authority(
+    initialized: Scratch,
+):
+    plans = initialized.repo / ".agents" / "plans"
+    assert sorted(p.name for p in plans.iterdir()) == ["README.md"]
+    text = (plans / "README.md").read_text(encoding="utf-8")
+    assert "plans" in text
+    assert "approvals" in text
+    assert "CLAUDE.md" in text
+    assert "Merge authority" in text
+
+
+def test_counter_is_zero(initialized: Scratch):
+    counter = initialized.repo / ".agents" / "tasks" / ".counter"
+    assert counter.read_text(encoding="utf-8").strip() == "0"
+
+
+def test_backlog_lists_no_tasks_and_is_script_generated(initialized: Scratch):
+    backlog = initialized.repo / ".agents" / "tasks" / "BACKLOG.md"
+    text = backlog.read_text(encoding="utf-8")
+    assert "GENERATED FILE" in text
+    assert re.search(r"T-\d{4}", text) is None, text
+    assert "0 task(s)" in text
+    before = _git(initialized.repo, "status", "--porcelain")
+    assert _script(initialized.repo, "backlog.py", "reindex").returncode == 0
+    assert _git(initialized.repo, "status", "--porcelain") == before
+    assert backlog.read_text(encoding="utf-8") == text
+
+
+def test_lessons_lists_no_lessons_and_is_script_generated(initialized: Scratch):
+    lessons = initialized.repo / ".agents" / "LESSONS.md"
+    text = lessons.read_text(encoding="utf-8")
+    assert "GENERATED FILE" in text
+    assert re.search(r"T-\d{4}", text) is None, text
+    assert "0 lesson(s)" in text
+    assert _script(initialized.repo, "report.py", "harvest").returncode == 0
+    assert lessons.read_text(encoding="utf-8") == text
+
+
+def test_templates_and_task_scripts_are_byte_identical_to_the_template(
+    initialized: Scratch,
+):
+    expected = [
+        n
+        for n in _tracked_in(REPO_ROOT, ".agents/tasks/templates", TASK_SCRIPTS)
+        if (REPO_ROOT / n).is_file()
+    ]
+    assert expected
+    for rel in expected:
+        assert (initialized.repo / rel).read_bytes() == (REPO_ROOT / rel).read_bytes()
+    for directory in (".agents/tasks/templates", TASK_SCRIPTS):
+        actual = sorted(
+            p.relative_to(initialized.repo).as_posix()
+            for p in (initialized.repo / directory).rglob("*")
+            if p.is_file()
+        )
+        assert actual == sorted(_expected_in(expected, directory)), actual
+
+
+def test_reports_keepfile_survives_so_git_keeps_the_directory(initialized: Scratch):
+    assert (initialized.repo / ".agents" / "tasks" / "reports" / ".gitkeep").is_file()
+
+
+def test_nothing_is_staged_after_the_reset(initialized: Scratch):
+    assert _git(initialized.repo, "diff", "--cached", "--name-only") == ""
+    deleted = _git(initialized.repo, "diff", "--name-only", "--diff-filter=D")
+    assert ".agents/tasks/reports/T-0001.md" in deleted.splitlines()
+
+
+def test_task_validate_passes_in_the_initialized_copy(initialized: Scratch):
+    result = _script(initialized.repo, "task.py", "validate")
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_next_task_is_allocated_as_t_0001(initialized: Scratch):
+    result = _script(
+        initialized.repo,
+        "task.py",
+        "new",
+        "-t",
+        "First task",
+        "-T",
+        "chore",
+        "-f",
+        "README.md",
+        "--no-publish",
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    created = sorted(
+        p.name for p in (initialized.repo / ".agents" / "tasks").glob("T-*.md")
+    )
+    assert len(created) == 1
+    assert created[0].startswith("T-0001-")
+
+
+def test_reset_adds_no_stub_calls(initialized: Scratch):
+    assert _stub_calls(initialized) == list(LOCK_COMMANDS)
+
+
+def test_failure_in_task_state_reset_prints_undo_and_undo_restores_tree(
+    scratch: Scratch,
+):
+    backlog = scratch.repo / TASK_SCRIPTS / "backlog.py"
+    backlog.write_text("raise SystemExit(3)\n", encoding="utf-8")
+    _git(scratch.repo, "commit", "-q", "--no-verify", "-am", "break backlog")
+
+    result, out = _run(scratch, "--yes", "--skip-install")
+
+    assert result.returncode != 0, out
+    assert UNDO in out, out
+    assert _git(scratch.repo, "diff", "--cached", "--name-only") == ""
+    assert _git(scratch.repo, "branch", "--list", "main") == ""
+    subprocess.run(
+        ["bash", "-c", UNDO],
+        cwd=scratch.repo,
+        check=True,
+        env=_env(),
+        capture_output=True,
+    )
+    assert _status(scratch.repo) == ""
+    assert (scratch.repo / "src" / "proj_template").is_dir()
+    assert (
+        scratch.repo / ".agents" / "plans" / "2026-10-03-template-init.md"
+    ).is_file()
 
 
 # --- script hygiene ---------------------------------------------------------------------------------
