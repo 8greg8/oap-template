@@ -1,7 +1,7 @@
 # Plan: make the repo usable as a template (init script)
 
 Status: proposed. Nothing in this plan is built. It needs the owner's decisions in § Decisions
-before the tasks are filed.
+before the tasks are filed. Amended 2026-10-03 after review: § Review changes lists what changed.
 
 ## Goal
 
@@ -58,19 +58,25 @@ Recommended answer first. Reply with the numbers you accept or change.
 4. **Method text in new projects.** Keep `strategic_model_init_material.md`. It is reference
    material, and `CLAUDE.md` governs.
 5. **Sample code.** Replace `greet` and `farewell` with one smoke test that imports the package.
-   `pytest` exits non-zero when it collects no tests, so a new project needs at least one.
-6. **Self-removal.** The script deletes itself, its tests and the template banner in the README in
-   the same commit, so a second run is impossible and no template residue stays.
-7. **Where it lives.** `scripts/init_project.py`. `scripts/` is under "Ask first", so this needs the
-   owner's written approval for adding that one file. Approving this plan by name is that approval;
-   the orchestrator cites it in each task report.
+   The tooling tests stay, so `pytest` always collects tests; the smoke test proves the renamed
+   package imports.
+6. **Self-removal.** The script deletes itself and its tests in the same commit, so a second run
+   is impossible and no template residue stays.
+7. **Where it lives.** `init_project.py` at the repository root. The script deletes itself, so it
+   need not sit with the permanent tooling, and outside `scripts/` it is not under "Ask first".
+   The alternative is `scripts/init_project.py`, which needs the owner's written approval for
+   adding that one file; approving this plan by name would be that approval, cited in each task
+   report.
+8. **Lessons in new projects.** Clear `LESSONS.md`. It is generated from the reports by
+   `report.py harvest`, so it cannot outlive the report reset. A lesson worth keeping in every
+   project belongs in the template's docs, through a separate task, not in the init script.
 
-## Design: `scripts/init_project.py`
+## Design: `init_project.py`
 
 Run once, from the primary checkout of a new repository made from the template.
 
 ```
-python scripts/init_project.py --name "My Project" --package my_project \
+python init_project.py --name "My Project" --package my_project \
     --owner "Jane Doe" --description "One sentence." [--dry-run] [--yes] [--skip-install]
 ```
 
@@ -81,45 +87,61 @@ Standard library only, like the task scripts, so it runs before any dependency i
 - `src/proj_template/` still exists, so the script has not run before.
 - `--package` is a valid lowercase Python identifier and differs from `proj_template`.
 
+**Names.** Three names are derived, and the dry run prints each:
+- Import package: `--package`, for example `my_project`. Renames `src/proj_template/`, the
+  `packages` path in `[tool.hatch.build.targets.wheel]`, test imports and both dev container
+  names (`<package>` and `<package> (spec-blind)`).
+- Distribution name: `--package` with `_` replaced by `-`, for example `my-project`. Sets
+  `[project] name` in `pyproject.toml` (now `proj-template`).
+- npm name: `<distribution name>-dev-tooling`, for example `my-project-dev-tooling`. Sets the
+  `package.json` name (now `oap-template-dev-tooling`).
+- `--name` is the display name, used in the README title and the `CLAUDE.md` project section.
+  `--description` sets `[project] description` in `pyproject.toml`.
+
 **Steps, in order:**
 1. Print the full change list. `--dry-run` stops here. Otherwise ask for `--yes`.
 2. Install tooling unless `--skip-install`: `npm ci` and `uv sync`, so hooks work.
-3. Rename. Move `src/proj_template` to `src/<package>`. Update the package name and `packages` path
-   in `pyproject.toml`, the `package.json` name, both dev container names, and test imports. Set the
-   LICENSE holder and year. Regenerate `uv.lock` with `uv lock` and `package-lock.json` with
+3. Rename, as in § Names. Set the LICENSE holder and year. Regenerate `uv.lock` with `uv lock` and `package-lock.json` with
    `npm install --package-lock-only`. Never hand-edit either. If offline, print the two commands
    and continue.
-4. Reset task state. Remove `T-*.md` and `reports/*.md`. Empty `.agents/plans/`. Write `0` to
+4. Reset task state. Remove `T-*.md` and `reports/*.md`. Remove every file in `.agents/plans/`
+   and add `.agents/plans/README.md` saying owner plans and approvals go there (`CLAUDE.md` § Merge
+   authority names that directory, and git does not keep an empty one). Write `0` to
    `.agents/tasks/.counter`. Regenerate `BACKLOG.md` and `LESSONS.md` with `backlog.py reindex` and
    `report.py harvest`. Keep `templates/` and `scripts/`.
-5. Seed project files. Replace the README with a short project README. Insert a `## Project`
+5. Seed project files. Write a fresh, short project README in place of the template README; no
+   template banner or text is carried over. Insert a `## Project`
    section at the top of `CLAUDE.md` with the description filled in and comment prompts for
    mission, architecture and domain terms. Add `docs/spec/README.md` explaining that the spec-first
    test rule reads from it. Replace the sample code with the smoke test.
-6. Remove template residue: the script, `tests/test_init_project.py`, and the README banner.
-7. Create the missing `main` or `develop` branch at the current commit. Local only.
-8. Run `scripts/gate.sh`. Stop on red without committing.
-9. Commit once: `chore: initialize project from OAP template`.
+6. Remove template residue: the script and `tests/test_init_project.py`.
+7. Run `scripts/gate.sh`. Stop on red without committing.
+8. Commit once: `chore: initialize project from OAP template`.
+9. Create the missing `main` or `develop` branch at the new commit, so both branches hold the
+   initialized project. Local only. If the branch already exists, refuse and say so; do not move
+   it.
 10. Print the human checklist: push both branches, set the default branch and protection on
     GitHub, fill the `CLAUDE.md` project section, write the first spec.
 
 **Safety:**
 - It never pushes, tags, or force-anything.
 - Every file it removes is listed in the dry run first.
-- On any failure before step 9, it leaves the working tree as `git status` shows and exits non-zero;
-  `git restore` and `git clean` undo it, and the message says so.
+- On any failure before the commit (step 8), it exits non-zero and has created no branch or
+  commit. Every change is in the working tree, as `git status` shows, and
+  `git restore . && git clean -fd` undoes it; the message prints that command. Installed
+  dependencies (`node_modules/`, `.venv/`) are ignored by git and left in place.
 
 ## Task breakdown
 
-Four sequential tasks. They share `scripts/init_project.py` and its test file, so `touches` overlap
+Four sequential tasks. They share `init_project.py` and its test file, so `touches` overlap
 and they cannot run in parallel. Each is PR-sized and ends with a report and an independent verify.
 
 | Task | Scope | Touches | Depends on |
 |---|---|---|---|
-| I-1 | CLI, preconditions, dry run, rename step, lock regeneration | `scripts/init_project.py`, `tests/test_init_project.py` | none |
-| I-2 | Task state reset, `.counter`, regenerate `BACKLOG.md` and `LESSONS.md` | same files | I-1 |
+| I-1 | CLI, preconditions, dry run, name derivation, rename step, lock regeneration | `init_project.py`, `tests/test_init_project.py` | none |
+| I-2 | Task state reset, `.counter`, `.agents/plans/README.md`, regenerate `BACKLOG.md` and `LESSONS.md` | same files | I-1 |
 | I-3 | Seed README, `CLAUDE.md` project section, `docs/spec/`, smoke test | same files | I-2 |
-| I-4 | Branch creation, gate run, single commit, self-removal, final checklist, template README "Getting started" rewrite, end-to-end dogfood test | same files, `README.md` | I-3 |
+| I-4 | Gate run, single commit, branch creation after the commit, self-removal, final checklist, template README "Getting started" rewrite, end-to-end dogfood test | same files, `README.md` | I-3 |
 
 Task files are filed with `task.py new` once the decisions above are settled. Non-goals for all four:
 no change to the gate, hooks, release tooling, `CLAUDE.md` rules or the Ask-first list, and no
@@ -130,7 +152,8 @@ change to the task scripts.
 - Unit tests build a scratch copy of the repo from `git ls-files`, with a bare remote, and run the
   script against it. Expected values come from this plan.
 - I-4 adds one end-to-end test: copy, init, gate green, `task.py new` gives `T-0001`, `main` and
-  `develop` share a merge base, `gitflow.sh hotfix start` works, the script is gone.
+  `develop` both point at the init commit, `gitflow.sh hotfix start` works, the script is gone.
+  A second case makes the gate fail and checks that no commit or branch was created.
 - Dogfood, once I-4 is merged: create a real private repository from the template on GitHub and run
   the script there. The result goes in the I-4 report. This needs a human to create the repository.
 - bash 3.2 does not apply: the script is Python.
@@ -141,7 +164,8 @@ change to the task scripts.
 - **Names in docs.** The docs use `<repo_name>` as a generic placeholder. The script leaves those
   alone, because they describe the convention. Only real names are renamed.
 - **Drift.** A new file with the template name added later is missed by the rename. The end-to-end
-  test greps the result for `proj_template` and `oap-template` and fails on any hit.
+  test greps the result, `uv.lock` included, for `proj_template`, `proj-template` and
+  `oap-template`, and fails on any hit.
 - **Human gates the script cannot do.** Template setting, default branch and branch protection are
   GitHub settings. They are in the checklist, not automated.
 
@@ -150,3 +174,20 @@ change to the task scripts.
 - Updating projects already created from the template.
 - A `gh`-based repository creator.
 - Changing the Gitflow model, the gate, or the merge rules.
+
+## Review changes (2026-10-03)
+
+A review of the first draft against `develop` `96a7bbf` changed:
+
+1. Branch creation moved after the commit. Before, `main` would have pointed at the uninitialized
+   template. The script refuses if the branch already exists.
+2. § Names defines the import package, distribution and npm names, and sets
+   `[project] description`.
+3. Decision 5: corrected reason. The tooling tests stay, so `pytest` always collects tests.
+4. `.agents/plans/` keeps a `README.md`, since `CLAUDE.md` names the directory.
+5. Safety: no branch or commit exists before step 8, and the undo command is exact.
+6. Step 5 writes a fresh README, so the separate banner removal is gone from step 6.
+7. Decision 8 added: `LESSONS.md` is cleared, because it is generated from the reports.
+8. The drift grep includes `proj-template` and `uv.lock`.
+9. Decision 7 recommends `init_project.py` at the root, outside "Ask first"; `scripts/` stays
+   the alternative.
