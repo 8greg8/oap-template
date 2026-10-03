@@ -8,6 +8,10 @@ tags: [{tags}]
 
 # Report — {id}: {title}
 
+Write every section below in concise prose (see `CLAUDE.md`'s "Concise
+prose in task and report files" section) — required literal content
+(status words, safety confirmations) still stays complete.
+
 ## Summary
 
 TODO: two or three sentences. What was asked, what happened, and whether the
@@ -31,6 +35,16 @@ other: passed / failed / skipped / not run / blocked.
 uv run pytest tests/test_x.py :: 12 passed
 uv run ruff check src tests :: passed
 uv run pytest tests/integration :: not run (no test data mount)
+```
+
+End the list with the independent-verify line in exactly this form. The
+orchestrator replaces `pending` with `passed (commit <hash>)`, naming the commit
+verified, or with `failed` or `blocked`. Do not state the verify status in
+`## Summary`; the verify line records it. A `done` task whose
+line says `not run` or `pending` fails `report.py validate`.
+
+```
+Independent verify agent (fresh context) :: pending
 ```
 
 Do not write "all tests passed" unless the full relevant suite was actually run.
