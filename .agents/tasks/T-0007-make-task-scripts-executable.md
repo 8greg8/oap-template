@@ -1,7 +1,7 @@
 ---
 id: T-0007
 title: Make task scripts executable
-status: in_progress
+status: done
 type: fix
 priority: high
 depends_on: []
