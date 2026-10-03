@@ -36,10 +36,12 @@ rewritten itself. They are found in the repository as described below.
   in 11 files, and it appears in commit messages such as `0b32945`. L1 contains L3. L3u, the same
   name with the hyphen written as an underscore, is at `.agents/plans/2026-10-03-workflow-sync.md:129`.
 - Short form of L3 (L3s): the lowercase two-letter abbreviation of L3, used as a whole word in
-  prose and path prefixes (for example `L3s:CLAUDE.md`, `L3s's`). About 70 occurrences in the
-  same 11 files on `develop`, and some in history. L3V, its uppercase form, is a shell variable at
-  `.agents/plans/2026-10-03-workflow-sync.md` lines 315, 317 and 320. A search of all history
-  found the short form only in prose and in that variable, never in lock files or hashes.
+  prose and path prefixes (for example `L3s:CLAUDE.md`, `L3s's`). About 74 occurrences in 8 of
+  those 11 files on `develop`, and some in history. L3V, its uppercase form, is a shell variable
+  at `.agents/plans/2026-10-03-workflow-sync.md` lines 315, 317 and 320. L3t is the test name at
+  `tests/test_report_scripts.py:287`, which embeds L3s between underscores, so a whole-word
+  rule misses it. A search of all history found no other embedded form, and none in lock files,
+  hashes or URLs.
 - Session trailers: about 65 commit messages end with a `Claude-Session:` line. The number grows
   with each session commit.
 - Method text: `strategic_model_init_material.md` is "Orchestrated Agentic Programming", version
@@ -63,6 +65,7 @@ they match, the rewritten `develop` tree must be identical to the `develop` tree
 | L3u | `source_project` |
 | L3V followed by `=..` | `SRC=..` |
 | `"$` L3V `"` | `"$SRC"` |
+| L3t up to and including `_thresholds` | `test_no_source_project_thresholds` |
 | L3s as a whole word, lowercase only (regex `\b<L3s>\b`, case-sensitive) | `source-project` |
 
 L1 therefore becomes `/path/to/source-project`. All rules but the last are plain text.
@@ -100,11 +103,12 @@ git filter-repo --mailmap ../mailmap \
 ```
 
 filter-repo updates abbreviated hashes cited in commit messages on its own. A dry run of this
-exact command with all seven rules, on a full mirror of all branches (2026-10-03, placeholder
+exact command with all eight rules, on a full mirror from GitHub (2026-10-03, placeholder
 address), rewrote all 51 owner commits and left no match for any literal or the work-email domain
-in contents or messages, and no `Claude-Session:` line in messages. The rewritten plan's shell
-lines read `SRC=../source-project` and `"$SRC"`. An independent verify reproduced the four-rule
-version.
+in contents or messages, and no `Claude-Session:` line in messages. The only remaining substring
+match of L3s is the unrelated LaTeX command `\markboth`. The rewritten plan's shell lines read
+`SRC=../source-project` and `"$SRC"`, and the renamed test file compiles. An independent verify
+reproduced the seven-rule version, including tree equivalence with T-0019's two passes.
 
 Before pushing, check:
 - Author and committer addresses are only the private address and `noreply@anthropic.com`.
