@@ -31,14 +31,14 @@ point to the new commits. The old repository survives untouched as `oap-template
   truth. Where this file and the plan differ, stop and report.
 - Depends on T-0015 to T-0019. T-0019 makes the tree free of the literals, so the rewrite must
   leave the `develop` tree unchanged.
-- The literals (P1, L2, L3) are defined in the plan and T-0019 without quoting them. After T-0019
+- The literals (P1, L2, L3, L3u) are defined in the plan and T-0019 without quoting them. After T-0019
   they exist only in history. Read them from `develop` before T-0019's merge commit
   (for example `git show <merge>^1:.agents/LESSONS.md`).
-- The owner's work address is the committer address on 50 commits (`git log --format='%ae'`).
+- The owner's work address is the committer address on 51 commits (`git log --format='%ae'`).
   The owner gives the private address at dispatch. It goes in the mailmap only, never in a
   tracked file.
-- 65 commit messages end with a `Claude-Session:` line.
-- 36 hashes of this repository's commits are cited in tracked files under `.agents/`.
+- About 65 commit messages end with a `Claude-Session:` line; the number grows with each session commit.
+- About 37 hashes of this repository's commits are cited in task, report and plan files under `.agents/`.
 - A dry run of the plan's command on a mirror (2026-10-03) left no literal, no work email and no
   trailer. Tools: `uv tool run git-filter-repo`; gitleaks 8.21.2 from its GitHub release.
 - Re-check against `develop` before starting and report any discrepancy.
@@ -49,13 +49,16 @@ point to the new commits. The old repository survives untouched as `oap-template
   `done`; no unmerged task branch exists on the remote; the owner has renamed this repository to
   `oap-template-archive` and created an empty private `8greg8/oap-template`. If any fails, set
   the task `blocked` and stop.
-- In a scratch directory outside any checkout: mirror-clone `oap-template-archive`, write
+- In a scratch directory outside any checkout: mirror-clone `oap-template-archive` from GitHub
+  and confirm `git rev-parse --is-shallow-repository` prints `false`, write
   `mailmap` and `replace.txt` next to the mirror (not inside it), run the plan's § Step 2
   command, and run its four checks.
 - Push the rewritten `main` and `develop` to the new `8greg8/oap-template`. Push no other ref and
   no tags.
 - In the new repository, on this task's branch: replace each of the 36 cited old hashes in
-  tracked files with its new hash, from `filter-repo/commit-map`, keeping the cited length. Then
+  tracked files with its new hash, from `filter-repo/commit-map`, keeping the cited length.
+  Editing other tasks' files, reports and plans is allowed for this mapping only. This overrides
+  the Workflow rule against editing another task's file. Then
   write the report, commit and push the branch.
 - Re-run the gitleaks scan and the literal checks against a fresh clone of the new repository.
 
@@ -65,7 +68,7 @@ point to the new commits. The old repository survives untouched as `oap-template
 - Do not change repository visibility, the default branch or the template flag. That is the
   owner's step 3.
 - Do not push merged task branches or tags to the new repository.
-- Do not edit file content during the rewrite beyond the three replacements. The tree check must
+- Do not edit file content during the rewrite beyond the four replacements. The tree check must
   stay empty.
 - Do not commit `mailmap`, `replace.txt`, the private address, the work address or any literal.
 - Do not change `scripts/`, `.husky/`, `CLAUDE.md`, `pyproject.toml` or any lock file.
@@ -103,10 +106,11 @@ None needed. The plan already describes the result.
 - [ ] Preconditions are recorded in the report; the task is blocked if any failed.
 - [ ] `git diff <archive develop> <rewritten develop>` was empty before the hash-update commit.
 - [ ] Author and committer addresses are only the private address and `noreply@anthropic.com`.
-- [ ] No pushed commit's content or message contains P1, L2, L3 or the work-email domain.
+- [ ] No pushed commit's content or message contains P1, L2, L3, L3u or the work-email domain.
 - [ ] No pushed commit message has a `Claude-Session:` line.
 - [ ] gitleaks reports no leaks on a fresh clone of the new repository.
 - [ ] Only `main`, `develop` and this task's branch exist on the new repository.
+- [ ] The rewrite ran on a full (not shallow) mirror.
 - [ ] Every cited hash under `.agents/` resolves in the new repository.
 - [ ] `oap-template-archive` is unchanged.
 - [ ] No tracked file or the report contains the private address, the work address or a literal.

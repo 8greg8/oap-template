@@ -19,7 +19,7 @@ prose in task and report files" section) — required literal content
 ## Goal
 
 No tracked file on `develop` contains the local path, the downstream project name or the
-workflow-sync source project name, and the method text is attributed in a new `NOTICE.md`. The
+workflow-sync source project name in either spelling, and the method text is attributed in a new `NOTICE.md`. The
 tree is exactly what T-0020's history rewrite will produce, so the rewritten `develop` tree
 matches it byte for byte.
 
@@ -31,8 +31,9 @@ matches it byte for byte.
 - This file does not quote the literals, because quoting them would put them back in the tree.
   Find them as follows:
   - L3, the source project name: the project named in the title of
-    `.agents/plans/2026-10-03-workflow-sync.md`. 37 occurrences in 11 files: that plan, `.agents/LESSONS.md`,
-    tasks T-0002 to T-0006 and reports T-0002 to T-0005.
+    `.agents/plans/2026-10-03-workflow-sync.md`. 37 lines (45 occurrences) in 11 files: that plan,
+    `.agents/LESSONS.md`, tasks T-0002 to T-0006 and reports T-0002 to T-0005.
+  - L3u, L3 with the hyphen written as an underscore: `.agents/plans/2026-10-03-workflow-sync.md:129`.
   - P1, the home-directory prefix: the text from `/home/` up to and including the `/` before L3
     inside the absolute path at `.agents/LESSONS.md:139` and `.agents/tasks/reports/T-0004.md:85`.
   - L2, the downstream project name: the backticked project name at
@@ -47,8 +48,10 @@ matches it byte for byte.
 ## Scope
 
 - Apply exactly these plain-text replacements to every tracked file that contains them:
-  P1 to `/path/to/`, L2 to `downstream-project`, L3 to `source-project`. Change nothing else on
-  those lines.
+  P1 to `/path/to/`, L2 to `downstream-project`, L3 to `source-project`, L3u to
+  `source_project`. Change nothing else on those lines.
+- Editing other tasks' files and reports, and the workflow-sync plan, is allowed for these
+  replacements only. This overrides the Workflow rule against editing another task's file.
 - Add `NOTICE.md` with a "Third-party material" section for `strategic_model_init_material.md`:
   title, version, author, source URL, a statement that it is included under the MIT License as
   public SLAIF workshop material with copyright held by its author, and this acknowledgement
@@ -66,7 +69,7 @@ matches it byte for byte.
 - Do not rewrite history, change commit metadata or touch git config. That is T-0020.
 - Do not change `scripts/`, `.husky/`, `.agents/tasks/scripts/`, `CLAUDE.md`, `pyproject.toml`
   or any lock file.
-- Do not write any of the three literals, or the owner's work email, into the report.
+- Do not write any of the four literals, or the owner's work email, into the report.
 
 ## Files to inspect
 
@@ -76,17 +79,17 @@ matches it byte for byte.
 
 ## Required behavior
 
-After the change, a case-insensitive `git grep` for each of P1, L2 and L3 on the branch finds
-nothing. Applying T-0020's `replace.txt` to the branch's tree with filter-repo's rules changes
+After the change, a case-insensitive `git grep` for each of P1, L2, L3 and L3u on the branch
+finds nothing. Applying T-0020's `replace.txt` to the branch's tree with filter-repo's rules changes
 no file.
 
 ## Tests required
 
-- `git grep -n -i -e <P1> -e <L2> -e <L3>` on the branch: no output. Run it with the literals
+- `git grep -n -i -e <P1> -e <L2> -e <L3> -e <L3u>` on the branch: no output. Run it with the literals
   read from `develop` at the start of the task. Record the command shape in the report, not the
   literals.
-- `git diff develop --stat` lists only files in `touches` plus the report.
-- `git diff develop --word-diff=porcelain`: every changed word is one of the three replacements,
+- `git diff develop --stat` lists only files in `touches`, the report and `BACKLOG.md`.
+- `git diff develop --word-diff=porcelain`: every changed word is one of the four replacements,
   apart from `NOTICE.md` and the `LICENSE` line.
 - `scripts/gate.sh` passes.
 
@@ -96,12 +99,12 @@ no file.
 
 ## Acceptance criteria
 
-- [ ] No tracked file contains P1, L2 or L3.
-- [ ] Every changed line outside `NOTICE.md` and `LICENSE` differs only by the three replacements.
+- [ ] No tracked file contains P1, L2, L3 or L3u.
+- [ ] Every changed line outside `NOTICE.md` and `LICENSE` differs only by the four replacements.
 - [ ] `NOTICE.md` names the title, version, author and source URL, states MIT with copyright held by the author, and quotes the SLAIF acknowledgement verbatim.
 - [ ] `LICENSE` keeps the MIT text unchanged and adds the one pointer line.
 - [ ] `strategic_model_init_material.md` and `README.md` are unchanged.
-- [ ] The report contains none of the three literals and no work email.
+- [ ] The report contains none of the four literals and no work email.
 - [ ] `scripts/gate.sh` passes.
 - [ ] Diff stays within `touches` plus the report.
 
