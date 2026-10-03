@@ -51,8 +51,12 @@ STATUSES: Sequence[str] = (
 #: Statuses that count as "finished successfully" when resolving dependencies.
 DONE_STATUSES = frozenset({"done"})
 
+#: Branch that task branches fork from and merge into, and that task filing
+#: publishes to. Mirrors DEVELOP_BRANCH in scripts/config/gate.sh.
+INTEGRATION_BRANCH = "develop"
+
 #: Statuses that mean a task must not be dispatched again.
-INACTIVE_STATUSES = frozenset({"in_progress", "review", "done", "abandoned"})
+INACTIVE_STATUSES = frozenset({"in_progress", "blocked", "review", "done", "abandoned"})
 
 #: Conventional Commits types; a task's type drives its git branch prefix.
 TYPES: Sequence[str] = (
