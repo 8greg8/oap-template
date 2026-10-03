@@ -1,7 +1,7 @@
 ---
 id: T-0008
 title: Fix pre-commit re-staging for unusual filenames
-status: open
+status: in_progress
 type: fix
 priority: medium
 depends_on: []
