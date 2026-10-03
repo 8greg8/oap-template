@@ -1,7 +1,7 @@
 ---
 id: T-0015
 title: Add init script CLI, preconditions, names and rename step
-status: open
+status: in_progress
 type: feat
 priority: medium
 depends_on: []

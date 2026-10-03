@@ -4,9 +4,9 @@
 
 # Task Backlog
 
-18 task(s). Generated 2026-10-03.
+20 task(s). Generated 2026-10-03.
 
-| open: 4 | in_progress: 0 | blocked: 0 | review: 0 | done: 14 | abandoned: 0 |
+| open: 4 | in_progress: 2 | blocked: 0 | review: 0 | done: 14 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -20,11 +20,13 @@
 | T-0005 | [Port agent rules, process docs and orchestrator-merge rules](T-0005-port-agent-rules-process-docs-and-orchestrator.md) | done | high | docs | T-0002, T-0003, T-0004, T-0006 | [report](reports/T-0005.md) |
 | T-0007 | [Make task scripts executable](T-0007-make-task-scripts-executable.md) | done | high | fix | — | [report](reports/T-0007.md) |
 | T-0013 | [Make orchestrator merge into develop the default](T-0013-make-orchestrator-merge-into-develop-the-default.md) | done | high | docs | — | [report](reports/T-0013.md) |
+| T-0019 | [Scrub private references and attribute the method text](T-0019-scrub-private-references-and-attribute-the.md) | in_progress | high | docs | — | — |
+| T-0020 | [Rewrite history into a clean public repository copy](T-0020-rewrite-history-into-a-clean-public-repository.md) | open | high | chore | T-0015, T-0016, T-0017, T-0018, T-0019 | — |
 | T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
 | T-0008 | [Fix pre-commit re-staging for unusual filenames](T-0008-fix-pre-commit-re-staging-for-unusual-filenames.md) | done | medium | fix | — | [report](reports/T-0008.md) |
 | T-0012 | [Make staged-file handling NUL-safe in gate and autofix scripts](T-0012-make-staged-file-handling-nul-safe-in-gate-and.md) | done | medium | fix | — | [report](reports/T-0012.md) |
 | T-0014 | [Amend the OAP method text so CLAUDE.md governs merge authority](T-0014-amend-the-oap-method-text-so-claude-md-governs.md) | done | medium | docs | — | [report](reports/T-0014.md) |
-| T-0015 | [Add init script CLI, preconditions, names and rename step](T-0015-add-init-script-cli-preconditions-names-and.md) | open | medium | feat | — | — |
+| T-0015 | [Add init script CLI, preconditions, names and rename step](T-0015-add-init-script-cli-preconditions-names-and.md) | in_progress | medium | feat | — | — |
 | T-0016 | [Reset task state in the init script](T-0016-reset-task-state-in-the-init-script.md) | open | medium | feat | T-0015 | — |
 | T-0017 | [Seed project files in the init script](T-0017-seed-project-files-in-the-init-script.md) | open | medium | feat | T-0016 | — |
 | T-0018 | [Finish the init script with gate, commit, branch and self-removal](T-0018-finish-the-init-script-with-gate-commit-branch.md) | open | medium | feat | T-0017 | — |
@@ -34,14 +36,11 @@
 
 ## Ready to dispatch
 
-Dependencies satisfied, not yet started:
-
-- **T-0015** Add init script CLI, preconditions, names and rename step — `init_project.py`, `tests/test_init_project.py`
-
-Suggested conflict-free parallel batch: T-0015
+*Nothing ready — every open task is blocked or already in flight.*
 
 ## Waiting on dependencies
 
+- **T-0020** Rewrite history into a clean public repository copy — needs T-0015, T-0016, T-0017, T-0018, T-0019
 - **T-0016** Reset task state in the init script — needs T-0015
 - **T-0017** Seed project files in the init script — needs T-0016
 - **T-0018** Finish the init script with gate, commit, branch and self-removal — needs T-0017
