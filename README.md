@@ -12,7 +12,7 @@ the placeholders (`<repo_name>`, mission, architecture) for your actual reposito
 
 | File / folder | Purpose |
 |---|---|
-| [`CLAUDE.md`](CLAUDE.md) | The entry point for any coding agent working in this repo — autonomy boundaries, what needs asking first, spec-first test rules, batch-run authority, and how the task workflow below fits together. [`AGENTS.md`](AGENTS.md) is a one-line redirect to it. |
+| [`CLAUDE.md`](CLAUDE.md) | The entry point for any coding agent working in this repo — autonomy boundaries, what needs asking first, spec-first test rules, merge authority, and how the task workflow below fits together. [`AGENTS.md`](AGENTS.md) is a one-line redirect to it. |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | Branching (Gitflow), commit conventions, semantic versioning, and the verify/resolve/merge workflow every change follows. |
 | [`PYTHON_CONVENTIONS.md`](PYTHON_CONVENTIONS.md) | Project layout (`uv` workspace, `src/` layout), commands, dependency management, testing, and code style. |
 | [`DEV_TOOLING_SPEC.md`](DEV_TOOLING_SPEC.md) | Spec for the `scripts/` + `.husky/` + `package.json` bundle: deterministic lint/typecheck/test gates, commit-message validation, SemVer release tagging, and Gitflow helpers — copy-pasteable into any repo. |
