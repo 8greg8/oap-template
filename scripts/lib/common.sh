@@ -63,3 +63,26 @@ run_gate() {
         return 1
     fi
 }
+
+# staged_files: staged paths (added, copied, modified, renamed) matching STAGED_GLOB.
+staged_files() {
+    git diff --cached --name-only --diff-filter=ACMR -- "${STAGED_GLOB:-*}"
+}
+
+# run_on_files <name> <command-string> [files...]: run_gate with the files appended as
+# arguments to the command string; with no files the command runs unchanged.
+run_on_files() {
+    local name="$1" cmd="$2"; shift 2
+    run_gate "$name" bash -c "$cmd \"\$@\"" gate ${1+"$@"}
+}
+
+# merge_message <branch> <base>: the merge commit header, in the chore(merge) form.
+# Task branches (<type>/T-NNNN-<slug>) name the task; any other branch names itself.
+merge_message() {
+    local branch="$1" base="$2"
+    if [[ "$branch" =~ ^[a-z]+/T-([0-9]{4,})- ]]; then
+        printf 'chore(merge): merge task %s into %s' "${BASH_REMATCH[1]}" "$base"
+    else
+        printf 'chore(merge): merge %s into %s' "$branch" "$base"
+    fi
+}

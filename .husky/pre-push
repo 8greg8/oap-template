@@ -1,2 +1,31 @@
 #!/usr/bin/env sh
-scripts/gate.sh
+# Skip the gate when every pushed commit changes only .agents/ records (task files,
+# reports, BACKLOG.md, LESSONS.md), as `task.py new` does on each filing. Tooling code
+# under .agents/tasks/scripts/ always runs the gate. Files are listed
+# per commit, so a change that a later commit reverts still counts. Anything else runs the
+# full gate: a file outside .agents/ (including one renamed into it, hence --no-renames), a
+# new remote branch, or a range git cannot list. A merge commit lists its files against its
+# first parent (--diff-merges=first-parent), so a change made only inside a merge counts.
+tasks_only=1
+while read -r local_ref local_sha remote_ref remote_sha; do
+  # A deleted ref (all-zero local sha) pushes no commits.
+  case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+  # A new remote branch (all-zero remote sha) has no base to diff against.
+  case "$remote_sha" in *[!0]*) ;; *) tasks_only=0; break ;; esac
+  if ! changed=$(git log --format= --name-only --no-renames --diff-merges=first-parent "$remote_sha..$local_sha" 2>/dev/null); then
+    tasks_only=0
+    break
+  fi
+  if printf '%s\n' "$changed" | grep -q -v -e '^\.agents/' -e '^$' \
+      || printf '%s\n' "$changed" | grep -q '^\.agents/tasks/scripts/'; then
+    tasks_only=0
+    break
+  fi
+done
+
+if [ "$tasks_only" = 1 ]; then
+  echo "pre-push: only .agents/ records changed; skipping gate."
+  exit 0
+fi
+
+exec scripts/gate.sh

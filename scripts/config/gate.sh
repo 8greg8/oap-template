@@ -18,3 +18,8 @@ TEST_CMD="uv run pytest"
 # Branch names used by gitflow.sh and release.py, per CONTRIBUTING.md § Branching.
 MAIN_BRANCH="main"
 DEVELOP_BRANCH="develop"
+
+# Pathspec for files the pre-commit hook checks (gate.sh --staged, autofix.sh --staged).
+# LINT_CMD, FORMAT_CHECK_CMD and TYPECHECK_CMD (and the *_FIX_CMDs) must accept file paths
+# as trailing arguments; with no arguments they check the whole repo.
+STAGED_GLOB="*.py"

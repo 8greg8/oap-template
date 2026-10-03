@@ -19,7 +19,7 @@ Install the hooks:
 
 ```bash
 npm install
-npm run prepare      # husky sets core.hooksPath to .husky/
+npm run prepare      # husky sets core.hooksPath to .husky/_
 chmod +x .husky/* scripts/*.sh scripts/*.py
 ```
 
@@ -27,7 +27,7 @@ Verify it landed correctly (this template's `.agents/tasks/scripts/housekeep.py 
 this automatically if that tooling is also present):
 
 ```bash
-git config --get core.hooksPath      # should print .husky
+git config --get core.hooksPath      # should print .husky/_ (Husky 9)
 ls -l .husky                          # hook files should be executable
 ```
 
@@ -36,7 +36,9 @@ ls -l .husky                          # hook files should be executable
 ```bash
 scripts/gate.sh              # run all 4 verify gates (lint, format check, typecheck, test)
 scripts/gate.sh --fast       # skip tests, for a quick iteration loop (not a substitute for the full gate)
+scripts/gate.sh --staged     # lint/format/typecheck only staged files matching STAGED_GLOB; no tests
 scripts/autofix.sh           # apply lint autofix + formatting, then re-run scripts/gate.sh
+scripts/autofix.sh --staged  # same, but only on staged files matching STAGED_GLOB
 
 scripts/commit_lint.py <msg-file>    # validate a commit message (used by .husky/commit-msg)
 scripts/next_version.py              # print the next SemVer version from commits since last tag
@@ -54,9 +56,15 @@ scripts/gitflow.sh hotfix  start|finish <topic>   # from/into main, with back-me
 
 | Hook | Runs |
 |---|---|
-| `pre-commit` | `autofix.sh`, stages the result, then the full `gate.sh` |
-| `commit-msg` | `commit_lint.py` against the message being committed |
-| `pre-push` | the full `gate.sh` |
+| `pre-commit` | `autofix.sh --staged`, re-stages the files that were staged, then `gate.sh --staged` (no tests). Skipped when only `.agents/` records are staged |
+| `commit-msg` | `commit_lint.py` against the message being committed (lines <= 100 chars) |
+| `pre-push` | the full `gate.sh`. Skipped when every pushed commit changes only `.agents/` records |
+
+Code under `.agents/tasks/scripts/` is never skipped by either hook. A new remote branch, or a
+range git cannot list, always runs the full gate. `gitflow.sh finish` merges with
+`chore(merge): merge task NNNN into <base>` (task branches) or
+`chore(merge): merge <branch> into <base>`. The `STAGED_GLOB` pathspec in
+`config/gate.sh` selects the files `--staged` checks.
 
 These are the same scripts an agent (or you) should run by hand during the verify/resolve loop
 — the hooks are a safety net, not the primary way this gate gets run.
