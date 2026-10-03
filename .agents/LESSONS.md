@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-9 lesson(s) across 7 section(s). Generated 2026-10-03.
+10 lesson(s) across 8 section(s). Generated 2026-10-03.
 
 ## Tag index
 
@@ -22,6 +22,7 @@ to all lessons that carry it.
 - `docker` — [T-0006](#t-0006-success)
 - `docs` — [T-0005](#t-0005-success)
 - `execution-loop` — [T-0001](#t-0001-success)
+- `file-mode` — [T-0009](#t-0009-success)
 - `file-modes` — [T-0007](#t-0007-success)
 - `gate` — [T-0004](#t-0004-success)
 - `git` — [T-0007](#t-0007-success), [T-0012](#t-0012-success)
@@ -41,7 +42,9 @@ to all lessons that carry it.
 - `ruff` — [T-0007](#t-0007-success)
 - `scripts` — [T-0012](#t-0012-success)
 - `set-status` — [T-0001](#t-0001-success)
+- `shebang` — [T-0009](#t-0009-success)
 - `staged-files` — [T-0012](#t-0012-success)
+- `task-scripts` — [T-0009](#t-0009-success)
 - `task-tooling` — [T-0001](#t-0001-success), [T-0002](#t-0002-success)
 - `uv` — [T-0006](#t-0006-success)
 - `worktree` — [T-0002](#t-0002-success)
@@ -125,6 +128,16 @@ Source: [`reports/T-0003.md`](tasks/reports/T-0003.md)
 Tags: `scripts`, `bash`, `git`, `nul-safe`, `staged-files`
 
 Source: [`reports/T-0012.md`](tasks/reports/T-0012.md)
+
+## task-scripts
+
+### T-0009 (success)
+
+`git update-index --chmod=-x` also stages the file's current content, so a later `git add` is not needed for edits made before it.
+
+Tags: `task-scripts`, `shebang`, `file-mode`
+
+Source: [`reports/T-0009.md`](tasks/reports/T-0009.md)
 
 ## task-tooling
 

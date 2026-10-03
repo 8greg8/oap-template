@@ -6,7 +6,7 @@
 
 12 task(s). Generated 2026-10-03.
 
-| open: 1 | in_progress: 2 | blocked: 0 | review: 0 | done: 9 | abandoned: 0 |
+| open: 1 | in_progress: 1 | blocked: 0 | review: 0 | done: 10 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -22,7 +22,7 @@
 | T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
 | T-0008 | [Fix pre-commit re-staging for unusual filenames](T-0008-fix-pre-commit-re-staging-for-unusual-filenames.md) | done | medium | fix | — | [report](reports/T-0008.md) |
 | T-0012 | [Make staged-file handling NUL-safe in gate and autofix scripts](T-0012-make-staged-file-handling-nul-safe-in-gate-and.md) | done | medium | fix | — | [report](reports/T-0012.md) |
-| T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | in_progress | low | chore | — | — |
+| T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | done | low | chore | — | [report](reports/T-0009.md) |
 | T-0010 | [Fix agent-doc wording and stale AGENTS.md references](T-0010-fix-agent-doc-wording-and-stale-agents-md.md) | in_progress | low | docs | — | — |
 | T-0011 | [Support docs and chore task branches in gitflow and fix housekeep worktrees](T-0011-support-docs-and-chore-task-branches-in-gitflow.md) | open | low | fix | — | — |
 
@@ -32,4 +32,4 @@ Dependencies satisfied, not yet started:
 
 - **T-0011** Support docs and chore task branches in gitflow and fix housekeep worktrees — `scripts/gitflow.sh`, `.agents/tasks/scripts/housekeep.py`, `tests/test_report_scripts.py`, `tests/test_hooks.py`
 
-Suggested conflict-free parallel batch: 
+Suggested conflict-free parallel batch: T-0011

@@ -1,7 +1,7 @@
 ---
 id: T-0009
 title: Drop shebangs from private task script helpers
-status: in_progress
+status: done
 type: chore
 priority: low
 depends_on: []
