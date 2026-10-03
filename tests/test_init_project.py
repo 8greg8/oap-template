@@ -359,10 +359,8 @@ def test_yes_skip_install_renames_every_template_name(scratch: Scratch):
     )
     assert "8greg8" not in license_text
 
-    greet = (repo / "tests" / "test_greet.py").read_text(encoding="utf-8")
-    farewell = (repo / "tests" / "test_farewell.py").read_text(encoding="utf-8")
-    assert "from my_project import greet" in greet
-    assert "from my_project import farewell" in farewell
+    smoke = (repo / "tests" / "test_smoke.py").read_text(encoding="utf-8")
+    assert "import my_project" in smoke
 
 
 def test_skip_install_still_runs_the_lock_commands_and_nothing_else(scratch: Scratch):
@@ -678,6 +676,200 @@ def test_failure_in_task_state_reset_prints_undo_and_undo_restores_tree(
     assert (
         scratch.repo / ".agents" / "plans" / "2026-10-03-template-init.md"
     ).is_file()
+
+
+# --- seeded project files (plan step 5) ---------------------------------------------------------
+
+TEMPLATE_README_TITLE = "# OAP Template"
+TEMPLATE_README_SENTENCE = "This is a **template**, not a working project"
+WORKING_UNIT = "## Working unit: the task"
+
+
+def _text(repo: Path, rel: str) -> str:
+    return (repo / rel).read_bytes().decode("utf-8")
+
+
+def _change_lines(out: str) -> list[str]:
+    return [line.strip() for line in out.splitlines()]
+
+
+def test_dry_run_lists_every_seeded_replaced_and_removed_file(scratch: Scratch):
+    result, out = _run(scratch, "--dry-run")
+
+    assert result.returncode == 0, out
+    lines = _change_lines(out)
+    expected = [
+        ("replace", "README.md"),
+        ("edit", "CLAUDE.md"),
+        ("write", "docs/spec/README.md"),
+        ("replace", "src/my_project/__init__.py"),
+        ("remove", "tests/test_greet.py"),
+        ("remove", "tests/test_farewell.py"),
+        ("write", "tests/test_smoke.py"),
+    ]
+    for verb, path in expected:
+        assert any(
+            line.startswith(f"{verb} ") and path in line.split(":")[0] for line in lines
+        ), f"`{verb} {path}` missing from change list:\n{out}"
+    assert _status(scratch.repo) == ""
+    assert not (scratch.repo / "docs").exists()
+    assert (scratch.repo / "tests" / "test_greet.py").is_file()
+
+
+def test_readme_is_a_fresh_short_project_readme(initialized: Scratch):
+    text = _text(initialized.repo, "README.md")
+
+    assert text.startswith("# My Project\n")
+    assert "One sentence." in text
+    assert "`CLAUDE.md`" in text
+    assert "`.agents/README.md`" in text
+    assert "scripts/gate.sh" in text
+    assert len(text.splitlines()) <= 30
+    assert TEMPLATE_README_TITLE not in text
+    assert TEMPLATE_README_SENTENCE not in text
+    assert "OAP Template" not in text
+    assert not any(s in text for s in TEMPLATE_STRINGS)
+    assert "<repo_name>" not in text
+
+
+def test_claude_md_gains_only_a_project_section_before_the_working_unit(
+    initialized: Scratch,
+):
+    template = _text(REPO_ROOT, "CLAUDE.md")
+    text = _text(initialized.repo, "CLAUDE.md")
+
+    assert text != template
+    start = text.index("## Project\n")
+    end = text.index(WORKING_UNIT)
+    assert start < end
+    # Removing the section gives the template's file back, byte for byte.
+    assert text[:start] + text[end:] == template
+    # It is the first `##` section.
+    assert re.findall(r"^## .*$", text, re.MULTILINE)[0] == "## Project"
+    assert text.count("## Project\n") == 1
+
+
+def test_claude_md_project_section_has_name_description_and_comment_prompts(
+    initialized: Scratch,
+):
+    text = _text(initialized.repo, "CLAUDE.md")
+    section = text[text.index("## Project\n") : text.index(WORKING_UNIT)]
+
+    assert "My Project" in section
+    assert "One sentence." in section
+    comments = re.findall(r"<!--.*?-->", section, re.DOTALL)
+    assert len(comments) >= 3, section
+    for topic in ("mission", "architecture", "domain"):
+        assert any(topic in c.lower() for c in comments), (
+            f"no {topic} prompt:\n{section}"
+        )
+    # Prompts only: no text outside comments beyond the heading and the filled-in values.
+    prose = re.sub(r"<!--.*?-->", "", section, flags=re.DOTALL)
+    assert "mission is" not in prose.lower()
+
+
+def test_spec_readme_exists_and_names_the_spec_first_rule(initialized: Scratch):
+    text = _text(initialized.repo, "docs/spec/README.md")
+
+    assert "specification" in text
+    assert "CLAUDE.md" in text
+    assert "spec-first" in text
+    assert len(text.splitlines()) <= 15
+
+
+def test_sample_package_is_docstring_only(initialized: Scratch):
+    init = initialized.repo / "src" / "my_project" / "__init__.py"
+    tree = ast.parse(init.read_text(encoding="utf-8"))
+
+    assert len(tree.body) == 1
+    node = tree.body[0]
+    assert isinstance(node, ast.Expr)
+    assert isinstance(node.value, ast.Constant)
+    assert isinstance(node.value.value, str)
+    assert ast.get_docstring(tree)
+    text = init.read_text(encoding="utf-8")
+    assert "greet" not in text
+    assert "farewell" not in text
+
+
+def test_sample_tests_are_gone_and_smoke_test_imports_the_package(
+    initialized: Scratch,
+):
+    tests = initialized.repo / "tests"
+    assert not (tests / "test_greet.py").exists()
+    assert not (tests / "test_farewell.py").exists()
+    smoke = tests / "test_smoke.py"
+    assert smoke.is_file()
+    tree = ast.parse(smoke.read_text(encoding="utf-8"))
+    imported = {
+        alias.name
+        for n in ast.walk(tree)
+        if isinstance(n, ast.Import)
+        for alias in n.names
+    }
+    assert "my_project" in imported
+    functions = [n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
+    assert any(name.startswith("test_") for name in functions)
+    assert "greet" not in smoke.read_text(encoding="utf-8")
+
+
+def test_smoke_test_passes_against_the_renamed_package(initialized: Scratch):
+    env = _env()
+    env["PYTHONPATH"] = str(initialized.repo / "src")
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests/test_smoke.py",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+        ],
+        cwd=initialized.repo,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_seeding_adds_no_stub_calls_and_stages_nothing(initialized: Scratch):
+    assert _stub_calls(initialized) == list(LOCK_COMMANDS)
+    assert _git(initialized.repo, "diff", "--cached", "--name-only") == ""
+    untracked = _git(initialized.repo, "ls-files", "--others", "--exclude-standard")
+    assert {"docs/spec/README.md", "tests/test_smoke.py"} <= set(untracked.splitlines())
+
+
+def test_failure_in_seeding_prints_undo_and_undo_restores_tree(scratch: Scratch):
+    claude_md = scratch.repo / "CLAUDE.md"
+    text = claude_md.read_text(encoding="utf-8")
+    claude_md.write_text(
+        text.replace(WORKING_UNIT, "## Something else"), encoding="utf-8"
+    )
+    _git(
+        scratch.repo, "commit", "-q", "--no-verify", "-am", "drop working unit heading"
+    )
+
+    result, out = _run(scratch, "--yes", "--skip-install")
+
+    assert result.returncode != 0, out
+    assert UNDO in out, out
+    assert _git(scratch.repo, "diff", "--cached", "--name-only") == ""
+    assert _git(scratch.repo, "branch", "--list", "main") == ""
+    subprocess.run(
+        ["bash", "-c", UNDO],
+        cwd=scratch.repo,
+        check=True,
+        env=_env(),
+        capture_output=True,
+    )
+    assert _status(scratch.repo) == ""
+    assert (scratch.repo / "src" / "proj_template").is_dir()
+    assert (scratch.repo / "tests" / "test_greet.py").is_file()
+    assert not (scratch.repo / "docs").exists()
 
 
 # --- script hygiene ---------------------------------------------------------------------------------
