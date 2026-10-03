@@ -4,9 +4,9 @@
 
 # Task Backlog
 
-7 task(s). Generated 2026-10-03.
+9 task(s). Generated 2026-10-03.
 
-| open: 3 | in_progress: 0 | blocked: 0 | review: 0 | done: 4 | abandoned: 0 |
+| open: 5 | in_progress: 0 | blocked: 0 | review: 0 | done: 4 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -20,14 +20,18 @@
 | T-0005 | [Port agent rules, process docs and orchestrator-merge rules](T-0005-port-agent-rules-process-docs-and-orchestrator.md) | open | high | docs | T-0002, T-0003, T-0004, T-0006 | — |
 | T-0007 | [Make task scripts executable](T-0007-make-task-scripts-executable.md) | done | high | fix | — | [report](reports/T-0007.md) |
 | T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
+| T-0008 | [Fix pre-commit re-staging for unusual filenames](T-0008-fix-pre-commit-re-staging-for-unusual-filenames.md) | open | medium | fix | — | — |
+| T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | open | low | chore | — | — |
 
 ## Ready to dispatch
 
 Dependencies satisfied, not yet started:
 
 - **T-0003** Port report validation, harvest and housekeep checks — `.agents/tasks/scripts/report.py`, `.agents/tasks/scripts/housekeep.py`, `.agents/tasks/templates/report.md`, `tests/test_report_scripts.py`
+- **T-0008** Fix pre-commit re-staging for unusual filenames — `.husky/pre-commit`, `tests/test_hooks.py`
+- **T-0009** Drop shebangs from private task script helpers — `.agents/tasks/scripts`, `tests/test_task_scripts.py`
 
-Suggested conflict-free parallel batch: T-0003
+Suggested conflict-free parallel batch: T-0003, T-0008
 
 ## Waiting on dependencies
 
