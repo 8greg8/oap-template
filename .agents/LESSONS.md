@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-6 lesson(s) across 6 section(s). Generated 2026-10-03.
+7 lesson(s) across 6 section(s). Generated 2026-10-03.
 
 ## Tag index
 
@@ -23,13 +23,15 @@ to all lessons that carry it.
 - `file-modes` — [T-0007](#t-0007-success)
 - `gate` — [T-0004](#t-0004-success)
 - `git` — [T-0007](#t-0007-success)
+- `git-pathspec` — [T-0008](#t-0008-success)
 - `git-publish` — [T-0002](#t-0002-success)
 - `gitflow` — [T-0004](#t-0004-success)
-- `hooks` — [T-0004](#t-0004-success)
+- `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success)
 - `housekeep` — [T-0003](#t-0003-success)
-- `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success)
+- `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success)
 - `orchestrator` — [T-0005](#t-0005-success)
 - `port` — [T-0003](#t-0003-success)
+- `pre-commit` — [T-0008](#t-0008-success)
 - `process` — [T-0005](#t-0005-success)
 - `report-validation` — [T-0003](#t-0003-success)
 - `ruff` — [T-0007](#t-0007-success)
@@ -86,6 +88,16 @@ Source: [`reports/T-0007.md`](tasks/reports/T-0007.md)
 Tags: `hooks`, `husky`, `gate`, `commit-lint`, `gitflow`
 
 Source: [`reports/T-0004.md`](tasks/reports/T-0004.md)
+
+### T-0008 (success)
+
+- A rename is invisible to a `--diff-filter=ACMR` listing as anything but its new path. Use `--no-renames` and no filter when deciding on "what did this commit touch", as `pre-push` does.
+- `git add -- <name>` treats `[`, `*` and `?` in a name as pathspec globs, so a test that stages `a[1].py` must use `:(literal)a[1].py`, and the hook must set `GIT_LITERAL_PATHSPECS=1`.
+- Hook tests with stub `autofix.sh`/`gate.sh` cannot show problems inside the real scripts. Check unusual names against the real `staged_files` too.
+
+Tags: `hooks`, `husky`, `pre-commit`, `git-pathspec`
+
+Source: [`reports/T-0008.md`](tasks/reports/T-0008.md)
 
 ## report-validation
 
