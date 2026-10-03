@@ -600,3 +600,32 @@ def test_publish_task_commit_header_fits_the_limit_for_a_long_slug(tmp_path):
     header = _git(clone, "log", "-1", "--format=%s").stdout.strip()
     assert len(header) <= _git_publish.MAX_HEADER_LENGTH
     assert header.startswith("chore(tasks): file T-0001 ")
+
+
+# --- executable bit on shebang-bearing scripts ---------------------------------
+
+
+def test_shebang_task_scripts_are_executable_in_git_index():
+    """Every script under `.agents/tasks/scripts/` that starts with `#!` is mode 100755.
+
+    ruff's EXE001 fires on a shebang file without the executable bit, and a fresh clone
+    takes its file modes from the git index, not from the author's working tree.
+    """
+    listing = subprocess.run(
+        ["git", "ls-files", "-s", "--", ".agents/tasks/scripts/*.py"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    assert listing, "git ls-files returned no task scripts"
+
+    wrong = {}
+    for line in listing:
+        meta, path = line.split("\t", 1)
+        mode = meta.split()[0]
+        has_shebang = (REPO_ROOT / path).read_bytes().startswith(b"#!")
+        expected = "100755" if has_shebang else "100644"
+        if mode != expected:
+            wrong[path] = f"{mode} (expected {expected})"
+    assert not wrong, f"wrong git index modes: {wrong}"
