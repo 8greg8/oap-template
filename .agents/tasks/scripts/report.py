@@ -17,6 +17,8 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import logging
+import os
+import re
 import subprocess
 import sys
 from collections import defaultdict
@@ -26,21 +28,59 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from _frontmatter import FrontmatterError
 from _schema import (
+    INTEGRATION_BRANCH,
     LESSONS_FILE,
     OUTCOMES,
     PLACEHOLDER,
+    REPO_ROOT,
     REPORT_TEMPLATE,
     REQUIRED_REPORT_SECTIONS,
     TASKS_DIR,
     Report,
+    Task,
     ValidationError,
     find_task,
     load_reports,
+    load_tasks,
+    paths_overlap,
 )
 
 logger = logging.getLogger("report")
 
 UNTAGGED = "untagged"
+
+#: Repository-discovery variables a git hook exports; they would override ``cwd``
+#: and point the merge lookup at the wrong repository.
+_GIT_ENV_TO_STRIP = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CEILING_DIRECTORIES",
+)
+
+#: The one form the independent-verify line takes in "## Tests run".
+VERIFY_LINE_RE = re.compile(
+    r"^Independent verify agent \(fresh context\) :: (?P<status>.+?)\s*$",
+    re.MULTILINE,
+)
+
+#: A verify line names its commit as ``commit <hash>`` (7 to 40 hex digits).
+VERIFY_COMMIT_RE = re.compile(r"\bcommit [0-9a-f]{7,40}\b")
+
+#: A summary that calls the verify pending or not run contradicts the verify line.
+STALE_SUMMARY_RE = re.compile(
+    r"verif\w*[^.\n]*\b(pending|has not run)\b", re.IGNORECASE
+)
+
+#: The other stale-summary wording: acceptance met "except the independent verify".
+STALE_SUMMARY_PHRASE = "except the independent verify"
+
+TOUCHES_TICKED_RE = re.compile(
+    r"^- \[[xX]\] No files changed outside the task's declared `touches` scope\.",
+    re.MULTILINE,
+)
 
 GENERATED_HEADER = (
     "<!-- GENERATED FILE — do not edit by hand.\n"
@@ -104,11 +144,136 @@ def create_report(task_id: str, force: bool = False) -> Path:
     return path
 
 
-def validate_report(report: Report) -> list[str]:
-    """Check a report for missing sections and unfilled placeholders.
+def _git_env() -> dict[str, str]:
+    return {k: v for k, v in os.environ.items() if k not in _GIT_ENV_TO_STRIP}
+
+
+def merge_commit_for(task_id: str, repo_root: Path) -> str | None:
+    """Find the merge commit whose subject names a task.
+
+    Args:
+        task_id: Identifier such as ``T-0004``.
+        repo_root: Repository to search (history reachable from ``HEAD``).
+
+    Returns:
+        The newest matching commit hash, or ``None`` when there is none.
+    """
+    number = task_id.strip().upper().removeprefix("T-")
+    subject = f"chore(merge): merge task {number} into {INTEGRATION_BRANCH}"
+    try:
+        result = subprocess.run(
+            ["git", "log", "--format=%H %s", "--fixed-strings", f"--grep={subject}"],
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=repo_root,
+            env=_git_env(),
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    for line in result.stdout.splitlines():
+        commit, _, found = line.partition(" ")
+        if found == subject:
+            return commit
+    return None
+
+
+def _outside_touches(files: list[str], task: Task) -> list[str]:
+    allowed = [*task.touches, f".agents/tasks/reports/{task.id}.md"]
+    task_file_prefix = f".agents/tasks/{task.id}-"
+    return [
+        name
+        for name in files
+        if not (
+            any(paths_overlap(name, entry) for entry in allowed)
+            or (
+                name.startswith(task_file_prefix)
+                and name.endswith(".md")
+                and "/" not in name.removeprefix(".agents/tasks/")
+            )
+        )
+    ]
+
+
+def validate_done_rules(
+    report: Report, task: Task, repo_root: Path = REPO_ROOT
+) -> list[str]:
+    """Apply the verify and touches rules to a ``done`` task's report.
 
     Args:
         report: The parsed report.
+        task: The task the report belongs to.
+        repo_root: Repository searched for the task's merge commit.
+
+    Returns:
+        Problems found; empty when the task is not done or is compliant.
+    """
+    if task.status != "done":
+        return []
+    problems: list[str] = []
+
+    match = VERIFY_LINE_RE.search(report.section_text("Tests run"))
+    if not match:
+        problems.append(
+            "done task has no 'Independent verify agent (fresh context) :: <status>' "
+            "line in '## Tests run'"
+        )
+    else:
+        status = match.group("status").lower()
+        if not status.startswith("passed"):
+            problems.append(
+                f"independent verify is recorded as {match.group('status')!r}; "
+                "a done task needs a verify status that starts with 'passed'"
+            )
+        elif not (VERIFY_COMMIT_RE.search(match.group("status"))):
+            problems.append(
+                "independent verify line names no commit; record it as "
+                "'passed (commit <hash>; ...)' with the commit the verify checked"
+            )
+
+    summary = report.section_text("Summary")
+    if STALE_SUMMARY_RE.search(summary) or STALE_SUMMARY_PHRASE in summary.lower():
+        problems.append(
+            "'## Summary' calls the independent verify pending, not run or "
+            "excepted; state the outcome only in the verify line"
+        )
+
+    if TOUCHES_TICKED_RE.search(report.section_text("Safety confirmations")):
+        commit = merge_commit_for(task.id, repo_root)
+        if commit is None:
+            logger.info("%s: no merge commit yet; touches check skipped", task.id)
+        else:
+            try:
+                diff = subprocess.run(
+                    ["git", "diff", "--name-only", f"{commit}^1", commit],
+                    capture_output=True,
+                    text=True,
+                    check=True,
+                    cwd=repo_root,
+                    env=_git_env(),
+                )
+            except (OSError, subprocess.CalledProcessError) as exc:
+                problems.append(f"could not diff merge commit {commit[:12]}: {exc}")
+            else:
+                outside = _outside_touches(diff.stdout.split(), task)
+                if outside:
+                    problems.append(
+                        "touches box is ticked but merge "
+                        f"{commit[:12]} changed files outside touches: "
+                        + ", ".join(outside)
+                    )
+    return problems
+
+
+def validate_report(
+    report: Report, task: Task | None = None, repo_root: Path = REPO_ROOT
+) -> list[str]:
+    """Check a report for missing sections, placeholders and false claims.
+
+    Args:
+        report: The parsed report.
+        task: The report's task; when given, the done-task rules also run.
+        repo_root: Repository used by the touches check.
 
     Returns:
         A list of human-readable problems; empty means the report is complete.
@@ -124,28 +289,51 @@ def validate_report(report: Report) -> list[str]:
             problems.append(f"missing section '## {heading}'")
         elif PLACEHOLDER in text:
             problems.append(f"section '## {heading}' still contains a placeholder")
+    if task is not None:
+        problems += validate_done_rules(report, task, repo_root)
     return problems
 
 
 def collect_lessons() -> dict[str, list[tuple]]:
-    """Gather the lessons section from every report, grouped by tag.
+    """Gather the lessons section from every report, each lesson once.
+
+    A lesson is filed under the first tag its report declares. The remaining
+    tags are kept on the entry so the tag index can still link to it.
 
     Returns:
-        A mapping of tag to a list of ``(task_id, outcome, text)`` tuples.
-        Reports with no lessons, or with an unfilled placeholder, are skipped.
+        A mapping of first tag to a list of
+        ``(task_id, outcome, text, stem, tags)`` tuples, where ``stem`` is the
+        report's filename without ``.md`` and ``tags`` is every tag of the
+        report. Reports with no lessons, or with an unfilled placeholder, are
+        skipped.
     """
     grouped: dict[str, list[tuple]] = defaultdict(list)
     for report in load_reports():
         text = report.section_text("Lessons learned")
         if not text or PLACEHOLDER in text:
             continue
-        for tag in report.tags or [UNTAGGED]:
-            grouped[tag].append((report.task_id, report.outcome, text))
+        tags = report.tags or [UNTAGGED]
+        grouped[tags[0]].append(
+            (report.task_id, report.outcome, text, report.path.stem, tags)
+        )
     return grouped
+
+
+def _lesson_anchor(stem: str, outcome: str) -> str:
+    """Return the Markdown anchor of a lesson heading ``### <stem> (<outcome>)``."""
+    return (
+        f"{stem} ({outcome})".lower()
+        .replace("(", "")
+        .replace(")", "")
+        .replace(" ", "-")
+    )
 
 
 def render_lessons(grouped: dict[str, list[tuple]]) -> str:
     """Render ``.agents/LESSONS.md`` from grouped lessons.
+
+    Each lesson is written once, under its first tag. A tag index at the top
+    links every tag to all the lessons that carry it.
 
     Args:
         grouped: Output of :func:`collect_lessons`.
@@ -163,8 +351,8 @@ def render_lessons(grouped: dict[str, list[tuple]]) -> str:
         "starting — these are repo-specific traps that already cost someone time.",
         "",
         (
-            f"{total} entr(ies) across {len(grouped)} tag(s). "
-            f"Generated {dt.datetime.now(tz=dt.timezone.utc).date().isoformat()}."
+            f"{total} lesson(s) across {len(grouped)} section(s). "
+            f"Generated {dt.datetime.now().astimezone().date().isoformat()}."
         ),
         "",
     ]
@@ -173,21 +361,38 @@ def render_lessons(grouped: dict[str, list[tuple]]) -> str:
         lines += ["*No lessons recorded yet.*", ""]
         return "\n".join(lines)
 
-    lines += ["## Tags", ""]
-    for tag in sorted(grouped):
-        anchor = tag.lower().replace(" ", "-")
-        lines.append(f"- [`{tag}`](#{anchor}) — {len(grouped[tag])} entr(ies)")
+    by_tag: dict[str, list[tuple]] = defaultdict(list)
+    for entries in grouped.values():
+        for entry in entries:
+            for tag in entry[4]:
+                by_tag[tag].append(entry)
+
+    lines += [
+        "## Tag index",
+        "",
+        "Each lesson appears once, under its first tag; the index links every tag",
+        "to all lessons that carry it.",
+        "",
+    ]
+    for tag in sorted(by_tag):
+        links = ", ".join(
+            f"[{stem}](#{_lesson_anchor(stem, outcome)})"
+            for _task_id, outcome, _text, stem, _tags in sorted(by_tag[tag])
+        )
+        lines.append(f"- `{tag}` — {links}")
     lines.append("")
 
     for tag in sorted(grouped):
         lines += [f"## {tag}", ""]
-        for task_id, outcome, text in sorted(grouped[tag]):
+        for _task_id, outcome, text, stem, tags in sorted(grouped[tag]):
             lines += [
-                f"### {task_id} ({outcome})",
+                f"### {stem} ({outcome})",
                 "",
                 text,
                 "",
-                f"Source: [`reports/{task_id}.md`](tasks/reports/{task_id}.md)",
+                f"Tags: {', '.join(f'`{t}`' for t in tags)}",
+                "",
+                f"Source: [`reports/{stem}.md`](tasks/reports/{stem}.md)",
                 "",
             ]
 
@@ -263,13 +468,16 @@ def main(argv=None):
             return 0
 
         if args.command == "lessons":
-            grouped = collect_lessons()
-            tags = [args.tag] if args.tag else sorted(grouped)
+            entries = sorted(
+                entry for group in collect_lessons().values() for entry in group
+            )
             found = False
-            for tag in tags:
-                for task_id, outcome, text in grouped.get(tag, []):
-                    found = True
-                    print(f"--- {tag} / {task_id} ({outcome}) ---\n{text}\n")
+            for task_id, outcome, text, _stem, tags in entries:
+                if args.tag and args.tag not in tags:
+                    continue
+                found = True
+                label = args.tag or ", ".join(tags)
+                print(f"--- {label} / {task_id} ({outcome}) ---\n{text}\n")
             if not found:
                 print("(no matching lessons)")
             return 0
@@ -281,10 +489,13 @@ def main(argv=None):
                 reports = [r for r in reports if r.task_id.upper() == wanted]
                 if not reports:
                     raise ValidationError(f"no report for {args.id}")
+            tasks = {t.id.upper(): t for t in load_tasks()}
             problems = [
                 f"{report.path.name}: {problem}"
                 for report in reports
-                for problem in validate_report(report)
+                for problem in validate_report(
+                    report, tasks.get(report.task_id.upper())
+                )
             ]
             if problems:
                 for problem in problems:
