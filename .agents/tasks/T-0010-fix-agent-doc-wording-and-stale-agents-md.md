@@ -1,7 +1,7 @@
 ---
 id: T-0010
 title: Fix agent-doc wording and stale AGENTS.md references
-status: open
+status: in_progress
 type: docs
 priority: low
 depends_on: []
