@@ -1,7 +1,7 @@
 ---
 id: T-0003
 title: Port report validation, harvest and housekeep checks
-status: open
+status: in_progress
 type: fix
 priority: high
 depends_on: [T-0002]
