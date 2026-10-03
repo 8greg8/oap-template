@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Lock-safe allocation of sequential task identifiers.
 
 Task creation may happen from several sessions or worktrees at once, so the

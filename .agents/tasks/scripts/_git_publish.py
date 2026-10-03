@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Git-atomic publish for new task files.
 
 Task *filing* must land on the integration branch immediately so
