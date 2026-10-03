@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Shared paths, vocabulary, and validation rules for the agent task workflow.
 
 This module is the single source of truth for what a well-formed task or report

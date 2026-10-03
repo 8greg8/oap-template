@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Strict parser and serializer for the ``---`` frontmatter used by task files.
 
 The supported syntax is deliberately a small subset of YAML so that the agent
