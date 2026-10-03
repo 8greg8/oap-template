@@ -115,7 +115,7 @@ testing contexts where a real push isn't wanted.
    on `develop` before the merge, on the task's branch.
 7. **Verify, resolve, merge.** The orchestrator merges the branch into `develop` by default,
    with no per-batch grant (`CLAUDE.md` § "Merge authority: orchestrator merges by default"). It
-   does so only after a verify by an agent other than the executor has passed, per
+   does so only after a verify by an independent verifier has passed, per
    § "Verify, resolve, merge" below, and with the merge commit header
    `chore(merge): merge task NNNN into develop` (`CONTRIBUTING.md`'s branching model). A human
    decides only a breaking change (defined in `CLAUDE.md`) and every "Ask first" item; a task that
@@ -139,7 +139,13 @@ Step 7 runs as follows, for every task:
      (`scripts/gate.sh`), every acceptance criterion checked against the
      files, `git diff --name-only` against `touches`, and, for test changes,
      that each expected value comes from spec text. It reports every failure
-     and fixes nothing. It is never the executor of the task.
+     and fixes nothing. It must also check and report whether the change is a
+     breaking change (as `CLAUDE.md` defines it) or crosses any "Ask first"
+     item, including edits to `scripts/`, `pyproject.toml` `[tool]` sections or
+     hooks outside the task's own scope. If either is true, the orchestrator
+     does not merge and the task is set `blocked` for a human.
+   - The verifier is independent as `CLAUDE.md` § "Merge authority:
+     orchestrator merges by default" defines it.
    - On a failure, a fresh executor fixes the findings on the same branch and
      a new verifier checks again. After three failed rounds the task is
      `blocked` and is not merged.

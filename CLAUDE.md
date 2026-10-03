@@ -207,8 +207,10 @@ only; tests cannot run there. See `.devcontainer/README.md`.
 ## Merge authority: orchestrator merges by default
 
 The orchestrator merges a task branch into `develop` by default. No written grant is needed. The
-one precondition is a passed independent verify of the pushed branch by an agent other than the
-executor (fresh context; see § Verification is not optional).
+one precondition is a passed independent verify of the pushed branch by an independent verifier
+(fresh context; see § Verification is not optional). The independent verifier is an agent that is
+neither the task's executor, nor the executor of any fix round, nor the orchestrator doing the
+merge.
 
 - An executor never merges its own work and never verifies its own change.
 - The orchestrator follows `.agents/README.md` § "The execution loop", including the merge steps.
@@ -220,7 +222,11 @@ executor (fresh context; see § Verification is not optional).
   task's `touches`, with the reason recorded in the task's report; and, before dispatch, amending
   a task file with the findings of a pre-batch review, on a `docs/` branch.
 - A human decides only two kinds of case: a breaking change, and every item under "Ask first".
-  A task that can only be finished by crossing either is `blocked`.
+  A task that crosses either boundary, whether the crossing is needed or incidental, is not merged
+  by the orchestrator and is `blocked` for a human.
+- A human decision for a blocked task is the owner's written approval, either in the session
+  instruction or in a note under `.agents/plans/`. The orchestrator cites it in the task's report.
+  The approval is per change, not standing.
 - This default covers only merging task branches into `develop`. It does not extend to `main`,
   release tags or releases.
 - The standalone, non-task Autonomy entry above (including its `main`-bound hotfix merge) is
