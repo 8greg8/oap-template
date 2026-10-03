@@ -18,49 +18,92 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+No tracked file on `develop` contains the local path, the downstream project name or the
+workflow-sync source project name, and the method text is attributed in a new `NOTICE.md`. The
+tree is exactly what T-0020's history rewrite will produce, so the rewritten `develop` tree
+matches it byte for byte.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-03-public-release-cleanup.md`, accepted by the owner on
+  2026-10-03. Its § Replacements is the source of truth for the replacements. Where this file and
+  the plan differ, stop and report.
+- This file does not quote the literals, because quoting them would put them back in the tree.
+  Find them as follows:
+  - L3, the source project name: the project named in the title of
+    `.agents/plans/2026-10-03-workflow-sync.md`. 37 occurrences in 11 files: that plan, `.agents/LESSONS.md`,
+    tasks T-0002 to T-0006 and reports T-0002 to T-0005.
+  - P1, the home-directory prefix: the text from `/home/` up to and including the `/` before L3
+    inside the absolute path at `.agents/LESSONS.md:139` and `.agents/tasks/reports/T-0004.md:85`.
+  - L2, the downstream project name: the backticked project name at
+    `.agents/tasks/T-0001-enforce-report-writing-as-a-pipeline-gate-not.md` lines 25, 56 and 86.
+- `strategic_model_init_material.md` is "Orchestrated Agentic Programming", version 1.0.1, by
+  Janez Perš, from <https://edu.slaif.si/trainings/workshop-orchestrated-agentic-programming>.
+  The owner treats it as MIT-licensed public SLAIF material.
+- `LICENSE` is MIT, "Copyright (c) 2026 8greg8" (the owner's GitHub account).
+- T-0018 touches `README.md`. This task does not.
+- Re-check against `develop` before starting and report any discrepancy.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- Apply exactly these plain-text replacements to every tracked file that contains them:
+  P1 to `/path/to/`, L2 to `downstream-project`, L3 to `source-project`. Change nothing else on
+  those lines.
+- Add `NOTICE.md` with a "Third-party material" section for `strategic_model_init_material.md`:
+  title, version, author, source URL, a statement that it is included under the MIT License as
+  public SLAIF workshop material with copyright held by its author, and this acknowledgement
+  verbatim: "We acknowledge the support of the EC/EuroHPC JU and the Slovenian Ministry of HESI
+  via the project SLAIF (grant number 101254461)."
+- Append one line to `LICENSE` after the MIT text: "Third-party material in this repository is
+  listed in NOTICE.md."
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not edit `strategic_model_init_material.md`, including its author and email front matter.
+- Do not edit `README.md`; T-0018 owns it.
+- Do not reword, reflow or otherwise edit lines beyond the replacements. T-0020's tree check
+  depends on the edit being exactly the replacements.
+- Do not rewrite history, change commit metadata or touch git config. That is T-0020.
+- Do not change `scripts/`, `.husky/`, `.agents/tasks/scripts/`, `CLAUDE.md`, `pyproject.toml`
+  or any lock file.
+- Do not write any of the three literals, or the owner's work email, into the report.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-03-public-release-cleanup.md`
+- Every file listed in `touches`
+- `strategic_model_init_material.md` lines 1-10 and 64-72 (attribution facts)
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+After the change, a case-insensitive `git grep` for each of P1, L2 and L3 on the branch finds
+nothing. Applying T-0020's `replace.txt` to the branch's tree with filter-repo's rules changes
+no file.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- `git grep -n -i -e <P1> -e <L2> -e <L3>` on the branch: no output. Run it with the literals
+  read from `develop` at the start of the task. Record the command shape in the report, not the
+  literals.
+- `git diff develop --stat` lists only files in `touches` plus the report.
+- `git diff develop --word-diff=porcelain`: every changed word is one of the three replacements,
+  apart from `NOTICE.md` and the `LICENSE` line.
+- `scripts/gate.sh` passes.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason.
+`NOTICE.md` (new) and the `LICENSE` pointer line, as in Scope.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] No tracked file contains P1, L2 or L3.
+- [ ] Every changed line outside `NOTICE.md` and `LICENSE` differs only by the three replacements.
+- [ ] `NOTICE.md` names the title, version, author and source URL, states MIT with copyright held by the author, and quotes the SLAIF acknowledgement verbatim.
+- [ ] `LICENSE` keeps the MIT text unchanged and adds the one pointer line.
+- [ ] `strategic_model_init_material.md` and `README.md` are unchanged.
+- [ ] The report contains none of the three literals and no work email.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches` plus the report.
 
 ## Workflow
 

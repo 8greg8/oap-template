@@ -18,49 +18,100 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+`8greg8/oap-template` is a new private repository whose `main` and `develop` carry the full
+history with the owner's commits under the private address, no private literal in any content
+or message, and no `Claude-Session:` trailer. The cited commit hashes in task and report files
+point to the new commits. The old repository survives untouched as `oap-template-archive`.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-03-public-release-cleanup.md`, accepted by the owner on
+  2026-10-03. The plan's § Owner decisions is the owner's written approval for this rewrite (an
+  "Ask first" item); cite it in the report. Its § Replacements and § Step 2 are the source of
+  truth. Where this file and the plan differ, stop and report.
+- Depends on T-0015 to T-0019. T-0019 makes the tree free of the literals, so the rewrite must
+  leave the `develop` tree unchanged.
+- The literals (P1, L2, L3) are defined in the plan and T-0019 without quoting them. After T-0019
+  they exist only in history. Read them from `develop` before T-0019's merge commit
+  (for example `git show <merge>^1:.agents/LESSONS.md`).
+- The owner's work address is the committer address on 50 commits (`git log --format='%ae'`).
+  The owner gives the private address at dispatch. It goes in the mailmap only, never in a
+  tracked file.
+- 65 commit messages end with a `Claude-Session:` line.
+- 36 hashes of this repository's commits are cited in tracked files under `.agents/`.
+- A dry run of the plan's command on a mirror (2026-10-03) left no literal, no work email and no
+  trailer. Tools: `uv tool run git-filter-repo`; gitleaks 8.21.2 from its GitHub release.
+- Re-check against `develop` before starting and report any discrepancy.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- Preconditions, checked and recorded in the report before anything else: T-0015 to T-0019 are
+  `done`; no unmerged task branch exists on the remote; the owner has renamed this repository to
+  `oap-template-archive` and created an empty private `8greg8/oap-template`. If any fails, set
+  the task `blocked` and stop.
+- In a scratch directory outside any checkout: mirror-clone `oap-template-archive`, write
+  `mailmap` and `replace.txt` next to the mirror (not inside it), run the plan's § Step 2
+  command, and run its four checks.
+- Push the rewritten `main` and `develop` to the new `8greg8/oap-template`. Push no other ref and
+  no tags.
+- In the new repository, on this task's branch: replace each of the 36 cited old hashes in
+  tracked files with its new hash, from `filter-repo/commit-map`, keeping the cited length. Then
+  write the report, commit and push the branch.
+- Re-run the gitleaks scan and the literal checks against a fresh clone of the new repository.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not push to, force-push, rename, delete or change settings on `oap-template-archive`.
+- Do not change repository visibility, the default branch or the template flag. That is the
+  owner's step 3.
+- Do not push merged task branches or tags to the new repository.
+- Do not edit file content during the rewrite beyond the three replacements. The tree check must
+  stay empty.
+- Do not commit `mailmap`, `replace.txt`, the private address, the work address or any literal.
+- Do not change `scripts/`, `.husky/`, `CLAUDE.md`, `pyproject.toml` or any lock file.
+- Do not merge the hash-update branch. The orchestrator merges after an independent verify.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-03-public-release-cleanup.md`
+- The T-0019 report and its merge commit
+- Files under `.agents/` that cite commit hashes (`git grep -nE '\b[0-9a-f]{7,40}\b' -- .agents`)
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+The new repository's `develop` tree equals the archive's `develop` tree, apart from the
+hash-update commit. Every author and committer address is the private address or
+`noreply@anthropic.com`. No content or message in any pushed commit contains a literal or the work-email
+domain, and no message has a `Claude-Session:` line.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- The four checks from the plan's § Step 2, run on the rewritten mirror before pushing, each
+  recorded as passed or failed.
+- The same checks on a fresh clone of the new repository after pushing.
+- After the hash update: every hash cited under `.agents/` resolves to a commit in the new
+  repository (`git cat-file -e <hash>^{commit}`), apart from hashes of other repositories already
+  cited as such.
+- `scripts/gate.sh` passes on the hash-update branch.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason.
+None needed. The plan already describes the result.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] Preconditions are recorded in the report; the task is blocked if any failed.
+- [ ] `git diff <archive develop> <rewritten develop>` was empty before the hash-update commit.
+- [ ] Author and committer addresses are only the private address and `noreply@anthropic.com`.
+- [ ] No pushed commit's content or message contains P1, L2, L3 or the work-email domain.
+- [ ] No pushed commit message has a `Claude-Session:` line.
+- [ ] gitleaks reports no leaks on a fresh clone of the new repository.
+- [ ] Only `main`, `develop` and this task's branch exist on the new repository.
+- [ ] Every cited hash under `.agents/` resolves in the new repository.
+- [ ] `oap-template-archive` is unchanged.
+- [ ] No tracked file or the report contains the private address, the work address or a literal.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff of the hash-update branch stays within `touches` plus the report.
 
 ## Workflow
 
