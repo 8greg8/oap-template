@@ -1,7 +1,7 @@
 ---
 id: T-0006
 title: Add a devcontainer
-status: open
+status: in_progress
 type: feat
 priority: medium
 depends_on: []

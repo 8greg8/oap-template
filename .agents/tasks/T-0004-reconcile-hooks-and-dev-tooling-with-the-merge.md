@@ -1,7 +1,7 @@
 ---
 id: T-0004
 title: Reconcile hooks and dev tooling with the merge and push rules
-status: open
+status: in_progress
 type: feat
 priority: high
 depends_on: []
