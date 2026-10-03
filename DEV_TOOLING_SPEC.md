@@ -4,7 +4,7 @@ This document specifies the copy-pasteable `scripts/` + `.husky/` + `package.jso
 turns the process described in [`CONTRIBUTING.md`](CONTRIBUTING.md) (branching, commits,
 versioning, verify/resolve) into deterministic, agent-runnable commands instead of prose an agent
 has to interpret freshly each time. It is the implementation of `README.md` step 4 ("Wire up
-Husky-managed git hooks") and of the tagging step `AGENTS.md` refers to ("outside the tagging step
+Husky-managed git hooks") and of the tagging step `CLAUDE.md` refers to ("outside the tagging step
 defined in `CONTRIBUTING.md`").
 
 It is written to be **copy-pasted as a unit** into an existing or new repository: the `scripts/`
@@ -42,7 +42,7 @@ them is `scripts/config/gate.sh`.
   `scripts/gate.sh` call if/when one is added later, but authoring `.github/workflows/*` is out of
   scope.
 - No auto-merge, auto-tag-push, or auto-release-on-push behavior. Tagging and pushing tags stay a
-  deliberate, explicit invocation (`scripts/release.py`) — see `AGENTS.md`'s "Ask first" list
+  deliberate, explicit invocation (`scripts/release.py`) — see `CLAUDE.md`'s "Ask first" list
   (cutting a release tag by hand is a human-in-the-loop action; this spec gives the *tool*, not
   permission to run it unattended).
 - No changelog generation. Out of scope for this pass; `scripts/next_version.py` prints the commits
@@ -202,7 +202,7 @@ Explicit, human/agent-invoked, never triggered by a hook:
    working tree is clean.
 2. Calls `next_version.py` for the version to cut.
 3. Prints the version and the commits behind it, and requires `--yes` to actually create the tag
-   (otherwise it's a dry-run preview) — matching `AGENTS.md`'s rule that cutting a release tag is
+   (otherwise it's a dry-run preview) — matching `CLAUDE.md`'s rule that cutting a release tag is
    not something to do silently.
 4. With `--yes`: creates an annotated tag `git tag -a vX.Y.Z -m "..."`. Does **not** push by
    default; `--push` additionally runs `git push origin vX.Y.Z`, since pushing a tag is the
@@ -240,7 +240,7 @@ task form is what `.agents/tasks/scripts/report.py` looks up to find a task's me
 `CONTRIBUTING.md` § Agent verify/resolve workflow is unchanged by this spec — it's the same five
 steps. What changes is that steps 2 ("Verify") and 4 ("repeat") are now literally
 `scripts/gate.sh` and `scripts/autofix.sh` + `scripts/gate.sh`, not a re-derivation of "run ruff,
-ty, pytest" from `PYTHON_CONVENTIONS.md` each time. `AGENTS.md`'s rule that verification must come
+ty, pytest" from `PYTHON_CONVENTIONS.md` each time. `CLAUDE.md`'s rule that verification must come
 from "an independent agent invocation (fresh context)" is unaffected — the script makes that
 invocation's job mechanical, it doesn't replace the independence requirement.
 

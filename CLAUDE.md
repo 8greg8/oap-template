@@ -213,8 +213,11 @@ batch, and is never the default. Every rule under "Ask first" still applies; a t
 be finished by crossing one is set `blocked`.
 
 Under a grant, the orchestrator follows `.agents/README.md` § "The execution loop", including the
-orchestrator-merge steps. It never merges without a passed independent verify, never
-force-pushes, and never edits a task file except through `task.py set-status`.
+orchestrator-merge steps. It never merges without a passed independent verify and never
+force-pushes. Orchestrator edits to task files are limited to these three: `task.py set-status`;
+widening a task's `touches`, with the reason recorded in the task's report; and, before
+dispatch, amending a task file with the findings of a pre-batch review, on a `docs/`
+branch.
 
 ## File boundaries
 
