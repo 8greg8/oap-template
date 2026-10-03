@@ -5,7 +5,7 @@ status: open
 type: docs
 priority: high
 depends_on: []
-touches: [NOTICE.md, LICENSE, .agents/LESSONS.md, .agents/plans/2026-10-03-workflow-sync.md, .agents/tasks/T-0001-enforce-report-writing-as-a-pipeline-gate-not.md, .agents/tasks/T-0002-port-git-atomic-task-filing-and-backlog-fixes.md, .agents/tasks/T-0003-port-report-validation-harvest-and-housekeep.md, .agents/tasks/T-0004-reconcile-hooks-and-dev-tooling-with-the-merge.md, .agents/tasks/T-0005-port-agent-rules-process-docs-and-orchestrator.md, .agents/tasks/T-0006-add-a-devcontainer.md, .agents/tasks/reports/T-0002.md, .agents/tasks/reports/T-0003.md, .agents/tasks/reports/T-0004.md, .agents/tasks/reports/T-0005.md]
+touches: [NOTICE.md, LICENSE, tests/test_report_scripts.py, .agents/LESSONS.md, .agents/plans/2026-10-03-workflow-sync.md, .agents/tasks/T-0001-enforce-report-writing-as-a-pipeline-gate-not.md, .agents/tasks/T-0002-port-git-atomic-task-filing-and-backlog-fixes.md, .agents/tasks/T-0003-port-report-validation-harvest-and-housekeep.md, .agents/tasks/T-0004-reconcile-hooks-and-dev-tooling-with-the-merge.md, .agents/tasks/T-0005-port-agent-rules-process-docs-and-orchestrator.md, .agents/tasks/T-0006-add-a-devcontainer.md, .agents/tasks/reports/T-0002.md, .agents/tasks/reports/T-0003.md, .agents/tasks/reports/T-0004.md, .agents/tasks/reports/T-0005.md]
 created: 2026-10-03
 report: reports/T-0019.md
 ---
@@ -35,8 +35,10 @@ matches it byte for byte.
     `.agents/LESSONS.md`, tasks T-0002 to T-0006 and reports T-0002 to T-0005.
   - L3u, L3 with the hyphen written as an underscore: `.agents/plans/2026-10-03-workflow-sync.md:129`.
   - L3s, the lowercase two-letter abbreviation of L3 as a whole word (for example `L3s:CLAUDE.md`,
-    `L3s's`): about 70 occurrences in the same 11 files. L3V, its uppercase form, is a shell
+    `L3s's`): about 74 occurrences in 8 of those 11 files. L3V, its uppercase form, is a shell
     variable at `.agents/plans/2026-10-03-workflow-sync.md` lines 315, 317 and 320.
+  - L3t, the test function name at `tests/test_report_scripts.py:287`, which embeds L3s between
+    underscores. Nothing else references it.
   - P1, the home-directory prefix: the text from `/home/` up to and including the `/` before L3
     inside the absolute path at `.agents/LESSONS.md:139` and `.agents/tasks/reports/T-0004.md:85`.
   - L2, the downstream project name: the backticked project name at
@@ -52,8 +54,8 @@ matches it byte for byte.
 
 - Apply exactly the plan's § Replacements rules to every tracked file that contains a match,
   in two passes. First the plain-text rules: P1 to `/path/to/`, L2 to `downstream-project`, L3
-  to `source-project`, L3u to `source_project`, `<L3V>=..` to `SRC=..`, `"$<L3V>"` to `"$SRC"`.
-  Then the regex rule: L3s as a case-sensitive whole word (`\b<L3s>\b`) to `source-project`.
+  to `source-project`, L3u to `source_project`, `<L3V>=..` to `SRC=..`, `"$<L3V>"` to `"$SRC"`,
+  L3t up to and including `_thresholds` to `test_no_source_project_thresholds`. Then the regex rule: L3s as a case-sensitive whole word (`\b<L3s>\b`) to `source-project`.
   The order matters: the regex pass must not see L3. Change nothing else on those lines.
 - Editing other tasks' files and reports, and the workflow-sync plan, is allowed for these
   replacements only. This overrides the Workflow rule against editing another task's file.
@@ -73,8 +75,8 @@ matches it byte for byte.
   depends on the edit being exactly the replacements.
 - Do not rewrite history, change commit metadata or touch git config. That is T-0020.
 - Do not change `scripts/`, `.husky/`, `.agents/tasks/scripts/`, `CLAUDE.md`, `pyproject.toml`
-  or any lock file.
-- Do not write any of the literals (P1, L2, L3, L3u, L3s, L3V), or the owner's work email, into the report.
+  or any lock file. In `tests/test_report_scripts.py`, change only the L3t function name.
+- Do not write any of the literals (P1, L2, L3, L3u, L3s, L3V, L3t), or the owner's work email, into the report.
 
 ## Files to inspect
 
@@ -105,12 +107,13 @@ no file.
 
 ## Acceptance criteria
 
-- [ ] No tracked file contains P1, L2, L3 or L3u, or L3s or L3V as a whole word in any case.
+- [ ] No tracked file contains P1, L2, L3, L3u or L3t, or L3s or L3V as a whole word in any case.
+- [ ] The renamed test in `tests/test_report_scripts.py` still runs and passes.
 - [ ] Every changed line outside `NOTICE.md` and `LICENSE` differs only by the plan's replacements.
 - [ ] `NOTICE.md` names the title, version, author and source URL, states MIT with copyright held by the author, and quotes the SLAIF acknowledgement verbatim.
 - [ ] `LICENSE` keeps the MIT text unchanged and adds the one pointer line.
 - [ ] `strategic_model_init_material.md` and `README.md` are unchanged.
-- [ ] The report contains none of the literals (P1, L2, L3, L3u, L3s, L3V) and no work email.
+- [ ] The report contains none of the literals (P1, L2, L3, L3u, L3s, L3V, L3t) and no work email.
 - [ ] `scripts/gate.sh` passes.
 - [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 
