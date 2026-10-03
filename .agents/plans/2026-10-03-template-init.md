@@ -1,8 +1,12 @@
 # Plan: make the repo usable as a template (init script)
 
-Status: proposed. Nothing in this plan is built. It needs the owner's decisions in
-§ Decisions for the owner before the tasks are filed. Amended 2026-10-03 after review;
-§ Review changes lists what changed.
+Status: accepted. Amended 2026-10-03 after review; § Review changes lists what changed.
+
+**Owner approval (2026-10-03, session instruction):** "accept all recommendations and file the
+tasks". Decisions 1 to 8 are accepted as recommended. Decision 7 places the script at the
+repository root as `init_project.py`, so no "Ask first" approval is needed for it. Decisions 1
+(template default branch `develop`) and 2 (template repository setting) are GitHub settings the
+owner applies; no task covers them. The tasks are T-0015 to T-0018 (I-1 to I-4).
 
 ## Goal
 
