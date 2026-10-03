@@ -1,7 +1,7 @@
 ---
 id: T-0005
 title: Port agent rules, process docs and orchestrator-merge rules
-status: open
+status: in_progress
 type: docs
 priority: high
 depends_on: [T-0002, T-0003, T-0004, T-0006]
