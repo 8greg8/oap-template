@@ -1,7 +1,7 @@
 ---
 id: T-0001
 title: Enforce report writing as a pipeline gate, not an agent courtesy
-status: review
+status: done
 type: chore
 priority: high
 depends_on: [T-0003, T-0005]

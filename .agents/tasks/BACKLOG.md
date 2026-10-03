@@ -6,14 +6,14 @@
 
 12 task(s). Generated 2026-10-03.
 
-| open: 3 | in_progress: 0 | blocked: 0 | review: 1 | done: 8 | abandoned: 0 |
+| open: 3 | in_progress: 0 | blocked: 0 | review: 0 | done: 9 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
 
 | ID | Title | Status | Prio | Type | Depends on | Report |
 |---|---|---|---|---|---|---|
-| T-0001 | [Enforce report writing as a pipeline gate, not an agent courtesy](T-0001-enforce-report-writing-as-a-pipeline-gate-not.md) | review | high | chore | T-0003, T-0005 | — |
+| T-0001 | [Enforce report writing as a pipeline gate, not an agent courtesy](T-0001-enforce-report-writing-as-a-pipeline-gate-not.md) | done | high | chore | T-0003, T-0005 | [report](reports/T-0001.md) |
 | T-0002 | [Port git-atomic task filing and backlog fixes](T-0002-port-git-atomic-task-filing-and-backlog-fixes.md) | done | high | fix | — | [report](reports/T-0002.md) |
 | T-0003 | [Port report validation, harvest and housekeep checks](T-0003-port-report-validation-harvest-and-housekeep.md) | done | high | fix | T-0002 | [report](reports/T-0003.md) |
 | T-0004 | [Reconcile hooks and dev tooling with the merge and push rules](T-0004-reconcile-hooks-and-dev-tooling-with-the-merge.md) | done | high | feat | — | [report](reports/T-0004.md) |
@@ -34,4 +34,4 @@ Dependencies satisfied, not yet started:
 - **T-0010** Fix agent-doc wording and stale AGENTS.md references — `CLAUDE.md`, `CONTRIBUTING.md`, `.agents/README.md`, `DEV_TOOLING_SPEC.md`
 - **T-0011** Support docs and chore task branches in gitflow and fix housekeep worktrees — `scripts/gitflow.sh`, `.agents/tasks/scripts/housekeep.py`, `tests/test_report_scripts.py`, `tests/test_hooks.py`
 
-Suggested conflict-free parallel batch: 
+Suggested conflict-free parallel batch: T-0009, T-0010

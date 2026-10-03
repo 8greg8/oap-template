@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-8 lesson(s) across 7 section(s). Generated 2026-10-03.
+9 lesson(s) across 7 section(s). Generated 2026-10-03.
 
 ## Tag index
 
@@ -21,6 +21,7 @@ to all lessons that carry it.
 - `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
 - `docker` — [T-0006](#t-0006-success)
 - `docs` — [T-0005](#t-0005-success)
+- `execution-loop` — [T-0001](#t-0001-success)
 - `file-modes` — [T-0007](#t-0007-success)
 - `gate` — [T-0004](#t-0004-success)
 - `git` — [T-0007](#t-0007-success), [T-0012](#t-0012-success)
@@ -35,11 +36,13 @@ to all lessons that carry it.
 - `port` — [T-0003](#t-0003-success)
 - `pre-commit` — [T-0008](#t-0008-success)
 - `process` — [T-0005](#t-0005-success)
+- `report-gate` — [T-0001](#t-0001-success)
 - `report-validation` — [T-0003](#t-0003-success)
 - `ruff` — [T-0007](#t-0007-success)
 - `scripts` — [T-0012](#t-0012-success)
+- `set-status` — [T-0001](#t-0001-success)
 - `staged-files` — [T-0012](#t-0012-success)
-- `task-tooling` — [T-0002](#t-0002-success)
+- `task-tooling` — [T-0001](#t-0001-success), [T-0002](#t-0002-success)
 - `uv` — [T-0006](#t-0006-success)
 - `worktree` — [T-0002](#t-0002-success)
 
@@ -124,6 +127,14 @@ Tags: `scripts`, `bash`, `git`, `nul-safe`, `staged-files`
 Source: [`reports/T-0012.md`](tasks/reports/T-0012.md)
 
 ## task-tooling
+
+### T-0001 (success)
+
+`Task.report_path` resolves from `_schema.REPORTS_DIR`, which derives from the script's own location. Tests can therefore exercise `task.py` safely by copying `scripts/` and `templates/` into `tmp_path` and running the copy, with no monkeypatching. `task.py new --no-publish` seeds a valid task file there without git. For branch tests, `git init` the same `tmp_path`, commit the report on a task branch, and strip `GIT_*` variables from the test's git calls. A `validate_report` rule that keys on `task.status` can be judged for a target status by passing a copy of the task with that status; no rule change is needed.
+
+Tags: `task-tooling`, `report-gate`, `set-status`, `execution-loop`
+
+Source: [`reports/T-0001.md`](tasks/reports/T-0001.md)
 
 ### T-0002 (success)
 
