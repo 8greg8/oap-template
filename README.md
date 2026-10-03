@@ -23,7 +23,9 @@ the placeholders (`<repo_name>`, mission, architecture) for your actual reposito
 
 ## Getting started with a new project
 
-1. Create a new repository from this template on GitHub and clone it. Run the next steps in that
+1. Create a new repository from this template on GitHub and clone it. Create it without ticking
+   "Include all branches", because branches created from a template have unrelated histories (the
+   script refuses if the other branch already exists on `origin`). Run the next steps in that
    clone, which must be clean, on `develop` or `main`, and have `origin` set.
 2. Preview the changes. This lists every file the script edits, removes or writes, and the three
    names it derives from `--package` (import package, distribution name, npm name). It changes

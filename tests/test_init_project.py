@@ -1085,8 +1085,11 @@ def test_full_run_prints_the_human_checklist(scratch: Scratch):
     ), out
     assert "default branch" in lowered
     # The default branch is named `develop`, with the reason and the role of `main`.
+    # The checklist item, not the dry-run summary line that also mentions the default branch.
     default_line = next(
-        line for line in lowered.splitlines() if "default branch" in line
+        line
+        for line in lowered.splitlines()
+        if "default branch" in line and line.strip().startswith("2.")
     )
     assert "`develop`" in default_line, default_line
     assert "task.py" in default_line, default_line

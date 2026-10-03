@@ -777,8 +777,9 @@ def step_checklist(ctx: Context) -> None:
     print("\nChecklist")
     print(f"  1. Push both branches: git push -u origin {ctx.branch} {other}")
     print(
-        "  2. On GitHub, set develop as the default branch and add branch protection "
-        "for develop and main."
+        "  2. On GitHub, set the default branch to `develop` (task.py syncs "
+        "origin/develop; main is for releases) and add branch protection for develop "
+        "and main."
     )
     print(
         "  3. Fill in the `## Project` section of CLAUDE.md: mission, architecture and "
