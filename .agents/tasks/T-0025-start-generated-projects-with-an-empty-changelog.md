@@ -1,7 +1,7 @@
 ---
 id: T-0025
 title: Start generated projects with an empty changelog
-status: in_progress
+status: review
 type: feat
 priority: medium
 depends_on: [T-0022]
