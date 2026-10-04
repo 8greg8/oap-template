@@ -597,5 +597,12 @@ def test_repository_fragments_are_valid() -> None:
 
 def test_repository_readme_names_no_template_string() -> None:
     text = (REPO_ROOT / "changelog.d" / "README.md").read_text(encoding="utf-8").lower()
-    for forbidden in ("proj_template", "proj-template", "oap-template", "8greg8"):
+    # Built from pieces so this file never names a template string itself (init scan).
+    forbidden_strings = (
+        "proj" + "_template",
+        "proj" + "-template",
+        "oap" + "-template",
+        "8gre" + "g8",
+    )
+    for forbidden in forbidden_strings:
         assert forbidden not in text
