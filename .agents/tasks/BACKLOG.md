@@ -6,7 +6,7 @@
 
 26 task(s). Generated 2026-10-04.
 
-| open: 4 | in_progress: 0 | blocked: 0 | review: 1 | done: 21 | abandoned: 0 |
+| open: 4 | in_progress: 0 | blocked: 0 | review: 0 | done: 22 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -22,7 +22,7 @@
 | T-0013 | [Make orchestrator merge into develop the default](T-0013-make-orchestrator-merge-into-develop-the-default.md) | done | high | docs | — | [report](reports/T-0013.md) |
 | T-0019 | [Scrub private references and attribute the method text](T-0019-scrub-private-references-and-attribute-the.md) | done | high | docs | — | [report](reports/T-0019.md) |
 | T-0020 | [Rewrite history into a clean public repository copy](T-0020-rewrite-history-into-a-clean-public-repository.md) | done | high | chore | T-0015, T-0016, T-0017, T-0018, T-0019 | [report](reports/T-0020.md) |
-| T-0022 | [Add the changelog tool, CHANGELOG.md and changelog fragments](T-0022-add-the-changelog-tool-changelog-md-and.md) | review | high | feat | — | — |
+| T-0022 | [Add the changelog tool, CHANGELOG.md and changelog fragments](T-0022-add-the-changelog-tool-changelog-md-and.md) | done | high | feat | — | [report](reports/T-0022.md) |
 | T-0023 | [Require a changelog fragment on push and at finish](T-0023-require-a-changelog-fragment-on-push-and-at.md) | open | high | feat | T-0022 | — |
 | T-0024 | [Release from develop into main with the changelog](T-0024-release-from-develop-into-main-with-the.md) | open | high | feat | T-0023 | — |
 | T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
@@ -42,11 +42,14 @@
 
 ## Ready to dispatch
 
-*Nothing ready — every open task is blocked or already in flight.*
+Dependencies satisfied, not yet started:
+
+- **T-0023** Require a changelog fragment on push and at finish — `.husky/pre-push`, `scripts/gitflow.sh`, `tests/test_hooks.py`, `tests/test_gitflow.py`, `changelog.d/T-0023.changed.md`
+- **T-0025** Start generated projects with an empty changelog — `init_project.py`, `tests/test_init_project.py`, `changelog.d/T-0025.added.md`
+
+Suggested conflict-free parallel batch: T-0023, T-0025
 
 ## Waiting on dependencies
 
-- **T-0023** Require a changelog fragment on push and at finish — needs T-0022
 - **T-0024** Release from develop into main with the changelog — needs T-0023
-- **T-0025** Start generated projects with an empty changelog — needs T-0022
 - **T-0026** Document the changelog and release workflow — needs T-0024, T-0025

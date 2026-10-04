@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-21 lesson(s) across 11 section(s). Generated 2026-10-04.
+22 lesson(s) across 12 section(s). Generated 2026-10-04.
 
 ## Tag index
 
@@ -19,6 +19,8 @@ to all lessons that carry it.
 - `backlog` — [T-0002](#t-0002-success)
 - `bash` — [T-0012](#t-0012-success)
 - `bash-3.2` — [T-0011](#t-0011-success)
+- `changelog` — [T-0022](#t-0022-success)
+- `changelog-fragments` — [T-0022](#t-0022-success)
 - `chore` — [T-0020](#t-0020-success)
 - `code-of-conduct` — [T-0021](#t-0021-success)
 - `commit` — [T-0018](#t-0018-success)
@@ -28,6 +30,7 @@ to all lessons that carry it.
 - `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success), [T-0013](#t-0013-success), [T-0014](#t-0014-success), [T-0019](#t-0019-success), [T-0021](#t-0021-success)
 - `end-to-end` — [T-0018](#t-0018-success)
 - `execution-loop` — [T-0001](#t-0001-success)
+- `feat` — [T-0022](#t-0022-success)
 - `file-mode` — [T-0009](#t-0009-success)
 - `file-modes` — [T-0007](#t-0007-success)
 - `filter-repo` — [T-0020](#t-0020-success)
@@ -56,7 +59,7 @@ to all lessons that carry it.
 - `report-gate` — [T-0001](#t-0001-success)
 - `report-validation` — [T-0003](#t-0003-success)
 - `ruff` — [T-0007](#t-0007-success)
-- `scripts` — [T-0012](#t-0012-success)
+- `scripts` — [T-0012](#t-0012-success), [T-0022](#t-0022-success)
 - `scrub` — [T-0019](#t-0019-success)
 - `security-policy` — [T-0021](#t-0021-success)
 - `seeding` — [T-0017](#t-0017-success)
@@ -144,6 +147,24 @@ Source: [`reports/T-0019.md`](tasks/reports/T-0019.md)
 Tags: `docs`, `security-policy`, `code-of-conduct`, `init-project`
 
 Source: [`reports/T-0021.md`](tasks/reports/T-0021.md)
+
+## feat
+
+### T-0022 (success)
+
+- Modules loaded with `importlib.util.spec_from_file_location` are not in `sys.modules` unless
+  added by hand. A `@dataclass` under `from __future__ import annotations` then fails at import.
+  Use `NamedTuple` in `scripts/` files that tests load this way.
+- ruff's `DTZ011` bans `datetime.date.today()` here. Use
+  `datetime.datetime.now().astimezone().date()`.
+- `git log` detects renames by default. Add `--no-renames` when filtering on `--diff-filter=A`.
+- A gate run before new files are tracked can miss scans that read `git ls-files`. Commit first,
+  then run the gate.
+- Re-read the task file on `develop` before a fix round; the worktree copy can be stale.
+
+Tags: `feat`, `changelog`, `scripts`, `changelog-fragments`
+
+Source: [`reports/T-0022.md`](tasks/reports/T-0022.md)
 
 ## git
 
