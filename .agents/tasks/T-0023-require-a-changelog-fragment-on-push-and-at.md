@@ -44,6 +44,17 @@ changelog fragment is rejected, with the ranges and skips the plan defines.
   message on failure.
 - Tests in `tests/test_hooks.py` and `tests/test_gitflow.py`.
 - `changelog.d/T-0023.changed.md`: this task's entry, describing the new rule as breaking.
+- `changelog.py check` exit 2, a failing `git merge-base`, or a missing `origin/develop` /
+  `origin/main` ref means the range is unlistable: skip the fragment check for that ref and run
+  the gate.
+- `gitflow.sh finish` uses `origin/$base` as the base when it exists, else the local `$base`.
+- Invoke the tool as `python3 scripts/changelog.py`, as `.husky/commit-msg` does.
+- The hook sources `scripts/config/gate.sh` for `MAIN_BRANCH` and `DEVELOP_BRANCH` instead of
+  hard-coding branch names.
+- Restructure the pre-push loop (today it `break`s on the first non-`.agents/` ref) so the
+  fragment check runs for every pushed ref; the `.agents/`-only decision stays per push.
+- The `tests/test_hooks.py` and `tests/test_gitflow.py` fixtures copy `scripts/changelog.py`,
+  `scripts/next_version.py` and `scripts/config/gate.sh`.
 
 ## Non-goals
 
@@ -60,8 +71,11 @@ changelog fragment is rejected, with the ranges and skips the plan defines.
 
 ## Required behavior
 
-Each case in the plan's § Fragment check on push, and the walkthroughs a feature push, fix round,
-merge to `develop`, docs-only task and hotfix branch, behave as the plan states.
+Each case in the plan's § Fragment check on push behaves as the plan states. In particular: a
+feature push with a fragment passes and without one fails; a fix round on a branch whose range
+already adds a fragment passes; pushing `develop` after merging a feat task passes because the
+task's commits in `<remote>..<local>` add its fragment; a docs-only branch passes; a `hotfix/*`
+branch is ranged from `origin/main`; a release push of `main`, `develop` and the tag passes.
 
 ## Tests required
 
@@ -69,7 +83,10 @@ merge to `develop`, docs-only task and hotfix branch, behave as the plan states.
   that has a fragment passes; docs-only passes; `HEAD:feat/x` push classified by `remote_ref`;
   `hotfix/*` uses `origin/main`; tag ref skipped; first push of `main`/`develop` skipped;
   `.agents/`-only skip kept; unlistable range runs the gate.
-- `gitflow.sh finish` refuses a feat branch without a fragment and merges one with it.
+- Ranges: pushing `develop` after merging a feat task with its fragment passes; a release push of
+  `main`, `develop` and the tag passes.
+- `gitflow.sh finish` refuses a feat branch without a fragment and merges one with it; it uses
+  `origin/$base` when that ref exists and falls back to the local `$base` when it does not.
 - `uv run pytest tests/test_hooks.py tests/test_gitflow.py -v` and `scripts/gate.sh`.
 
 ## Documentation required
@@ -80,8 +97,8 @@ None in this task; T-0026 documents the rule.
 
 - [ ] Pre-push applies the fragment check with exactly the ranges and skips the plan defines.
 - [ ] `gitflow.sh finish` runs the branch check before merging.
-- [ ] The existing pre-push and gitflow behavior is otherwise unchanged and its tests still pass.
-- [ ] `changelog.d/T-0023.changed.md` exists and passes `check`.
+- [ ] The existing pre-push and gitflow tests still pass; `test_task_branch_kinds_start_and_finish_end_to_end[fix]` and `test_feature_kind_is_unchanged` add a fragment, since their commits are `fix` and `feat`.
+- [ ] `changelog.d/T-0023.changed.md` exists and `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch.
 - [ ] The commit introducing the hook rule is marked breaking.
 - [ ] `uv run pytest tests/test_hooks.py tests/test_gitflow.py -v` passes.
 - [ ] `scripts/gate.sh` passes.
