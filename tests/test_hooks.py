@@ -3,6 +3,8 @@
 Each case builds a throwaway git repository. The real hook runs under `sh -e` the way Husky 9
 does; the repository gets stub `scripts/gate.sh` and `scripts/autofix.sh` files that write marker
 files, so the assertions are "was the gate asked to run" rather than "did pytest run". The
+pre-push cases also copy the real `scripts/changelog.py`, `scripts/next_version.py` and
+`scripts/config/gate.sh`, so the changelog fragment check runs for real. The
 `gate.sh` / `autofix.sh` cases copy the real `scripts/` into the throwaway repository and replace
 `scripts/config/gate.sh` with commands that log their arguments.
 """
@@ -56,10 +58,10 @@ def _write(repo: Path, files: dict[str, str]) -> None:
         path.write_text(content, encoding="utf-8")
 
 
-def _commit(repo: Path, files: dict[str, str]) -> str:
+def _commit(repo: Path, files: dict[str, str], message: str = "c") -> str:
     _write(repo, files)
     _git(repo, "add", "-A")
-    _git(repo, "commit", "-q", "--no-verify", "-m", "c")
+    _git(repo, "commit", "-q", "--no-verify", "-m", message)
     return _git(repo, "rev-parse", "HEAD")
 
 
@@ -97,11 +99,20 @@ def _install_gate_stubs(repo: Path, exit_code: int = 0) -> tuple[Path, Path]:
 # --- pre-push -----------------------------------------------------------------
 
 
+def _install_changelog_tooling(repo: Path) -> None:
+    """Copy the real changelog check and its config into the repository (untracked)."""
+    for rel in ("changelog.py", "next_version.py", "config/gate.sh"):
+        target = repo / "scripts" / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(SCRIPTS / rel, target)
+
+
 def _run_pre_push(
     repo: Path, stdin: str, gate_exit: int = 0
 ) -> tuple[subprocess.CompletedProcess[str], bool]:
     """Run the hook; return the result and whether the stub gate.sh was invoked."""
     gate_marker, _ = _install_gate_stubs(repo, gate_exit)
+    _install_changelog_tooling(repo)
     result = subprocess.run(
         ["sh", "-e", str(PRE_PUSH)],
         input=stdin,
@@ -248,6 +259,262 @@ def test_empty_stdin_skips_gate(repo: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert not ran
     assert "skipping gate" in result.stdout
+
+
+# --- pre-push: changelog fragment check ---------------------------------------
+
+FRAGMENT = "changelog.d/T-0001.added.md"
+FRAGMENT_BODY = "- Added the thing, described for a reader of the changelog.\n"
+
+
+def _set_origin(repo: Path, branch: str, sha: str) -> None:
+    """Create the remote-tracking ref `origin/<branch>` without a remote."""
+    _git(repo, "update-ref", f"refs/remotes/origin/{branch}", sha)
+
+
+def _checkout_new(repo: Path, branch: str) -> None:
+    _git(repo, "checkout", "-q", "-b", branch)
+
+
+def _ref_line(
+    local_sha: str,
+    remote_sha: str,
+    remote_ref: str = "refs/heads/feat/x",
+    local_ref: str = "HEAD",
+) -> str:
+    return f"{local_ref} {local_sha} {remote_ref} {remote_sha}\n"
+
+
+def _assert_rejected_by_changelog(
+    result: subprocess.CompletedProcess[str], ran: bool
+) -> None:
+    assert result.returncode != 0
+    assert not ran
+    assert "changelog fragment" in result.stderr
+
+
+def test_feat_branch_without_fragment_is_rejected(repo: Path) -> None:
+    _set_origin(repo, "develop", _git(repo, "rev-parse", "HEAD"))
+    _checkout_new(repo, "feat/x")
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "feat(app): change it")
+    result, ran = _run_pre_push(repo, _ref_line(head, ZERO))
+    _assert_rejected_by_changelog(result, ran)
+
+
+def test_feat_branch_with_fragment_passes_and_runs_gate(repo: Path) -> None:
+    _set_origin(repo, "develop", _git(repo, "rev-parse", "HEAD"))
+    _checkout_new(repo, "feat/x")
+    head = _commit(
+        repo, {"src/app.py": "x = 2\n", FRAGMENT: FRAGMENT_BODY}, "feat(app): change it"
+    )
+    result, ran = _run_pre_push(repo, _ref_line(head, ZERO))
+    assert result.returncode == 0, result.stderr
+    assert ran
+
+
+def test_breaking_commit_without_fragment_is_rejected(repo: Path) -> None:
+    _set_origin(repo, "develop", _git(repo, "rev-parse", "HEAD"))
+    _checkout_new(repo, "chore/x")
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "chore(app)!: drop it")
+    result, ran = _run_pre_push(repo, _ref_line(head, ZERO, "refs/heads/chore/x"))
+    _assert_rejected_by_changelog(result, ran)
+
+
+def test_fix_round_on_branch_that_already_has_fragment_passes(repo: Path) -> None:
+    _set_origin(repo, "develop", _git(repo, "rev-parse", "HEAD"))
+    _checkout_new(repo, "feat/x")
+    pushed = _commit(
+        repo, {"src/app.py": "x = 2\n", FRAGMENT: FRAGMENT_BODY}, "feat(app): change it"
+    )
+    head = _commit(repo, {"src/app.py": "x = 3\n"}, "fix(app): address review")
+    result, ran = _run_pre_push(repo, _ref_line(head, pushed))
+    assert result.returncode == 0, result.stderr
+    assert ran
+
+
+def test_docs_only_branch_passes_without_fragment(repo: Path) -> None:
+    _set_origin(repo, "develop", _git(repo, "rev-parse", "HEAD"))
+    _checkout_new(repo, "docs/x")
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "docs(app): explain it")
+    result, ran = _run_pre_push(repo, _ref_line(head, ZERO, "refs/heads/docs/x"))
+    assert result.returncode == 0, result.stderr
+    assert ran
+
+
+def test_branch_is_classified_by_remote_ref_not_local_ref(repo: Path) -> None:
+    """Local ref `develop` pushed to `refs/heads/feat/x` is a feature branch, not develop.
+
+    Classified by local_ref it would be a first push of develop and skip the check.
+    """
+    _set_origin(repo, "develop", _git(repo, "rev-parse", "HEAD"))
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "feat(app): change it")
+    line = _ref_line(head, ZERO, "refs/heads/feat/x", "refs/heads/develop")
+    result, ran = _run_pre_push(repo, line)
+    _assert_rejected_by_changelog(result, ran)
+
+
+def test_hotfix_branch_is_ranged_from_origin_main(repo: Path) -> None:
+    """Only origin/main exists: a hotfix is checked, where origin/develop would skip it."""
+    _set_origin(repo, "main", _git(repo, "rev-parse", "HEAD"))
+    _checkout_new(repo, "hotfix/x")
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "fix(app): patch it")
+    line = _ref_line(head, ZERO, "refs/heads/hotfix/x")
+    result, ran = _run_pre_push(repo, line)
+    _assert_rejected_by_changelog(result, ran)
+
+
+def test_hotfix_branch_with_fragment_passes(repo: Path) -> None:
+    _set_origin(repo, "main", _git(repo, "rev-parse", "HEAD"))
+    _checkout_new(repo, "hotfix/x")
+    head = _commit(
+        repo,
+        {"src/app.py": "x = 2\n", "changelog.d/hot.fixed.md": FRAGMENT_BODY},
+        "fix(app): patch it",
+    )
+    line = _ref_line(head, ZERO, "refs/heads/hotfix/x")
+    result, ran = _run_pre_push(repo, line)
+    assert result.returncode == 0, result.stderr
+    assert ran
+
+
+def test_feature_branch_without_origin_develop_skips_check_and_runs_gate(
+    repo: Path,
+) -> None:
+    _set_origin(repo, "main", _git(repo, "rev-parse", "HEAD"))
+    _checkout_new(repo, "feat/x")
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "feat(app): change it")
+    result, ran = _run_pre_push(repo, _ref_line(head, ZERO))
+    assert result.returncode == 0, result.stderr
+    assert ran
+    assert "skipping the changelog check" in result.stderr
+
+
+def test_tag_ref_is_not_checked(repo: Path) -> None:
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "feat(app): change it")
+    _git(repo, "tag", "v0.1.0", head)
+    line = _ref_line(head, ZERO, "refs/tags/v0.1.0", "refs/tags/v0.1.0")
+    result, ran = _run_pre_push(repo, line)
+    assert result.returncode == 0, result.stderr
+    assert ran
+
+
+@pytest.mark.parametrize("branch", ["develop", "main"])
+def test_first_push_of_main_or_develop_is_not_checked(repo: Path, branch: str) -> None:
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "feat(app): change it")
+    line = _ref_line(head, ZERO, f"refs/heads/{branch}")
+    result, ran = _run_pre_push(repo, line)
+    assert result.returncode == 0, result.stderr
+    assert ran
+
+
+@pytest.mark.parametrize("branch", ["develop", "main"])
+def test_later_push_of_main_or_develop_without_fragment_is_rejected(
+    repo: Path, branch: str
+) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "fix(app): patch it")
+    line = _ref_line(head, base, f"refs/heads/{branch}")
+    result, ran = _run_pre_push(repo, line)
+    _assert_rejected_by_changelog(result, ran)
+
+
+def test_agents_only_push_skips_fragment_check_and_gate(repo: Path) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    _set_origin(repo, "develop", base)
+    _checkout_new(repo, "feat/x")
+    head = _commit(
+        repo, {".agents/tasks/T-0002.md": "new task\n"}, "feat(tasks): file a task"
+    )
+    result, ran = _run_pre_push(repo, _ref_line(head, base))
+    assert result.returncode == 0, result.stderr
+    assert not ran
+    assert "skipping gate" in result.stdout
+
+
+def test_unlistable_range_skips_fragment_check_and_runs_gate(repo: Path) -> None:
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "feat(app): change it")
+    result, ran = _run_pre_push(repo, _line(head, "1" * 40))
+    assert result.returncode == 0, result.stderr
+    assert ran
+    assert "skipping the changelog check" in result.stderr
+
+
+def test_several_refs_are_all_checked(repo: Path) -> None:
+    """A passing ref listed first does not hide a failing one after it."""
+    base = _git(repo, "rev-parse", "HEAD")
+    _set_origin(repo, "develop", base)
+    _checkout_new(repo, "feat/ok")
+    ok = _commit(
+        repo, {"src/app.py": "x = 2\n", FRAGMENT: FRAGMENT_BODY}, "feat(app): change it"
+    )
+    _git(repo, "checkout", "-q", "-b", "feat/bad", base)
+    bad = _commit(repo, {"src/other.py": "y = 1\n"}, "feat(app): other change")
+    stdin = _ref_line(ok, ZERO, "refs/heads/feat/ok") + _ref_line(
+        bad, ZERO, "refs/heads/feat/bad"
+    )
+    result, ran = _run_pre_push(repo, stdin)
+    _assert_rejected_by_changelog(result, ran)
+
+
+def test_push_of_develop_after_merging_feat_task_with_fragment_passes(
+    repo: Path,
+) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    _checkout_new(repo, "feat/t")
+    _commit(
+        repo, {"src/app.py": "x = 2\n", FRAGMENT: FRAGMENT_BODY}, "feat(app): change it"
+    )
+    _git(repo, "checkout", "-q", "develop")
+    _git(
+        repo, "merge", "--no-ff", "-q", "-m", "chore(merge): merge task 0001", "feat/t"
+    )
+    head = _git(repo, "rev-parse", "HEAD")
+    result, ran = _run_pre_push(repo, _line(head, base))
+    assert result.returncode == 0, result.stderr
+    assert ran
+
+
+def test_push_of_develop_after_merging_feat_task_without_fragment_is_rejected(
+    repo: Path,
+) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    _checkout_new(repo, "feat/t")
+    _commit(repo, {"src/app.py": "x = 2\n"}, "feat(app): change it")
+    _git(repo, "checkout", "-q", "develop")
+    _git(
+        repo, "merge", "--no-ff", "-q", "-m", "chore(merge): merge task 0001", "feat/t"
+    )
+    head = _git(repo, "rev-parse", "HEAD")
+    result, ran = _run_pre_push(repo, _line(head, base))
+    _assert_rejected_by_changelog(result, ran)
+
+
+def test_release_push_of_main_develop_and_tag_passes(repo: Path) -> None:
+    """The range on main holds the feat and its fragment; develop's holds only the release."""
+    first = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "branch", "main", first)
+    develop_before = _commit(
+        repo, {"src/app.py": "x = 2\n", FRAGMENT: FRAGMENT_BODY}, "feat(app): change it"
+    )
+    _git(repo, "checkout", "-q", "main")
+    _git(repo, "merge", "--no-ff", "-q", "-m", "chore(merge): merge develop", "develop")
+    _git(repo, "rm", "-q", FRAGMENT)
+    _write(repo, {"CHANGELOG.md": "# Changelog\n"})
+    _git(repo, "add", "CHANGELOG.md")
+    _git(repo, "commit", "-q", "--no-verify", "-m", "chore(release): v0.1.0")
+    release = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "tag", "-a", "-m", "v0.1.0", "v0.1.0")
+    tag = _git(repo, "rev-parse", "v0.1.0")
+    _git(repo, "checkout", "-q", "develop")
+    _git(repo, "merge", "--ff-only", "-q", "main")
+    stdin = (
+        _line(release, first).replace("develop", "main")
+        + _line(release, develop_before)
+        + _ref_line(tag, ZERO, "refs/tags/v0.1.0", "refs/tags/v0.1.0")
+    )
+    result, ran = _run_pre_push(repo, stdin)
+    assert result.returncode == 0, result.stderr
+    assert ran
 
 
 # --- pre-commit ---------------------------------------------------------------

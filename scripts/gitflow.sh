@@ -69,6 +69,19 @@ finish() {
     if ! git -C "$worktree_dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
         die "worktree $worktree_dir not found -- run gate.sh and merge manually if it was already removed"
     fi
+
+    # The same fragment check .husky/pre-push runs on a branch: from the merge base with the
+    # base branch to the tip. The remote-tracking ref is preferred (it is what a push is
+    # checked against); the local base is the fallback when there is no such ref.
+    base_ref="$base"
+    if git show-ref --verify --quiet "refs/remotes/origin/$base"; then
+        base_ref="origin/$base"
+    fi
+    merge_base="$(git merge-base "$base_ref" "refs/heads/$branch")" \
+        || die "no merge base between $base_ref and $branch -- cannot check the changelog"
+    python3 "$SCRIPTS_DIR/changelog.py" check "$merge_base" "refs/heads/$branch" \
+        || die "changelog check failed on $branch -- add changelog.d/<id>.<category>.md and commit it before finishing"
+
     ( cd "$worktree_dir" && "$SCRIPTS_DIR/gate.sh" ) || die "gate failed on $branch -- fix before finishing"
 
     section "merging $branch into $base"
