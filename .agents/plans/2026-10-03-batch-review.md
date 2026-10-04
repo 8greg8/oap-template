@@ -9,12 +9,12 @@ terms, and how to close each one.
 
 | Task | Merge commit | Verified commit | Gate at verify |
 |---|---|---|---|
-| T-0008 pre-commit re-staging | `d36a259` | `13b69b6` | 116 tests passed |
-| T-0012 NUL-safe gate and autofix | `3d253b0` | `b88a3a6` | 130 tests passed |
-| T-0001 report gate in `set-status` | `1562dc6` | `81e1c20` | 146 tests passed |
-| T-0009 helper shebangs | `87ebf73` | `fd3c9a2` | 169 tests passed |
-| T-0010 agent-doc wording | `af98144` | `c3eaf0c` | 169 tests passed |
-| T-0011 gitflow task branches, housekeep | `f237af3` | `122728d` | 175 tests passed |
+| T-0008 pre-commit re-staging | `2e1bf26` | `4b07f50` | 116 tests passed |
+| T-0012 NUL-safe gate and autofix | `26c6dda` | `e30d56d` | 130 tests passed |
+| T-0001 report gate in `set-status` | `8be3613` | `73dd7b7` | 146 tests passed |
+| T-0009 helper shebangs | `9830da4` | `ec13600` | 169 tests passed |
+| T-0010 agent-doc wording | `f17344f` | `d719110` | 169 tests passed |
+| T-0011 gitflow task branches, housekeep | `665853d` | `fe56e47` | 175 tests passed |
 
 See one task's change with `git diff <merge>^1 <merge>`. Each report is
 `.agents/tasks/reports/T-00XX.md`.
@@ -75,7 +75,7 @@ check you can run.
 
 5. **A quirk of the new report gate (T-0001).** It refuses `done` if the report's Summary still says
    the verify is pending. This caught one slip: T-0009's Summary said so after verification. It
-   was fixed on `develop` in commit `24e0e9d`. Nothing is open.
+   was fixed on `develop` in commit `34dcc83`. Nothing is open.
 
 ## Optional ideas written in reports
 

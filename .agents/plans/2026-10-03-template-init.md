@@ -192,7 +192,7 @@ change to the task scripts.
 
 ## Review changes (2026-10-03)
 
-A review of the first draft against `develop` `96a7bbf` changed:
+A review of the first draft against `develop` `58246f2` changed:
 
 1. Branch creation moved after the commit. Before, `main` would have pointed at the uninitialized
    template. A precondition refuses to start if that branch already exists.
