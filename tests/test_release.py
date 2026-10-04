@@ -272,7 +272,7 @@ def _hotfix_on_main(repo: Path) -> None:
     git(repo, "checkout", "-q", "main")
 
 
-def test_hotfix_release_from_main_back_merges_develop(repo: Path):
+def test_hotfix_release_from_main_merges_main_into_develop(repo: Path):
     feat(repo, "a")
     git(repo, "push", "-q", "origin", "develop")
     release(repo, "--yes", "--push", expect=0)
@@ -349,7 +349,20 @@ def test_version_override_lower_than_any_tag_is_refused_without_tags_too(repo: P
     assert_refused(repo, ("--yes", "--version", "v0.0.0"), "must be higher")
 
 
-@pytest.mark.parametrize("value", ["1.0.0", "v1.0", "v1.0.0-rc1", "latest", "v1.0.0.0"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "1.0.0",
+        "v1.0",
+        "v1.0.0-rc1",
+        "latest",
+        "v1.0.0.0",
+        "v01.0.0",
+        "v1.00.0",
+        "v1.0.00",
+        "v1.0.0\n",
+    ],
+)
 def test_version_accepts_only_vx_y_z(repo: Path, value: str):
     feat(repo, "a")
     git(repo, "push", "-q", "origin", "develop")
@@ -612,3 +625,259 @@ def test_hook_rejecting_the_release_commit_stops_and_prints_commands(repo: Path)
     assert git(repo, "tag", "--list") == ""
     assert git(repo, "rev-parse", "develop") == develop_before
     assert git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+
+
+# ------------------------------------------- finishing by hand with the printed commands
+
+
+def finish_lines(result: subprocess.CompletedProcess[str]) -> list[str]:
+    """The commands under "To finish by hand", in order, without the prose hints."""
+    lines = result.stderr.splitlines()
+    start = next(i for i, line in enumerate(lines) if "To finish by hand" in line) + 1
+    commands: list[str] = []
+    for line in lines[start:]:
+        if not line.strip():
+            break
+        if not line.strip().startswith("("):
+            commands.append(line.strip())
+    return commands
+
+
+def run_finish(repo: Path, result: subprocess.CompletedProcess[str]) -> list[str]:
+    """Run the printed finish commands verbatim in a shell, each of which must succeed."""
+    commands = finish_lines(result)
+    assert commands
+    for command in commands:
+        done = subprocess.run(
+            command,
+            shell=True,
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=_env(),
+        )
+        assert done.returncode == 0, f"{command}\n{done.stdout}{done.stderr}"
+    return commands
+
+
+def reject_release_commits(repo: Path) -> Path:
+    """Install a commit-msg hook that rejects `chore(release)` commits; return the hook."""
+    hooks = repo.parent / "hooks"
+    hooks.mkdir()
+    hook = hooks / "commit-msg"
+    hook.write_text(
+        '#!/bin/sh\nif grep -q "^chore(release)" "$1"; then\n'
+        '  echo "release commit rejected by hook" >&2\n  exit 1\nfi\nexit 0\n',
+        encoding="utf-8",
+    )
+    hook.chmod(hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    git(repo, "config", "core.hooksPath", str(hooks))
+    return hook
+
+
+def reject_tags(repo: Path) -> Path:
+    """Install a reference-transaction hook that aborts creating any tag; return the hook."""
+    hooks = repo.parent / "tag-hooks"
+    hooks.mkdir()
+    hook = hooks / "reference-transaction"
+    hook.write_text(
+        '#!/bin/sh\n[ "$1" = prepared ] || exit 0\nwhile read old new ref; do\n'
+        '  case "$ref" in refs/tags/*) echo "tag rejected by hook" >&2; exit 1;; esac\n'
+        "done\nexit 0\n",
+        encoding="utf-8",
+    )
+    hook.chmod(hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    git(repo, "config", "core.hooksPath", str(hooks))
+    return hook
+
+
+def assert_released(
+    repo: Path, version: str, start: str, *, same_commit: bool, entry: str = "a.txt"
+) -> None:
+    """The plan's end state: tagged release on main, develop caught up, start checked out."""
+    tip = git(repo, "rev-parse", "main")
+    assert subject(repo, "main") == f"chore(release): {version}"
+    assert git(repo, "cat-file", "-t", version) == "tag"
+    assert git(repo, "rev-list", "-n", "1", version) == tip
+    assert git(repo, "merge-base", "--is-ancestor", version, "develop") == ""
+    if same_commit:
+        assert git(repo, "rev-parse", "develop") == tip
+    else:
+        assert subject(repo, "develop") == "chore(merge): merge main into develop"
+        assert len(parents(repo, "develop")) == 2
+    assert git(repo, "rev-parse", "--abbrev-ref", "HEAD") == start
+    assert git(repo, "status", "--porcelain") == ""
+    assert not [f for f in git(repo, "ls-files", "changelog.d").split() if "added" in f]
+    assert f"- Change from {entry}." in git(repo, "show", "main:CHANGELOG.md")
+
+
+def test_finishing_after_a_merge_conflict_ends_with_develop_fast_forwarded(repo: Path):
+    git(repo, "checkout", "-q", "main")
+    commit(repo, "clash.txt", "chore: main side", content="main\n")
+    git(repo, "push", "-q", "origin", "main")
+    git(repo, "checkout", "-q", "develop")
+    commit(repo, "clash.txt", "feat: develop side", "a.added.md", content="develop\n")
+    git(repo, "push", "-q", "origin", "develop")
+    result = release(repo, "--yes", "--push")
+    assert result.returncode == 1
+    assert "merge --no-ff main" not in result.stderr.split("To undo")[0]
+
+    # A human resolves the conflict, then runs the printed commands as they are.
+    (repo / "clash.txt").write_text("resolved\n", encoding="utf-8")
+    git(repo, "add", "clash.txt")
+    commands = run_finish(repo, result)
+
+    assert "git merge --ff-only main" in commands
+    assert commands[-1] == "git push --atomic origin main develop v0.1.0"
+    assert_released(repo, "v0.1.0", "develop", same_commit=True, entry="clash.txt")
+    assert subject(repo, "main~1") == "chore(merge): merge develop into main"
+    for ref in ("main", "develop"):
+        assert git(origin_of(repo), "rev-parse", ref) == git(repo, "rev-parse", ref)
+
+
+def test_finishing_after_a_rejected_release_commit_starts_at_the_commit(repo: Path):
+    hook = reject_release_commits(repo)
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+
+    result = release(repo, "--yes")
+
+    assert result.returncode == 1
+    # The failed attempt left the assembled changelog staged, so assemble is not repeated.
+    assert git(repo, "status", "--porcelain") != ""
+    commands = finish_lines(result)
+    assert commands[0] == "git add -A -- CHANGELOG.md changelog.d"
+    assert not any("changelog.py assemble" in c for c in commands)
+    assert "git merge --ff-only main" in commands
+    assert not any("merge --no-ff main" in c for c in commands)
+
+    hook.unlink()  # the problem is fixed; now run the printed commands
+    run_finish(repo, result)
+
+    assert_released(repo, "v0.1.0", "develop", same_commit=True)
+
+
+def test_finishing_after_a_failed_tag_ends_with_develop_fast_forwarded(repo: Path):
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+    hook = reject_tags(repo)
+
+    result = release(repo, "--yes")
+
+    assert result.returncode == 1
+    assert "FAILED at step 'tag'" in result.stderr
+    assert subject(repo, "main") == "chore(release): v0.1.0"
+    commands = finish_lines(result)
+    assert commands[0].startswith("git tag -a v0.1.0")
+    assert "git merge --ff-only main" in commands
+    assert not any("merge --no-ff main" in c for c in commands)
+
+    hook.unlink()  # the problem is fixed
+    run_finish(repo, result)
+
+    assert_released(repo, "v0.1.0", "develop", same_commit=True)
+
+
+def test_finishing_after_a_failed_develop_checkout_fast_forwards_develop(repo: Path):
+    hooks = repo.parent / "hooks"
+    hooks.mkdir()
+    hook = hooks / "post-checkout"
+    # Its exit status becomes `git checkout`'s: fail once the tag exists and develop is entered.
+    hook.write_text(
+        '#!/bin/sh\n[ "$(git symbolic-ref --short HEAD)" = develop ] || exit 0\n'
+        "git rev-parse -q --verify refs/tags/v0.1.0 >/dev/null || exit 0\n"
+        'echo "checkout hook failed" >&2\nexit 1\n',
+        encoding="utf-8",
+    )
+    hook.chmod(hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    git(repo, "config", "core.hooksPath", str(hooks))
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+
+    result = release(repo, "--yes", "--push")
+
+    assert result.returncode == 1
+    assert "FAILED at step 'develop'" in result.stderr
+    assert git(repo, "tag", "--list") == "v0.1.0"
+    assert git(repo, "rev-parse", "develop") != git(repo, "rev-parse", "main")
+    commands = finish_lines(result)
+    assert "git merge --ff-only main" in commands
+    assert commands[-1] == "git push --atomic origin main develop v0.1.0"
+
+    hook.unlink()  # the problem is fixed
+    run_finish(repo, result)
+
+    assert_released(repo, "v0.1.0", "develop", same_commit=True)
+    for ref in ("main", "develop"):
+        assert git(origin_of(repo), "rev-parse", ref) == git(repo, "rev-parse", ref)
+
+
+def test_hotfix_finishing_after_a_failed_back_merge_ends_with_the_no_ff_merge(
+    repo: Path,
+):
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+    release(repo, "--yes", "--push", expect=0)
+    # develop and the hotfix both change the same file, so merging main into develop conflicts.
+    commit(repo, "clash.txt", "feat: develop side", "b.added.md", content="develop\n")
+    git(repo, "push", "-q", "origin", "develop")
+    git(repo, "checkout", "-q", "main")
+    git(repo, "checkout", "-q", "-b", "hotfix/x")
+    commit(repo, "clash.txt", "fix: hotfix side", "x.fixed.md", content="hotfix\n")
+    git(repo, "checkout", "-q", "main")
+    git(
+        repo, "merge", "-q", "--no-ff", "hotfix/x", "-m", "chore(merge): merge hotfix/x"
+    )
+    git(repo, "push", "-q", "origin", "main")
+
+    result = release(repo, "--yes", "--push")
+
+    assert result.returncode == 1
+    assert "FAILED at step 'develop'" in result.stderr
+    assert "merge in progress: yes" in result.stderr
+    assert git(repo, "tag", "--list").split() == ["v0.1.0", "v0.1.1"]
+    assert not any("merge --ff-only" in c for c in finish_lines(result))
+
+    (repo / "clash.txt").write_text("resolved\n", encoding="utf-8")
+    git(repo, "add", "clash.txt")
+    commands = run_finish(repo, result)
+
+    assert commands[-1] == "git push --atomic origin main develop v0.1.1"
+    assert subject(repo, "main") == "chore(release): v0.1.1"
+    assert git(repo, "rev-list", "-n", "1", "v0.1.1") == git(repo, "rev-parse", "main")
+    assert len(parents(repo, "develop")) == 2
+    assert git(repo, "merge-base", "--is-ancestor", "v0.1.1", "develop") == ""
+    assert git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+    assert git(repo, "status", "--porcelain") == ""
+    for ref in ("main", "develop"):
+        assert git(origin_of(repo), "rev-parse", ref) == git(repo, "rev-parse", ref)
+
+
+def test_hotfix_finishing_after_a_failed_tag_ends_with_the_no_ff_merge(repo: Path):
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+    release(repo, "--yes", "--push", expect=0)
+    feat(repo, "b")
+    git(repo, "push", "-q", "origin", "develop")
+    _hotfix_on_main(repo)
+    hook = reject_tags(repo)
+
+    result = release(repo, "--yes")
+
+    assert result.returncode == 1
+    assert "FAILED at step 'tag'" in result.stderr
+    commands = finish_lines(result)
+    assert (
+        'git merge --no-ff main -m "chore(merge): merge main into develop"' in commands
+    )
+    assert not any("--ff-only" in c for c in commands)
+
+    hook.unlink()
+    run_finish(repo, result)
+
+    assert subject(repo, "main") == "chore(release): v0.1.1"
+    assert subject(repo, "develop") == "chore(merge): merge main into develop"
+    assert git(repo, "merge-base", "--is-ancestor", "v0.1.1", "develop") == ""
+    assert git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+    assert git(repo, "status", "--porcelain") == ""

@@ -19,7 +19,7 @@ With --yes the sequence is:
   2. Run `changelog.py assemble <version>` and commit `chore(release): vX.Y.Z` on `main`.
   3. Create the annotated tag `vX.Y.Z` on that commit.
   4. Bring `develop` up to `main`: a fast-forward when `develop` is an ancestor of `main`,
-     otherwise a --no-ff back-merge (`chore(merge): merge main into develop`).
+     otherwise a --no-ff merge of `main` into `develop` (`chore(merge): merge main into develop`).
   Then the starting branch is checked out again. With --push, `git push --atomic origin main
   develop vX.Y.Z` lands all three refs or none.
 
@@ -50,7 +50,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
-VERSION_RE = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+# Canonical SemVer numbers only: ASCII digits, no leading zeros (`v01.0.0` is not a version).
+VERSION_RE = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
 REMOTE = "origin"
 
 
@@ -154,9 +155,10 @@ def parse_version(tag: str) -> tuple[int, int, int] | None:
         tag: The candidate string.
 
     Returns:
-        (major, minor, patch), or None when the string is not exactly `vX.Y.Z`.
+        (major, minor, patch), or None when the string is not exactly `vX.Y.Z` with canonical
+        numbers (no leading zeros).
     """
-    match = VERSION_RE.match(tag)
+    match = VERSION_RE.fullmatch(tag)
     if not match:
         return None
     major, minor, patch = (int(x) for x in match.groups())
@@ -314,11 +316,22 @@ class Release:
             f'git merge --no-ff {self.develop} -m "chore(merge): merge develop into main"',
         ]
 
-    @property
-    def release_commit(self) -> list[str]:
-        """The commands for step 2."""
+    def release_commit(self, assembled: bool = False) -> list[str]:
+        """The commands for step 2.
+
+        Args:
+            assembled: Whether `changelog.py assemble` already ran, so its result is in the
+                working tree or the index; assembling again would refuse.
+
+        Returns:
+            The assemble (unless already done), stage and commit command lines.
+        """
         return [
-            f"python3 scripts/changelog.py assemble {self.version}",
+            *(
+                []
+                if assembled
+                else [f"python3 scripts/changelog.py assemble {self.version}"]
+            ),
             "git add -A -- CHANGELOG.md changelog.d",
             f'git commit -m "chore(release): {self.version}"',
         ]
@@ -406,11 +419,64 @@ def undo_commands(plan: Release, step: str) -> list[str]:
     return commands
 
 
+def changelog_assembled() -> bool:
+    """Tell whether `changelog.py assemble` already left its result in the tree or the index.
+
+    Returns:
+        True when `CHANGELOG.md` or `changelog.d` has uncommitted changes.
+    """
+    return (
+        run("status", "--porcelain", "--", "CHANGELOG.md", "changelog.d").stdout.strip()
+        != ""
+    )
+
+
+def finish_commands(plan: Release, step: str, push: bool) -> list[str]:
+    """List the commands that complete the release by hand after a failed step.
+
+    The list starts at the failed step, leaves out work that is already done, and picks the
+    `develop` update from the state as it is now (or as it will be once a pending merge into
+    `main` completes), by `git merge-base --is-ancestor`, not by the starting branch.
+
+    Args:
+        plan: The release in progress.
+        step: The step that failed (`merge-main`, `release-commit`, `tag`, `develop`, `back`).
+        push: Whether the run was asked to push at the end.
+
+    Returns:
+        Command lines for a human to run, in order. The script never runs them.
+    """
+    resolve = ["(resolve the conflicts and git add them)", "git commit --no-edit"]
+    # Once the merge of develop into main is complete, develop is an ancestor of main.
+    develop_ff = step == "merge-main" or git_ok(
+        "merge-base", "--is-ancestor", plan.develop, plan.main
+    )
+    commands: list[str] = []
+    if step == "merge-main":
+        commands += resolve if merge_in_progress() else plan.merge_to_main
+    if step in ("merge-main", "release-commit"):
+        # Only a failed release commit can follow an assemble; a pending merge also leaves the
+        # incoming fragments staged, which must not be mistaken for an assemble result.
+        commands += plan.release_commit(
+            assembled=step == "release-commit" and changelog_assembled()
+        )
+    if step in ("merge-main", "release-commit", "tag"):
+        commands += plan.tag_command
+    if step == "develop" and merge_in_progress():
+        commands += resolve
+    elif step != "back":
+        commands += plan.update_develop(develop_ff)
+    commands += plan.return_to_start
+    if push:
+        commands.append(plan.push_command)
+    return commands
+
+
 def stop_after_failure(
     plan: Release,
     step: str,
     result: subprocess.CompletedProcess[str],
-    finish: list[str],
+    push: bool,
 ) -> int:
     """Print the state and recovery commands after a failed step.
 
@@ -418,7 +484,7 @@ def stop_after_failure(
         plan: The release in progress.
         step: Name of the failed step (see `undo_commands`).
         result: The failed command's result.
-        finish: Command lines that complete the release by hand, starting at the failed step.
+        push: Whether the run was asked to push, so the finish list ends with the push.
 
     Returns:
         The exit code, always 1.
@@ -432,7 +498,7 @@ def stop_after_failure(
         describe_state(plan),
         "",
         "To finish by hand (fix the problem first), run in order:",
-        *(f"  {command}" for command in finish),
+        *(f"  {command}" for command in finish_commands(plan, step, push)),
         "",
         "To undo what this run changed instead, run in order:",
         *(f"  {command}" for command in undo_commands(plan, step)),
@@ -470,31 +536,12 @@ def execute(plan: Release, push: bool) -> int:
     Returns:
         The process exit code.
     """
-    push_commands = [plan.push_command] if push else []
-    develop_ff = git_ok("merge-base", "--is-ancestor", plan.develop, plan.main)
-    # What remains after the release commit, as commands, for the failure report.
-    after_commit = [
-        *plan.tag_command,
-        *plan.update_develop(develop_ff),
-        *plan.return_to_start,
-        *push_commands,
-    ]
-
     if plan.start == plan.develop:
         step = merge_into(
             plan.main, plan.develop, "chore(merge): merge develop into main"
         )
         if step.returncode != 0:
-            if merge_in_progress():
-                head = [
-                    "(resolve the conflicts and git add them)",
-                    "git commit --no-edit",
-                ]
-            else:
-                head = plan.merge_to_main
-            return stop_after_failure(
-                plan, "merge-main", step, [*head, *plan.release_commit, *after_commit]
-            )
+            return stop_after_failure(plan, "merge-main", step, push)
         print(f"merged {plan.develop} into {plan.main}")
 
     step = run_script("changelog.py", "assemble", plan.version)
@@ -503,24 +550,17 @@ def execute(plan: Release, push: bool) -> int:
     if step.returncode == 0:
         step = run("commit", "-m", f"chore(release): {plan.version}", check=False)
     if step.returncode != 0:
-        return stop_after_failure(
-            plan, "release-commit", step, [*plan.release_commit, *after_commit]
-        )
+        return stop_after_failure(plan, "release-commit", step, push)
     print(f"committed chore(release): {plan.version} on {plan.main}")
 
     step = run("tag", "-a", plan.version, "-m", f"Release {plan.version}", check=False)
     if step.returncode != 0:
-        return stop_after_failure(plan, "tag", step, after_commit)
+        return stop_after_failure(plan, "tag", step, push)
     plan.tag_created = True
     print(f"created tag {plan.version}")
 
     # Decided by ancestry, not by the starting branch: after a hotfix develop has diverged.
     fast_forward = git_ok("merge-base", "--is-ancestor", plan.develop, plan.main)
-    after_tag = [
-        *plan.update_develop(fast_forward),
-        *plan.return_to_start,
-        *push_commands,
-    ]
     if fast_forward:
         step = run("checkout", plan.develop, check=False)
         if step.returncode == 0:
@@ -530,24 +570,15 @@ def execute(plan: Release, push: bool) -> int:
             plan.develop, plan.main, "chore(merge): merge main into develop"
         )
     if step.returncode != 0:
-        head = after_tag
-        if merge_in_progress():
-            head = [
-                "(resolve the conflicts and git add them)",
-                "git commit --no-edit",
-                *plan.return_to_start,
-                *push_commands,
-            ]
-        return stop_after_failure(plan, "develop", step, head)
-    print(
-        f"{plan.develop} {'fast-forwarded' if fast_forward else 'back-merged'} to {plan.main}"
-    )
+        return stop_after_failure(plan, "develop", step, push)
+    if fast_forward:
+        print(f"fast-forwarded {plan.develop} to {plan.main}")
+    else:
+        print(f"merged {plan.main} into {plan.develop}")
 
     step = run("checkout", plan.start, check=False)
     if step.returncode != 0:
-        return stop_after_failure(
-            plan, "back", step, [*plan.return_to_start, *push_commands]
-        )
+        return stop_after_failure(plan, "back", step, push)
 
     if not push:
         print(f"released {plan.version} locally -- push with: {plan.push_command}")
