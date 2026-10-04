@@ -6,7 +6,7 @@
 
 26 task(s). Generated 2026-10-04.
 
-| open: 1 | in_progress: 0 | blocked: 0 | review: 0 | done: 25 | abandoned: 0 |
+| open: 0 | in_progress: 1 | blocked: 0 | review: 0 | done: 25 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -35,15 +35,11 @@
 | T-0018 | [Finish the init script with gate, commit, branch and self-removal](T-0018-finish-the-init-script-with-gate-commit-branch.md) | done | medium | feat | T-0017 | [report](reports/T-0018.md) |
 | T-0021 | [Add a code of conduct and a security policy](T-0021-add-a-code-of-conduct-and-a-security-policy.md) | done | medium | docs | — | [report](reports/T-0021.md) |
 | T-0025 | [Start generated projects with an empty changelog](T-0025-start-generated-projects-with-an-empty-changelog.md) | done | medium | feat | T-0022 | [report](reports/T-0025.md) |
-| T-0026 | [Document the changelog and release workflow](T-0026-document-the-changelog-and-release-workflow.md) | open | medium | docs | T-0024, T-0025 | — |
+| T-0026 | [Document the changelog and release workflow](T-0026-document-the-changelog-and-release-workflow.md) | in_progress | medium | docs | T-0024, T-0025 | — |
 | T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | done | low | chore | — | [report](reports/T-0009.md) |
 | T-0010 | [Fix agent-doc wording and stale AGENTS.md references](T-0010-fix-agent-doc-wording-and-stale-agents-md.md) | done | low | docs | — | [report](reports/T-0010.md) |
 | T-0011 | [Support docs and chore task branches in gitflow and fix housekeep worktrees](T-0011-support-docs-and-chore-task-branches-in-gitflow.md) | done | low | fix | — | [report](reports/T-0011.md) |
 
 ## Ready to dispatch
 
-Dependencies satisfied, not yet started:
-
-- **T-0026** Document the changelog and release workflow — `CONTRIBUTING.md`, `CLAUDE.md`, `PYTHON_CONVENTIONS.md`, `DEV_TOOLING_SPEC.md`, `scripts/README.md`, `.agents/README.md`, `.agents/tasks/templates/task.md`
-
-Suggested conflict-free parallel batch: T-0026
+*Nothing ready — every open task is blocked or already in flight.*
