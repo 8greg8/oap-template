@@ -4,9 +4,9 @@
 
 # Task Backlog
 
-21 task(s). Generated 2026-10-04.
+26 task(s). Generated 2026-10-04.
 
-| open: 0 | in_progress: 0 | blocked: 0 | review: 0 | done: 21 | abandoned: 0 |
+| open: 4 | in_progress: 1 | blocked: 0 | review: 0 | done: 21 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -22,6 +22,9 @@
 | T-0013 | [Make orchestrator merge into develop the default](T-0013-make-orchestrator-merge-into-develop-the-default.md) | done | high | docs | — | [report](reports/T-0013.md) |
 | T-0019 | [Scrub private references and attribute the method text](T-0019-scrub-private-references-and-attribute-the.md) | done | high | docs | — | [report](reports/T-0019.md) |
 | T-0020 | [Rewrite history into a clean public repository copy](T-0020-rewrite-history-into-a-clean-public-repository.md) | done | high | chore | T-0015, T-0016, T-0017, T-0018, T-0019 | [report](reports/T-0020.md) |
+| T-0022 | [Add the changelog tool, CHANGELOG.md and changelog fragments](T-0022-add-the-changelog-tool-changelog-md-and.md) | in_progress | high | feat | — | — |
+| T-0023 | [Require a changelog fragment on push and at finish](T-0023-require-a-changelog-fragment-on-push-and-at.md) | open | high | feat | T-0022 | — |
+| T-0024 | [Release from develop into main with the changelog](T-0024-release-from-develop-into-main-with-the.md) | open | high | feat | T-0023 | — |
 | T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
 | T-0008 | [Fix pre-commit re-staging for unusual filenames](T-0008-fix-pre-commit-re-staging-for-unusual-filenames.md) | done | medium | fix | — | [report](reports/T-0008.md) |
 | T-0012 | [Make staged-file handling NUL-safe in gate and autofix scripts](T-0012-make-staged-file-handling-nul-safe-in-gate-and.md) | done | medium | fix | — | [report](reports/T-0012.md) |
@@ -31,6 +34,8 @@
 | T-0017 | [Seed project files in the init script](T-0017-seed-project-files-in-the-init-script.md) | done | medium | feat | T-0016 | [report](reports/T-0017.md) |
 | T-0018 | [Finish the init script with gate, commit, branch and self-removal](T-0018-finish-the-init-script-with-gate-commit-branch.md) | done | medium | feat | T-0017 | [report](reports/T-0018.md) |
 | T-0021 | [Add a code of conduct and a security policy](T-0021-add-a-code-of-conduct-and-a-security-policy.md) | done | medium | docs | — | [report](reports/T-0021.md) |
+| T-0025 | [Start generated projects with an empty changelog](T-0025-start-generated-projects-with-an-empty-changelog.md) | open | medium | feat | T-0022 | — |
+| T-0026 | [Document the changelog and release workflow](T-0026-document-the-changelog-and-release-workflow.md) | open | medium | docs | T-0024, T-0025 | — |
 | T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | done | low | chore | — | [report](reports/T-0009.md) |
 | T-0010 | [Fix agent-doc wording and stale AGENTS.md references](T-0010-fix-agent-doc-wording-and-stale-agents-md.md) | done | low | docs | — | [report](reports/T-0010.md) |
 | T-0011 | [Support docs and chore task branches in gitflow and fix housekeep worktrees](T-0011-support-docs-and-chore-task-branches-in-gitflow.md) | done | low | fix | — | [report](reports/T-0011.md) |
@@ -38,3 +43,10 @@
 ## Ready to dispatch
 
 *Nothing ready — every open task is blocked or already in flight.*
+
+## Waiting on dependencies
+
+- **T-0023** Require a changelog fragment on push and at finish — needs T-0022
+- **T-0024** Release from develop into main with the changelog — needs T-0023
+- **T-0025** Start generated projects with an empty changelog — needs T-0022
+- **T-0026** Document the changelog and release workflow — needs T-0024, T-0025
