@@ -48,7 +48,7 @@ If you discover a security vulnerability in this project, please report it priva
 tab and click **Report a vulnerability**. This routes directly to the maintainers through
 GitHub's secure channel.
 
-**Fallback:** Email info@koporec.eu
+**Fallback:** Email gregor.koporec@gmail.com
 
 Please include the following details in your report:
 
@@ -95,7 +95,7 @@ If you discover a vulnerability in one of our dependencies, please report it to 
 
 ## Safe Harbor
 
-We consider security research conducted in accordance with this policy to be authorised. This repository runs no service, so test only against your own clone of it or a project you created from the template. We will not initiate legal action against researchers who:
+We consider security research conducted in accordance with this policy to be authorised. We will not initiate legal action against researchers who:
 
 - Report vulnerabilities through the channels described above
 - Test only against their own clone or a project they created from the template

@@ -724,7 +724,7 @@ TEMPLATE_README_SENTENCE = "This is a **template**, not a working project"
 WORKING_UNIT = "## Working unit: the task"
 POLICY_FILES = ("CODE_OF_CONDUCT.md", "SECURITY.md")
 # The template owner's contacts in those two files; a generated project must not carry them.
-OWNER_CONTACTS = ("gregor.koporec@gmail.com", "info@koporec.eu")
+OWNER_CONTACTS = ("gregor.koporec@gmail.com",)
 
 
 def _text(repo: Path, rel: str) -> str:
