@@ -1,13 +1,21 @@
 # Plan: changelog and version bumping for the template
 
-Status: proposed. Owner decisions D1 to D7 below are open. No tasks are filed yet.
+Status: D1 to D7 accepted as recommended. D8 added by the owner; its details D8a to D8c are
+open. No tasks are filed yet.
+
+**Owner decisions (2026-10-04, session instruction):** "accept the changelog plan as
+recommended. What I would like to add is to bump version on every merge into develop branch,
+since this is the main branch we are working on." D1 to D7 are accepted as recommended. D8
+replaces D5's release-time bump with a bump at every merge into `develop`. Once D8a to D8c are
+settled, this is the owner's written approval for the "Ask first" and breaking-change items
+under § Approvals.
 
 ## Goal
 
 Every project created from this template keeps a human-written changelog in the Keep a Changelog
-format, is blocked from pushing a versioned change without a changelog entry, and gets its
-release section and version from one command at release time. The source of the practice is
-`8greg8/sistat-mcp` (`develop` at `20ae53d`).
+format, and cannot push a versioned change without a changelog entry. Every merge into `develop`
+that carries a versioned change produces a new version: a changelog section and a `vX.Y.Z` tag.
+The source of the practice is `8greg8/sistat-mcp` (`develop` at `20ae53d`).
 
 ## What sistat-mcp does
 
@@ -19,129 +27,193 @@ release section and version from one command at release time. The source of the 
 | `CLAUDE.md`, `AGENTS.md` | "Pre-commit Release Gate": agents bump and write the entry before every commit |
 | Release | By hand: move `[Unreleased]` items to `## [X.Y.Z] - date`, tag `vX.Y.Z`; `publish.yml` on the tag publishes to npm and creates a GitHub Release |
 
-What works and should carry over: the Keep a Changelog file with `[Unreleased]`, hand-written
-entries, a hook that makes skipping the entry impossible, agent rules that name the step, and a
-release step that turns `[Unreleased]` into a dated section.
+What carries over:
+- the Keep a Changelog file with `[Unreleased]`;
+- hand-written entries;
+- a hook that makes skipping a step impossible;
+- agent rules that name the step;
+- a frequent version bump.
 
 What does not fit this template:
 
-1. **Per-commit version bump.** `package.json` is at 0.10.6 while the last released section is
-   0.10.0. Every commit bumps, so the file version drifts from releases. This template already
-   takes the version from git tags (`hatch-vcs`, `pyproject.toml`) and computes the next one
-   from commit types (`scripts/next_version.py`). A second version source would compete with it.
+1. **Version in a file.** `package.json` is at 0.10.6 while the last released section is
+   0.10.0, so the file drifts from releases. This template takes the version from git tags
+   (`hatch-vcs`) and computes it from commit types (`scripts/next_version.py`). A second version
+   source would compete with it.
 2. **One shared file edited by every change.** Here several task branches run in parallel
-   (`backlog.py ready --parallel N`, `touches`). Each would append under the same
-   `[Unreleased]` heading, so merges into `develop` would conflict on `CHANGELOG.md`, and
-   `touches` could never keep two feature tasks apart.
-3. **Bump level by hand.** `pnpm run bump patch` for `docs:` and `chore:` disagrees with
-   Conventional Commits, where only `feat`, `fix` and breaking changes move the version. This
-   template's `CONTRIBUTING.md` § Versioning already follows the latter.
-4. **Presence check only.** The hook checks that the files are staged, not that the placeholder
-   ("update this line with a descriptive entry") was replaced.
+   (`backlog.py ready --parallel N`, `touches`). Each would edit the same `[Unreleased]`
+   heading, so merges into `develop` would conflict on `CHANGELOG.md`.
+3. **Bump level by hand, and on every commit.** `docs:` and `chore:` bump patch, which disagrees
+   with Conventional Commits and this template's `CONTRIBUTING.md` § Versioning.
+4. **Presence check only.** The hook does not check that the placeholder was replaced.
 5. **npm-only tooling.** `bump.sh` needs `node` and `pnpm`; `scripts/` here is stdlib Python.
 
-## Proposed design
+## Design
 
-**Changelog fragments.** A change adds one small file, `changelog.d/<id>.<category>.md`, with
-one or more bullet lines. `<id>` is the task ID (`T-0023`) or the branch topic; `<category>` is
-one of Keep a Changelog's `added`, `changed`, `deprecated`, `removed`, `fixed`, `security`.
-Fragments never conflict, and each task's `touches` names only its own fragment.
-`CHANGELOG.md` keeps the Keep a Changelog header, an `## [Unreleased]` heading and the released
-sections. Nobody edits it by hand between releases.
+### Changelog fragments (D1)
 
-**`scripts/changelog.py`** (stdlib only, like the rest of `scripts/`):
+A change adds `changelog.d/<id>.<category>.md` with one or more bullet lines.
+- `<id>` is the task ID (`T-0023`) or the branch topic.
+- `<category>` is one of `added`, `changed`, `deprecated`, `removed`, `fixed`, `security`.
+
+Fragments never conflict, and a task's `touches` names only its own fragment. `CHANGELOG.md`
+keeps the Keep a Changelog header, an empty `## [Unreleased]` heading and the version sections.
+Nobody edits it by hand.
+
+### `scripts/changelog.py` (stdlib only)
+
 - `check <range>`: fails when the range holds a non-merge `feat`, `fix` or breaking commit
-  (classified exactly as `next_version.py` does) but adds no fragment. Also fails on a fragment
-  with a bad name or category, no bullet, or placeholder text.
-- `preview`: prints the section the next release would write.
-- `assemble <version> [--date YYYY-MM-DD]`: writes `## [X.Y.Z] - date` under `[Unreleased]`
-  with the fragments grouped by category in Keep a Changelog order, then deletes the fragments.
+  (classified exactly as `next_version.py` does) and no commit in the range adds a fragment.
+  It also fails on a fragment with a bad name or category, no bullet, or placeholder text.
+  Fragments added and later folded into `CHANGELOG.md` inside the same range count as added.
+- `preview`: prints the section the next bump would write.
+- `assemble <version> [--date YYYY-MM-DD]`: writes `## [X.Y.Z] - date` under `[Unreleased]`,
+  groups the fragments by category in Keep a Changelog order, then deletes the fragments.
 
-**Enforcement in the pre-push hook**, not pre-commit. `.husky/pre-push` already sees the pushed
-range per ref. It runs `changelog.py check` on that range before the gate, with the same skips
-it has today (deleted refs, `.agents/`-only pushes). A task branch's commits are judged
-together, so an entry is needed once per change, not once per commit. A new remote branch is
-checked against its merge base with `develop`. `gitflow.sh finish` runs the same check before it
-merges.
+### Fragment check on push (D2, D3)
 
-**Version bump at release, not per commit.** The version stays in git tags only.
-`scripts/release.py` on `main`:
-1. computes the version with `next_version.py`, as today;
-2. runs `changelog.py assemble` and commits `chore(release): vX.Y.Z` on `main`;
-3. creates the annotated tag.
+`.husky/pre-push` runs `changelog.py check` on each pushed range before the gate. It keeps its
+current skips (deleted refs, `.agents/`-only pushes). A new remote branch is checked against its
+merge base with `develop`. `gitflow.sh finish` runs the same check before it merges. Only
+`feat`, `fix` and breaking changes need an entry.
 
-The dry run shows the version and the changelog section and changes nothing. Tagging stays a
-deliberate, manual step, as `CLAUDE.md` "Ask first" requires.
+### Version bump on every merge into `develop` (D8)
 
-**Agent rules.** `CONTRIBUTING.md` § Versioning and a short rule in `CLAUDE.md`'s task section
-say: a task whose change is `feat`, `fix` or breaking adds its fragment and names it in
-`touches`. The verifier in `.agents/README.md` § "Verify, resolve, merge" checks the fragment
-exists and describes the change.
+`scripts/bump.py` (new, stdlib only) runs on `develop` right after a merge:
 
-**Generated projects.** `init_project.py` replaces `CHANGELOG.md` with the empty header and
-`[Unreleased]`, and removes every fragment, so a new project starts with no history.
+1. Computes the next version with `next_version.py`. If the merged commits hold no `feat`,
+   `fix` or breaking change, it does nothing (see D8a).
+2. Runs `changelog.py assemble <version>` and commits `chore(release): vX.Y.Z` on `develop`.
+3. Creates the annotated tag `vX.Y.Z` on that commit.
+4. With `--push`, runs `git push --atomic origin develop vX.Y.Z`, so the branch and tag land
+   together or not at all. If the push is rejected because `develop` moved, it deletes the local
+   tag and stops, and the merger pulls and repeats.
+
+Who calls it:
+- `gitflow.sh finish` calls it without `--push` after every merge into `develop`. `finish`
+  does not push today; `bump.py` prints the atomic push command for the merger.
+- The orchestrator's merge step in `.agents/README.md` calls `bump.py --push` in place of its
+  plain push: merge, run the gate on `develop`, then bump and push.
+
+A Husky `post-merge` hook is not used. It also fires on `git pull` into `develop`, which would
+bump on every pull.
+
+**Husky guard:** `.husky/pre-push` refuses a push of `develop` whose tip is not tagged when the
+commits since the highest reachable `vX.Y.Z` tag include a `feat`, `fix` or breaking change. An
+un-bumped merge therefore cannot reach `origin`. This is the template's version of sistat-mcp's
+"commit blocked until bumped" hook.
+
+**Version lookup.** `next_version.py` uses the highest `vX.Y.Z` tag reachable from `HEAD`, not
+the nearest (`git describe`, today). A hotfix tag on `main` that is back-merged into `develop`
+must not lower `develop`'s base version.
+
+**`main` (D8b).** `main` catches up to a tagged `develop` commit by fast-forward
+(`scripts/release.py`, reworked from "tag `main`" to "fast-forward `main` to the latest
+`develop` tag"). `main` then carries the same commit and version as `develop`. A fast-forward
+is always possible, because every hotfix is back-merged into `develop`, so `main` stays an
+ancestor of `develop`.
+
+**Hotfixes (D8c).** A hotfix merges into `main`, gets a patch tag there with `bump.py`, and is
+back-merged into `develop`. That back-merge brings a `fix` commit not reachable from
+`develop`'s tag, so `bump.py` bumps `develop` too.
+
+### Agent rules
+
+- `CONTRIBUTING.md` § Versioning: fragments, the bump at each merge into `develop`, promotion of
+  `main`, hotfixes.
+- `CLAUDE.md`:
+  - a task whose change is `feat`, `fix` or breaking adds its fragment and lists it in `touches`;
+  - the "Ask first" item on release tags and § Merge authority's "does not extend to release
+    tags" now exclude the version tag `bump.py` creates in the defined merge step;
+  - promoting `main` stays a human step.
+- `.agents/README.md`:
+  - the merge step runs `bump.py --push`;
+  - the verifier checks that the fragment exists and describes the change.
+
+### Generated projects
+
+`init_project.py` replaces `CHANGELOG.md` with the empty header and `[Unreleased]`, and removes
+every fragment. A new project starts with no versions and no tags.
 
 ## Owner decisions
 
-- **D1. Changelog mechanism.** Fragments assembled at release (recommended). The alternatives
-  are one `CHANGELOG.md` edited by every change, as in sistat-mcp, which conflicts under
-  parallel tasks, or a changelog generated from commit subjects only, which needs no extra file
-  but gives weaker text.
-- **D2. Where it is enforced.** The pre-push range check plus `gitflow.sh finish`
-  (recommended). The alternative is pre-commit per commit, as in sistat-mcp.
-- **D3. Which changes need an entry.** `feat`, `fix` and breaking changes, matching the version
-  impact (recommended). The alternative is every non-exempt change, as in sistat-mcp.
-- **D4. Version source.** Git tags only, with no version written to a file (recommended).
-  `package.json` stays private tooling metadata without a meaningful version.
-- **D5. Release step.** `release.py` assembles the changelog, commits it on `main` and tags
-  (recommended). Tags stay manual.
-- **D6. The template's own changelog.** Start `CHANGELOG.md` with one hand-written
-  `[Unreleased]` summary of the template as it stands (recommended), or backfill entries from
-  the `feat` and `fix` commits so far. After this work lands, the owner cuts `v0.1.0`.
-- **D7. GitHub Releases.** Out of scope: the template has no CI. A later task can add a workflow
-  that creates a GitHub Release from the tag's changelog section, as sistat-mcp's
-  `publish.yml` does.
+Accepted (2026-10-04):
+- **D1:** changelog fragments assembled at bump time.
+- **D2:** enforcement in the pre-push range check and `gitflow.sh finish`.
+- **D3:** only `feat`, `fix` and breaking changes need an entry.
+- **D4:** git tags are the only version source.
+- **D5:** superseded by D8. The release step no longer writes the changelog; `bump.py` does it
+  at each merge into `develop`.
+- **D6:** `CHANGELOG.md` starts with one hand-written `[Unreleased]` summary of the template as
+  it stands. The first bump after this work lands produces `v0.1.0`.
+- **D7:** a GitHub Release workflow stays out of scope.
+
+Added by the owner:
+- **D8:** bump the version on every merge into `develop`.
+
+Open:
+- **D8a. Merges without a versioned change.** Recommended: a merge with only `docs`, `chore`,
+  `test`, `refactor`, `style`, `ci` or `build` commits gets no new version, matching D3 and
+  Conventional Commits. The alternative is a patch bump on every merge, as sistat-mcp does for
+  every commit.
+- **D8b. Promoting `main`.** Recommended: a fast-forward to the latest `develop` tag, run by a
+  human with `release.py`. The alternative is to drop `main` from the flow.
+- **D8c. Hotfixes.** Recommended: keep the hotfix flow, with a patch tag on `main` and a bump on
+  `develop` at the back-merge. The alternative is to fix on `develop` and promote `main`, which
+  also ships everything else that is on `develop`.
 
 ## Approvals this plan needs
 
-- **Ask first.** Tasks 1, 2 and 4 change `scripts/` (`changelog.py`, `release.py`,
-  `gitflow.sh`), which `CLAUDE.md` puts under "Ask first".
-- **Breaking change.** Task 2 changes hook behavior: a push without a fragment is now rejected.
-  `CLAUDE.md` names hook behavior as a breaking contract for downstream projects, so that task's
-  commit is marked breaking.
-- An owner acceptance of this plan, recorded here, is the written approval the orchestrator
-  cites when merging those tasks.
+- **Ask first:**
+  - tasks 1, 2, 3 and 4 change `scripts/`;
+  - task 3 makes merges create tags, which `CLAUDE.md` keeps for a human today.
+- **Breaking change:**
+  - task 2 rejects pushes without a fragment;
+  - task 3 changes the merge rules (a bump at every merge into `develop`, a push guard on
+    `develop`);
+  - task 4 changes how `main` is released.
+  `CLAUDE.md` names hook behavior and the branching and merge rules as breaking contracts.
+- The owner decisions recorded above are the written approval the orchestrator cites when
+  merging these tasks, once D8a to D8c are settled.
 
-## Tasks (filed after acceptance)
+## Tasks (filed after D8a to D8c are settled)
 
 1. **Add `scripts/changelog.py`, `CHANGELOG.md` and `changelog.d/`** (feat).
    - Touches: `scripts/changelog.py`, `tests/test_changelog.py`, `CHANGELOG.md`,
      `changelog.d/README.md`.
-   - Scope: the three subcommands, Keep a Changelog output, and fragment validation.
-   - Tests: classification parity with `next_version.py`, assembly order, fragment deletion,
-     and the placeholder and bad-name failures.
-2. **Enforce fragments on push and at release** (feat, breaking). Depends on 1.
-   - Touches: `.husky/pre-push`, `scripts/gitflow.sh`, `scripts/release.py`,
-     `tests/test_hooks.py`, `tests/test_gitflow.py`, `tests/test_release.py`.
-   - Scope: the pre-push check with the current skips, the `gitflow.sh finish` check, the
-     `release.py` assemble, commit and tag sequence, and a dry run that shows the section.
-3. **Generated projects start with an empty changelog** (feat). Depends on 1.
+2. **Require a fragment on push and at finish** (feat, breaking). Depends on 1.
+   - Touches: `.husky/pre-push`, `scripts/gitflow.sh`, `tests/test_hooks.py`,
+     `tests/test_gitflow.py`.
+3. **Bump the version at every merge into `develop`** (feat, breaking). Depends on 2.
+   - Touches: `scripts/bump.py`, `scripts/next_version.py`, `scripts/gitflow.sh`,
+     `.husky/pre-push`, `tests/test_bump.py`, `tests/test_next_version.py`,
+     `tests/test_hooks.py`, `tests/test_gitflow.py`.
+   - Scope: `bump.py` with the atomic push; the highest-tag lookup; the `develop` push guard;
+     `gitflow.sh finish` calling `bump.py` for merges into `develop`, including hotfix
+     back-merges.
+4. **Promote `main` by fast-forward** (feat, breaking). Depends on 3.
+   - Touches: `scripts/release.py`, `tests/test_release.py`.
+5. **Generated projects start with an empty changelog** (feat). Depends on 1.
    - Touches: `init_project.py`, `tests/test_init_project.py`.
-4. **Document the changelog workflow** (docs). Depends on 2.
+6. **Document the changelog and versioning workflow** (docs). Depends on 3 and 4.
    - Touches: `CONTRIBUTING.md`, `CLAUDE.md`, `DEV_TOOLING_SPEC.md`, `scripts/README.md`,
      `.agents/README.md`, `.agents/tasks/templates/task.md`.
-   - Scope: the rule, the verifier check, the spec's former "no changelog generation" non-goal,
-     and a "changelog fragment" line under the task template's Documentation required.
 
-Tasks 2 and 3 can run in parallel. Each task that is itself `feat` or breaking adds its own
-fragment once task 1 has landed, so the template's first changelog describes this work.
+Task 5 can run in parallel with tasks 2 to 4. Tasks 2 and 3 both touch `.husky/pre-push` and
+`scripts/gitflow.sh`, so they run in sequence. Once task 1 has landed, each `feat` or breaking
+task adds its own fragment.
+
+Until task 6 lands, the orchestrator runs `bump.py --push` after each merge by hand, as soon as
+task 3 has landed.
 
 ## Risks
 
-- **Fragment forgotten on direct commits.** The pre-push check covers every push, not only task
-  branches, so this is caught.
-- **Wrong commit type.** A change typed `chore` or `docs` that should be `feat` slips past the
-  check. The verifier's existing commit-type check is the guard. It already flagged this case
-  in T-0021.
-- **Tag without a pushed release commit.** `release.py` keeps the tag push explicit with
-  `--push`; the release commit on `main` is pushed by the same command.
+- **Two mergers at once.** Both compute the same next version. The atomic push lets only one
+  land; the other deletes its local tag, pulls and bumps again.
+- **Wrong commit type.** A change typed `chore` that should be `feat` gets no fragment and no
+  bump. The verifier's commit-type check is the guard; it flagged this case in T-0021.
+- **A tag pushed without its branch, or the reverse.** Prevented by `--atomic`. A red gate after
+  the push is handled as today: revert the merge as a new commit, which `bump.py` then versions
+  as needed.
+- **History of many tags.** Every versioned merge creates a tag. That is the intended effect of
+  D8.
