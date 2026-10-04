@@ -1,7 +1,7 @@
 ---
 id: T-0026
 title: Document the changelog and release workflow
-status: in_progress
+status: review
 type: docs
 priority: medium
 depends_on: [T-0024, T-0025]
