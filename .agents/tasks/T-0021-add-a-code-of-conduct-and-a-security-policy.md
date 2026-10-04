@@ -1,7 +1,7 @@
 ---
 id: T-0021
 title: Add a code of conduct and a security policy
-status: open
+status: done
 type: docs
 priority: medium
 depends_on: []

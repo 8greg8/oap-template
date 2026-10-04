@@ -4,9 +4,9 @@
 
 # Task Backlog
 
-20 task(s). Generated 2026-10-04.
+21 task(s). Generated 2026-10-04.
 
-| open: 0 | in_progress: 0 | blocked: 0 | review: 0 | done: 20 | abandoned: 0 |
+| open: 0 | in_progress: 0 | blocked: 0 | review: 0 | done: 21 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -30,6 +30,7 @@
 | T-0016 | [Reset task state in the init script](T-0016-reset-task-state-in-the-init-script.md) | done | medium | feat | T-0015 | [report](reports/T-0016.md) |
 | T-0017 | [Seed project files in the init script](T-0017-seed-project-files-in-the-init-script.md) | done | medium | feat | T-0016 | [report](reports/T-0017.md) |
 | T-0018 | [Finish the init script with gate, commit, branch and self-removal](T-0018-finish-the-init-script-with-gate-commit-branch.md) | done | medium | feat | T-0017 | [report](reports/T-0018.md) |
+| T-0021 | [Add a code of conduct and a security policy](T-0021-add-a-code-of-conduct-and-a-security-policy.md) | done | medium | docs | — | [report](reports/T-0021.md) |
 | T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | done | low | chore | — | [report](reports/T-0009.md) |
 | T-0010 | [Fix agent-doc wording and stale AGENTS.md references](T-0010-fix-agent-doc-wording-and-stale-agents-md.md) | done | low | docs | — | [report](reports/T-0010.md) |
 | T-0011 | [Support docs and chore task branches in gitflow and fix housekeep worktrees](T-0011-support-docs-and-chore-task-branches-in-gitflow.md) | done | low | fix | — | [report](reports/T-0011.md) |

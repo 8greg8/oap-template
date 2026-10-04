@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-20 lesson(s) across 11 section(s). Generated 2026-10-04.
+21 lesson(s) across 11 section(s). Generated 2026-10-04.
 
 ## Tag index
 
@@ -20,11 +20,12 @@ to all lessons that carry it.
 - `bash` — [T-0012](#t-0012-success)
 - `bash-3.2` — [T-0011](#t-0011-success)
 - `chore` — [T-0020](#t-0020-success)
+- `code-of-conduct` — [T-0021](#t-0021-success)
 - `commit` — [T-0018](#t-0018-success)
 - `commit-lint` — [T-0004](#t-0004-success)
 - `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
 - `docker` — [T-0006](#t-0006-success)
-- `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success), [T-0013](#t-0013-success), [T-0014](#t-0014-success), [T-0019](#t-0019-success)
+- `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success), [T-0013](#t-0013-success), [T-0014](#t-0014-success), [T-0019](#t-0019-success), [T-0021](#t-0021-success)
 - `end-to-end` — [T-0018](#t-0018-success)
 - `execution-loop` — [T-0001](#t-0001-success)
 - `file-mode` — [T-0009](#t-0009-success)
@@ -40,6 +41,7 @@ to all lessons that carry it.
 - `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success)
 - `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success)
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success)
+- `init-project` — [T-0021](#t-0021-success)
 - `init-script` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
 - `merge-authority` — [T-0013](#t-0013-success), [T-0014](#t-0014-success)
 - `method-text` — [T-0014](#t-0014-success)
@@ -56,6 +58,7 @@ to all lessons that carry it.
 - `ruff` — [T-0007](#t-0007-success)
 - `scripts` — [T-0012](#t-0012-success)
 - `scrub` — [T-0019](#t-0019-success)
+- `security-policy` — [T-0021](#t-0021-success)
 - `seeding` — [T-0017](#t-0017-success)
 - `set-status` — [T-0001](#t-0001-success)
 - `shebang` — [T-0009](#t-0009-success)
@@ -131,6 +134,16 @@ Source: [`reports/T-0014.md`](tasks/reports/T-0014.md)
 Tags: `docs`, `public-release`, `scrub`, `notice`
 
 Source: [`reports/T-0019.md`](tasks/reports/T-0019.md)
+
+### T-0021 (success)
+
+- `tests/test_init_project.py` builds its scratch copy from `git ls-files`, so a new root file
+  must be staged (`git add`) before the init tests see it; per the file's docstring, only
+  `init_project.py` and the test file are copied from the working tree.
+
+Tags: `docs`, `security-policy`, `code-of-conduct`, `init-project`
+
+Source: [`reports/T-0021.md`](tasks/reports/T-0021.md)
 
 ## git
 
