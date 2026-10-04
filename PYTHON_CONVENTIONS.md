@@ -29,6 +29,9 @@ Standard `src` layout, managed as a single `uv` workspace with one root `pyproje
 - `[tool.hatch.version]` uses `source = "vcs"`, so the package version is derived directly from
   `vX.Y.Z` git tags at the repo root (see [`CONTRIBUTING.md`](CONTRIBUTING.md)) — no extra
   `raw-options.root` needed since the workspace root and the version-controlled root are the same.
+  Tags are created only by `scripts/release.py`, never by hand, and a change that is a `feat`, `fix`
+  or breaking change adds a changelog fragment under `changelog.d/` (see `CONTRIBUTING.md` §
+  Versioning).
 
 ## Commands
 
@@ -53,8 +56,9 @@ uv run ruff format            # format code
 # Type check
 uv run ty check
 
-# Build and publish (via git tags)
-git tag vX.Y.Z && git push --tags
+# Release: tag, changelog and push (a human runs this; see CONTRIBUTING.md § Versioning)
+scripts/release.py              # dry run: next version, commits, changelog section
+scripts/release.py --yes --push
 ```
 
 `pytest`, `ruff`, and `ty` are declared as `dev` dependency-group entries in the root

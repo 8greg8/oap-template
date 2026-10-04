@@ -9,14 +9,18 @@ see [`PYTHON_CONVENTIONS.md`](PYTHON_CONVENTIONS.md).
 [Gitflow](https://nvie.com/posts/a-successful-git-branching-model/), with two permanent branches
 and short-lived branches on top:
 
-- `main` — always reflects the latest released state. Every merge into `main` is tagged
-  (`vX.Y.Z`, see Versioning) and is release-ready. No direct commits — only merges from `develop`
-  (release) or `hotfix/*`.
+- `main` — always reflects the latest released state and is release-ready. No direct commits —
+  it accepts only merges from `develop` (a release) or `hotfix/*`, and the `chore(release): vX.Y.Z`
+  commit that `scripts/release.py` writes on it. The release tag `vX.Y.Z` sits on that
+  `chore(release)` commit, not on the merge before it. A hotfix merged into `main` stays untagged
+  until `release.py` runs on `main` (see Versioning).
 - `develop` — integration branch for ongoing work. Always in a working, checks-passing state, but
   not necessarily released. No direct commits — only merges from `feat/*` or `bugfix/*`, from a
   task branch `<type>/T-NNNN-<slug>` (whatever its Conventional Commits `type` prefix), and the
-  back-merge from `hotfix/*`. The one exception to "no direct commits" is task filing, which
-  commits and pushes the new task file straight to `develop` (§ Worktrees for agents).
+  back-merge from `hotfix/*`. It also accepts what `release.py` does to it: a fast-forward to
+  `main` after a normal release, or a `--no-ff` merge of `main` after a hotfix release. The one
+  exception to "no direct commits" is task filing, which commits and pushes the new task file
+  straight to `develop` (§ Worktrees for agents).
 - `feat/<topic>` — new functionality, non-breaking, branched from and merged into `develop`.
 - `bugfix/<topic>` — bug fixes against `develop`, non-breaking, branched from and merged into `develop`.
 - `hotfix/<topic>` — urgent fixes branched from `main`, merged into both `main` and `develop`.
@@ -84,8 +88,16 @@ what changed and which branch it's on:
 | `feat/<topic>`         | new non-breaking feature    | `feat(scope): summary`                        | minor           |
 | `bugfix/<topic>`       | non-breaking fix            | `fix(scope): summary`                          | patch           |
 | `hotfix/<topic>`       | urgent patch on `main`      | `fix(scope): summary`                          | patch           |
-| `hotfix/<topic>`       | urgent breaking fix on `main` | `fix(scope)!: summary` + `BREAKING CHANGE:` footer | major     |
-| any branch             | breaking change              | `<type>(scope)!: summary` + `BREAKING CHANGE:` footer | major    |
+| `hotfix/<topic>`       | urgent breaking fix on `main` | `fix(scope)!: summary` + `BREAKING CHANGE:` footer | major (minor while the major version is 0) |
+| any branch             | breaking change              | `<type>(scope)!: summary` + `BREAKING CHANGE:` footer | major (minor while the major version is 0) |
+
+The impact column is the bump `scripts/release.py` makes at the next release; nothing is bumped
+when a change merges. The 0.x rule is in § Versioning.
+
+A `feat`, `fix` or breaking commit also needs a changelog fragment (§ Versioning). Other types
+(`docs`, `chore`, `test`, `refactor`, and so on) drive no version and need none, so pick the type
+by what the change does for users: a `chore` that should be a `feat` gets no fragment and no
+release.
 
 Rules the agent follows:
 
@@ -121,13 +133,148 @@ Accepted commits: none.
 ## Versioning
 
 Semantic versioning via git tags (`vX.Y.Z`), extracted by `hatch-vcs` (see
-[`PYTHON_CONVENTIONS.md`](PYTHON_CONVENTIONS.md) for how packages consume this). Tags are cut from
-`main` after a merge lands there. Commit types accumulated since the last tag determine the next
-version:
+[`PYTHON_CONVENTIONS.md`](PYTHON_CONVENTIONS.md) for how packages consume this). Git tags are the
+only version source; no file holds a version. A version and a changelog section come into being
+only when a human runs `scripts/release.py`. Merging into `develop` bumps nothing.
 
-- Any `BREAKING CHANGE` footer since the last tag → next tag bumps **major**.
-- Else any `feat:` → bumps **minor**.
-- Else only `fix:` → bumps **patch**.
+### Changelog fragments
+
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). It holds the
+header, an empty `## [Unreleased]` heading and the released sections, and changes only at a
+release. Never edit it by hand. Each change that needs an entry adds its own fragment file instead,
+so parallel branches never conflict on `CHANGELOG.md`. A release folds the fragments into a dated
+section and deletes them. `changelog.d/README.md` has the short version of these rules.
+
+- **When.** A `feat`, `fix` or breaking commit (`!` or a `BREAKING CHANGE:` footer) needs a
+  fragment in the same branch. Commits are classified by the same code `next_version.py` uses.
+  Merge commits are ignored, and other types need none.
+- **Name.** `changelog.d/<id>.<category>.md`. `<id>` is the task ID (`T-0023`) or the branch topic:
+  letters, digits, `-` and `_`, starting with a letter or digit, no dots. `<category>` is one of
+  `added`, `changed`, `deprecated`, `removed`, `fixed`, `security`, in lowercase. A change that
+  needs two categories adds two files. Every file in `changelog.d/` except `README.md` must have
+  this name; any other name fails the check.
+- **Content.** One or more bullets, each a line starting with `- ` or `* `. An indented line
+  continues the bullet above it. Write what changed for a user or maintainer, in one or two
+  sentences. A fragment with no bullet fails. So does a placeholder bullet: empty text, a
+  whole-word `todo` or `to-do`, `TBD`, `FIXME` or the literal `<...>`, in any letter case.
+- **Tasks.** A task whose change is `feat`, `fix` or breaking lists its fragment in `touches` and
+  never lists `CHANGELOG.md`.
+- **Preview.** `python scripts/changelog.py preview [vX.Y.Z]` prints the section a release would
+  write and changes nothing.
+
+`python scripts/changelog.py check <base> <tip>` is the check. It looks at the non-merge commits
+in `<base>..<tip>` and fails when one is `feat`, `fix` or breaking and no commit in the range adds
+a fragment. Each commit is inspected on its own, so a fragment added and later folded in by a
+release inside the same range still counts. It also fails on any invalid entry in `changelog.d/`
+at `<tip>`, which it reads from git, not from the working tree. It exits 0 when the range passes,
+1 when the check fails, and 2 when git cannot resolve the revisions or list the range.
+
+The check runs in two places:
+
+- **`pre-push`**, for each pushed branch, before the gate. The branch is taken from the remote ref
+  being updated, never from the local ref name. The range is `<remote sha>..<local sha>` for `main`
+  and `develop`; from the merge base with `origin/main` to the tip for `hotfix/*`; and from the
+  merge base with `origin/develop` to the tip for any other branch, new or not. A fix round that
+  adds only `fix` commits to a branch that already has its fragment therefore passes. A rejected
+  check rejects the push before the gate starts. The hook skips the check for a first push of
+  `main` or `develop` (an all-zero remote sha, as in a new project's
+  `git push -u origin main develop`), for deleted refs, for tags and other non-branch refs, and
+  when every pushed commit changes only `.agents/` records. It also skips it, with a message, when
+  the range cannot be listed: `changelog.py` exits 2, the merge base fails, or the `origin` ref is
+  missing. The gate still runs in those cases. Any other failure of the check, including a missing
+  `python3`, rejects the push.
+- **`scripts/gitflow.sh <kind> finish`**, before the gate and the merge. The range is from the merge
+  base with the base branch to the branch tip, where the base is `origin/<base>` when that remote
+  ref exists and the local base branch otherwise. Unlike the hook, `finish` stops on every failure,
+  including a range it cannot list or a missing merge base.
+
+### Version bump
+
+`scripts/next_version.py` finds the last `vX.Y.Z` tag reachable from `HEAD` (`v0.0.0` when there is
+none), classifies the commits since it, and bumps the highest level found:
+
+- A breaking change bumps **major**, with the 0.x exception below.
+- Else any `feat` bumps **minor**.
+- Else only `fix` bumps **patch**.
+- No such commit means nothing to release, and it exits 1.
+
+**The 0.x rule.** While the last tag's major version is 0, a breaking change bumps **minor**, as
+commitizen's `major_version_zero` does. A project stays on `0.y.z` until its owner moves to 1.0.0
+on purpose. With no tag yet, a `feat` or a breaking change makes the first release `v0.1.0`, and
+only `fix` commits make it `v0.0.1`. From major 1 on, a breaking change bumps major.
+
+### Releasing
+
+A release is a deliberate human step, as `CLAUDE.md` § "Ask first" requires. An agent runs
+`scripts/release.py --yes` only when the human asks for it. `scripts/release.py` is the tagging step
+that rule refers to. It is never run from a hook. Run it in the primary checkout, on a clean
+`develop` (a normal release) or on `main` (after a hotfix, see below).
+
+```bash
+scripts/release.py                         # dry run: version, commits, changelog section; changes nothing
+scripts/release.py --yes                   # release locally; nothing is pushed
+scripts/release.py --yes --push            # release, then push main, develop and the tag
+scripts/release.py --yes --version v1.0.0  # override the computed version
+```
+
+`--push` implies `--yes`. A dry run makes the same checks as a release and prints the section it
+would write; the only thing it changes is the remote-tracking refs, through `git fetch origin`.
+
+With `--yes`, from `develop`:
+
+1. Check out `main` and merge `develop` with `--no-ff` (`chore(merge): merge develop into main`).
+   Started on `main`, this step is skipped.
+2. Run `changelog.py assemble vX.Y.Z` and commit `CHANGELOG.md` and the removed fragments as
+   `chore(release): vX.Y.Z` on `main`.
+3. Create the annotated tag `vX.Y.Z` on that commit.
+4. Bring `develop` up to `main`. When `develop` is an ancestor of `main` (`git merge-base
+   --is-ancestor`), as after a normal release, this is a fast-forward and both branches point at the
+   same tagged commit. Otherwise, as after a hotfix, it is a `--no-ff` merge of `main` into
+   `develop` (`chore(merge): merge main into develop`). Either way `develop` loses the folded
+   fragments and can reach the new tag, so the next release does not fold them again.
+5. Check out the branch the run started on. With `--push`, run
+   `git push --atomic origin main develop vX.Y.Z`: all three refs land or none does. Without
+   `--push`, it prints that command.
+
+`--version vX.Y.Z` replaces the computed version, for a deliberate jump such as `v1.0.0`. It takes
+only the canonical form: a leading `v`, three numbers and no leading zeros. It must be SemVer-higher
+than the highest `vX.Y.Z` tag in the repository, whatever branch that tag is on. It does not skip
+the other checks: there must still be releasable commits and fragments.
+
+`release.py` runs `git fetch origin` first and refuses, changing nothing and exiting 1, when:
+
+- the starting branch is neither `main` nor `develop`, or the run is outside a git repository;
+- the fetch fails, or the working tree is dirty;
+- local `main` or `develop` is missing, has no `origin` counterpart, or differs from it (behind,
+  ahead or diverged), so an unpushed hotfix cannot be released by mistake;
+- `main` or `develop` is checked out in another worktree, because the release checks out both;
+- there is nothing to release: no `feat`, `fix` or breaking commit since the last tag, or no
+  fragment in `changelog.d/`;
+- a fragment is invalid, the version is not higher than the highest tag, or the tag already exists.
+
+If a step fails after the first change (a merge conflict, a hook rejecting the release commit, a
+rejected push), `release.py` stops and prints the current state, then two lists of exact commands:
+one to finish by hand after fixing the problem, one to undo what the run changed. It never runs
+`git reset`, forces or retries anything itself. The undo list can contain `git reset --hard` and
+`git branch -f`; an agent does not run those without the human's go-ahead (`CLAUDE.md` § "Ask
+first"), and hands the printed output to the human instead. A rejected atomic push leaves the
+release complete locally, and the message names the command to retry.
+
+**Hotfix release.** `scripts/gitflow.sh hotfix finish <topic>` merges the hotfix into `main` and
+back into `develop`. It pushes and tags nothing. The hotfix adds its fragment (a `fix` needs
+`changelog.d/<topic>.fixed.md`), and `finish` checks it. Then:
+
+1. Push both branches: `git push origin main develop`. The push check finds the hotfix fragment in
+   the `main` range.
+2. `git checkout main && scripts/release.py --yes`. From `main` it skips the merge of `develop`,
+   assembles the changelog, commits and tags, and merges `main` back into `develop`.
+
+Run it on `main` only for this case. A branch that is ahead of `origin` is refused, so push first.
+
+**Branch protection.** A repository with protection on `main` or `develop` must allow the release
+push (`main`, `develop` and the tag together), or the owner runs the release through pull requests
+instead. A repository created with GitHub's "Use this template" has no tags, so its first release
+starts from `v0.0.0`.
 
 ## Agent verify/resolve workflow
 
@@ -153,11 +300,14 @@ an agent never certifies its own work as passing:
    Commits section above and commits.
 6. **Merge & push** — according to branch type:
    - `feat/<topic>` / `bugfix/<topic>` → merge into `develop`
-     (`scripts/gitflow.sh <feature|bugfix> finish <topic>`).
+     (`scripts/gitflow.sh <feature|bugfix> finish <topic>`). A `feat`, `fix` or breaking change
+     has its changelog fragment committed on the branch first; `finish` refuses without it.
    - `hotfix/<topic>` → merge into `main`, then merge `main` back into `develop` to keep them in
-     sync, then tag `main` per the version bump implied by the commit(s)
-     (`scripts/gitflow.sh hotfix finish <topic>`, then `scripts/release.py`).
-   - Push the target branch(es) and any new tag to `origin`.
+     sync (`scripts/gitflow.sh hotfix finish <topic>`). Nothing is pushed or tagged yet. Push
+     `main` and `develop`, then run `scripts/release.py --yes` on `main`, which tags the hotfix,
+     writes its changelog section and brings `develop` up to date (§ Versioning).
+   - Push the target branch(es) to `origin`. Tags are pushed only by `release.py --push`, or by
+     the atomic push command it prints.
 
 Husky-managed git hooks re-run the same gate as a final safety net — they should never actually
 catch anything the verify/resolve loop didn't already catch, but a hook failure blocks the
@@ -173,13 +323,17 @@ install.
   `scripts/gate.sh --staged`: lint, format check and typecheck on staged files only (so
   pre-existing, unrelated repo debt cannot block an unrelated commit), and no tests.
 - `commit-msg` runs `scripts/commit_lint.py` against the Conventional Commits rules above.
-- `pre-push` runs the full `scripts/gate.sh`, tests included.
+- `pre-push` runs `scripts/changelog.py check` for each pushed branch (§ Versioning), then the
+  full `scripts/gate.sh`, tests included. A failed fragment check rejects the push before the gate
+  starts.
 - `pre-commit` and `pre-push` skip the gate when every changed file is under `.agents/` (task
-  files, reports, `BACKLOG.md`, `LESSONS.md`, as `task.py new` pushes). Code under
-  `.agents/tasks/scripts/` never counts as skippable. A new remote branch, a range git cannot
-  list, or any file outside `.agents/` (including one renamed into it) always runs the full gate.
-- `scripts/release.py` (see Versioning) is a separate, deliberately manual step; it is not wired
-  into any hook.
+  files, reports, `BACKLOG.md`, `LESSONS.md`, as `task.py new` pushes). `pre-push` then skips the
+  fragment check too. Code under `.agents/tasks/scripts/` never counts as skippable. A new remote
+  branch, a range git cannot list, or any file outside `.agents/` (including one renamed into it)
+  always runs the full gate.
+- `scripts/release.py` (see Versioning) is a separate, deliberately manual step; no hook runs it.
+  Its `chore(merge)` and `chore(release)` commits pass through `commit-msg` and `pre-commit` like
+  any other commit, and its push passes through `pre-push`.
 
 ## Definition of done
 
@@ -188,6 +342,8 @@ A change is done when, and only when:
 - [ ] The verify/resolve loop (above) has completed with a clean report.
 - [ ] Husky hooks pass on commit and push.
 - [ ] The commit message follows Conventional Commits and correctly reflects the version impact.
+- [ ] A `feat`, `fix` or breaking change has its changelog fragment in `changelog.d/`.
 - [ ] The branch has been merged to its correct target(s) per branch type.
-- [ ] For `hotfix/*`, `develop` has received the back-merge from `main`.
+- [ ] For `hotfix/*`, `develop` has received the back-merge from `main`, and the human has been
+      told that `scripts/release.py --yes` on `main` is what tags it.
 - [ ] Worktrees created for the task have been removed.

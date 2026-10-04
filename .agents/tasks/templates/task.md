@@ -54,7 +54,9 @@ not a passing test; a test that was not run is not evidence.
 
 TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
 `CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason.
+a reason. A `feat`, `fix` or breaking change also adds a changelog fragment,
+`changelog.d/<id>.<category>.md`, listed in `touches` (see `CONTRIBUTING.md`
+§ Versioning).
 
 ## Acceptance criteria
 
