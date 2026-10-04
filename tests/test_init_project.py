@@ -937,6 +937,119 @@ def test_failure_in_seeding_prints_undo_and_undo_restores_tree(scratch: Scratch)
     assert not (scratch.repo / "docs").exists()
 
 
+# --- changelog reset (CHANGELOG.md and changelog.d/) -----------------------------------------------
+
+CHANGELOG_FRAGMENT_DIR = "changelog.d"
+UNRELEASED = "## [Unreleased]\n"
+FRAGMENT_NAME = re.compile(
+    r"[A-Za-z0-9][A-Za-z0-9_-]*\.(added|changed|deprecated|removed|fixed|security)\.md"
+)
+
+
+def _template_fragments(repo: Path) -> list[str]:
+    """Return the tracked fragments of the template copy, as they exist before the run."""
+    return [
+        n
+        for n in _tracked_in(repo, CHANGELOG_FRAGMENT_DIR)
+        if FRAGMENT_NAME.fullmatch(n.rsplit("/", 1)[-1])
+    ]
+
+
+def _changelog_head(text: str) -> str:
+    """Return the header and the `## [Unreleased]` heading line of a changelog."""
+    return text[: text.index(UNRELEASED) + len(UNRELEASED)]
+
+
+def test_dry_run_lists_the_changelog_reset_and_changes_nothing(scratch: Scratch):
+    fragments = _template_fragments(scratch.repo)
+    assert fragments, "the scratch copy should carry fragments to remove"
+    before = _text(scratch.repo, "CHANGELOG.md")
+
+    result, out = _run(scratch, "--dry-run")
+
+    assert result.returncode == 0, out
+    lines = _change_lines(out)
+    assert any(
+        line.startswith("replace ") and line.split(":")[0].endswith("CHANGELOG.md")
+        for line in lines
+    ), out
+    for rel in fragments:
+        assert f"remove {rel}" in lines, f"`remove {rel}` missing:\n{out}"
+    assert f"remove {CHANGELOG_FRAGMENT_DIR}/README.md" not in lines
+    assert _status(scratch.repo) == ""
+    assert _text(scratch.repo, "CHANGELOG.md") == before
+    for rel in fragments:
+        assert (scratch.repo / rel).is_file(), rel
+
+
+def test_generated_changelog_is_the_header_and_an_empty_unreleased_section(
+    scratch: Scratch,
+):
+    template_head = _changelog_head(_text(scratch.repo, "CHANGELOG.md"))
+
+    result, out = _run(scratch, "--yes", "--skip-install")
+
+    assert result.returncode == 0, out
+    generated = _text(scratch.repo, "CHANGELOG.md")
+    assert generated == template_head
+    assert generated.count("## [") == 1
+    assert generated.endswith(UNRELEASED)
+
+
+def test_generated_project_has_no_fragments_and_keeps_the_fragment_readme(
+    scratch: Scratch,
+):
+    assert _template_fragments(scratch.repo), "the scratch copy should carry fragments"
+    readme_before = _text(scratch.repo, f"{CHANGELOG_FRAGMENT_DIR}/README.md")
+
+    result, out = _run(scratch, "--yes", "--skip-install")
+
+    assert result.returncode == 0, out
+    remaining = sorted(
+        p.name for p in (scratch.repo / CHANGELOG_FRAGMENT_DIR).iterdir()
+    )
+    assert remaining == ["README.md"]
+    assert _text(scratch.repo, f"{CHANGELOG_FRAGMENT_DIR}/README.md") == readme_before
+    assert not any(t in readme_before for t in TEMPLATE_STRINGS)
+
+
+def test_generated_changelog_assembles_one_fragment_with_changelog_py(
+    initialized: Scratch,
+):
+    repo = initialized.repo
+    (repo / CHANGELOG_FRAGMENT_DIR / "first.added.md").write_bytes(
+        b"- Added the first feature.\n"
+    )
+    env = _env()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/changelog.py",
+            "assemble",
+            "0.1.0",
+            "--date",
+            "2026-01-02",
+        ],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    text = _text(repo, "CHANGELOG.md")
+    assert text.endswith(
+        "## [Unreleased]\n\n## [0.1.0] - 2026-01-02\n\n### Added\n\n"
+        "- Added the first feature.\n"
+    ), text
+    assert sorted(p.name for p in (repo / CHANGELOG_FRAGMENT_DIR).iterdir()) == [
+        "README.md"
+    ]
+
+
 # --- script hygiene ---------------------------------------------------------------------------------
 
 
@@ -1136,6 +1249,31 @@ def test_full_run_prints_the_human_checklist(scratch: Scratch):
     assert not (scratch.repo / "CODE_OF_CONDUCT.md").exists()
     assert not (scratch.repo / "SECURITY.md").exists()
     assert "git restore --source=HEAD" not in out
+
+
+def test_branch_protection_wording_names_the_release_push(scratch: Scratch):
+    _stub_gate(scratch)
+
+    result, out = _run(scratch, "--yes", "--skip-install", full=True)
+
+    assert result.returncode == 0, out
+    item = next(
+        line for line in out.splitlines() if line.strip().startswith("2.")
+    ).lower()
+    assert "branch protection" in item, item
+    assert "release push" in item, item
+    assert "pull requests" in item, item
+
+
+def test_dry_run_checklist_line_names_the_release_push(scratch: Scratch):
+    result, out = _run(scratch, "--dry-run", full=True)
+
+    assert result.returncode == 0, out
+    line = next(
+        line for line in _change_lines(out) if line.startswith("print  the checklist")
+    )
+    assert "branch protection" in line, line
+    assert "release push" in line, line
 
 
 def test_full_run_on_main_creates_develop_at_the_commit(tmp_path: Path):
@@ -1432,6 +1570,11 @@ def test_end_to_end_template_copy_becomes_a_working_project(scratch: Scratch):
         if (repo / rel).is_file()
     }
     assert {rel: found for rel, found in hits.items() if found} == {}
+
+    # The changelog starts empty and no fragment survives; the fragment README does.
+    assert _tracked_in(repo, "changelog.d") == ["changelog.d/README.md"]
+    assert _text(repo, "CHANGELOG.md").endswith("\n## [Unreleased]\n")
+    assert _text(repo, "CHANGELOG.md").count("## [") == 1
 
     # Gitflow works: `main` exists, so a hotfix can start from it.
     hotfix = subprocess.run(

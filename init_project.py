@@ -54,6 +54,24 @@ README = "README.md"
 CLAUDE_MD = "CLAUDE.md"
 SPEC_README = "docs/spec/README.md"
 SMOKE_TEST = "tests/test_smoke.py"
+CHANGELOG = "CHANGELOG.md"
+FRAGMENT_DIR = "changelog.d"
+# Same shape as `FRAGMENT_RE` in `scripts/changelog.py`: `<id>.<category>.md`. The directory's
+# `README.md` never matches, so it stays.
+FRAGMENT_RE = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9_-]*\.(added|changed|deprecated|removed|fixed|security)\.md$"
+)
+# The header and the empty `## [Unreleased]` section of the template's `CHANGELOG.md`.
+CHANGELOG_TEXT = (
+    "# Changelog\n"
+    "\n"
+    "All notable changes to this project will be documented in this file.\n"
+    "\n"
+    "The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n"
+    "and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n"
+    "\n"
+    "## [Unreleased]\n"
+)
 # The template owner's code of conduct and security policy name the owner's contact details, so
 # the new project starts without them and the checklist asks the new owner for their own.
 POLICY_FILES = ("CODE_OF_CONDUCT.md", "SECURITY.md")
@@ -377,6 +395,8 @@ def plan_changes(ctx: Context) -> list[str]:
         f"regen  {BACKLOG_FILE} via `backlog.py reindex`",
         f"regen  {LESSONS_FILE} via `report.py harvest`",
         f"replace {README}: fresh project README titled {json.dumps(names.display)}",
+        f"replace {CHANGELOG}: Keep a Changelog header and an empty [Unreleased] section",
+        *(f"remove {rel}" for rel in fragment_files(ctx.root)),
         *(f"remove {rel}" for rel in POLICY_FILES),
         f"edit   {CLAUDE_MD}: insert `## Project` before `{PROJECT_SECTION_ANCHOR}`",
         f"write  {SPEC_README}",
@@ -395,11 +415,31 @@ def plan_changes(ctx: Context) -> list[str]:
         f"create branch {counterpart_branch(ctx.branch)} at the new commit (local only)",
         (
             "print  the checklist: push both branches, set the default branch and branch "
-            "protection, fill the CLAUDE.md project section, write the first spec, add a "
+            "protection (it must allow the release push), fill the CLAUDE.md project section, write the first spec, add a "
             "code of conduct and a security policy"
         ),
     ]
     return changes
+
+
+def fragment_files(root: Path) -> list[str]:
+    """List the changelog fragments step 5 removes.
+
+    Args:
+        root: Repository root.
+
+    Returns:
+        Repository-relative POSIX paths of files in `changelog.d/` named
+        `<id>.<category>.md`, sorted. `changelog.d/README.md` is not listed.
+    """
+    directory = root / FRAGMENT_DIR
+    if not directory.is_dir():
+        return []
+    return sorted(
+        f"{FRAGMENT_DIR}/{path.name}"
+        for path in directory.iterdir()
+        if path.is_file() and FRAGMENT_RE.match(path.name)
+    )
 
 
 def task_state_files(root: Path) -> list[str]:
@@ -613,7 +653,9 @@ def step_reset_tasks(ctx: Context) -> None:
 def step_seed_files(ctx: Context) -> None:
     """Step 5: seed the project files and replace the sample code with a smoke test.
 
-    Writes a fresh README, removes the template's code of conduct and security policy, inserts
+    Writes a fresh README and an empty changelog (the Keep a Changelog header and an empty
+    `[Unreleased]` section) and removes every changelog fragment, keeping `changelog.d/README.md`.
+    Removes the template's code of conduct and security policy, inserts
     the `## Project` section into `CLAUDE.md` before the first `##` section and leaves every
     other line alone, adds `docs/spec/README.md`, makes the package a docstring-only module,
     removes the sample tests and adds `tests/test_smoke.py`.
@@ -637,6 +679,9 @@ def step_seed_files(ctx: Context) -> None:
             "utf-8"
         )
     )
+    (root / CHANGELOG).write_bytes(CHANGELOG_TEXT.encode("utf-8"))
+    for rel in fragment_files(root):
+        (root / rel).unlink()
     for rel in POLICY_FILES:
         (root / rel).unlink(missing_ok=True)
     spec = root / SPEC_README
@@ -787,7 +832,8 @@ def step_checklist(ctx: Context) -> None:
     print(
         "  2. On GitHub, set the default branch to `develop` (task.py syncs "
         "origin/develop; main is for releases) and add branch protection for develop "
-        "and main."
+        "and main. Protection must allow the release push (main, develop and the tag), "
+        "or the owner releases through pull requests."
     )
     print(
         "  3. Fill in the `## Project` section of CLAUDE.md: mission, architecture and "
