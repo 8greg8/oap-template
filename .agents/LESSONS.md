@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-24 lesson(s) across 12 section(s). Generated 2026-10-04.
+25 lesson(s) across 12 section(s). Generated 2026-10-04.
 
 ## Tag index
 
@@ -19,8 +19,8 @@ to all lessons that carry it.
 - `backlog` — [T-0002](#t-0002-success)
 - `bash` — [T-0012](#t-0012-success)
 - `bash-3.2` — [T-0011](#t-0011-success)
-- `breaking` — [T-0023](#t-0023-success)
-- `changelog` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0025](#t-0025-success)
+- `breaking` — [T-0023](#t-0023-success), [T-0024](#t-0024-success)
+- `changelog` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0025](#t-0025-success)
 - `changelog-fragments` — [T-0022](#t-0022-success), [T-0025](#t-0025-success)
 - `chore` — [T-0020](#t-0020-success)
 - `code-of-conduct` — [T-0021](#t-0021-success)
@@ -31,7 +31,7 @@ to all lessons that carry it.
 - `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success), [T-0013](#t-0013-success), [T-0014](#t-0014-success), [T-0019](#t-0019-success), [T-0021](#t-0021-success)
 - `end-to-end` — [T-0018](#t-0018-success)
 - `execution-loop` — [T-0001](#t-0001-success)
-- `feat` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0025](#t-0025-success)
+- `feat` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0025](#t-0025-success)
 - `file-mode` — [T-0009](#t-0009-success)
 - `file-modes` — [T-0007](#t-0007-success)
 - `filter-repo` — [T-0020](#t-0020-success)
@@ -40,7 +40,7 @@ to all lessons that carry it.
 - `git-pathspec` — [T-0008](#t-0008-success)
 - `git-publish` — [T-0002](#t-0002-success)
 - `git-worktree` — [T-0010](#t-0010-success), [T-0011](#t-0011-success)
-- `gitflow` — [T-0004](#t-0004-success), [T-0011](#t-0011-success), [T-0023](#t-0023-success)
+- `gitflow` — [T-0004](#t-0004-success), [T-0011](#t-0011-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success)
 - `history-rewrite` — [T-0020](#t-0020-success)
 - `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success)
 - `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success)
@@ -57,6 +57,7 @@ to all lessons that carry it.
 - `pre-push` — [T-0023](#t-0023-success)
 - `process` — [T-0005](#t-0005-success)
 - `public-release` — [T-0019](#t-0019-success), [T-0020](#t-0020-success)
+- `release` — [T-0024](#t-0024-success)
 - `rename` — [T-0015](#t-0015-success)
 - `report-gate` — [T-0001](#t-0001-success)
 - `report-validation` — [T-0003](#t-0003-success)
@@ -75,6 +76,7 @@ to all lessons that carry it.
 - `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
 - `upstream-tracking` — [T-0010](#t-0010-success)
 - `uv` — [T-0006](#t-0006-success)
+- `versioning` — [T-0024](#t-0024-success)
 - `workflow` — [T-0013](#t-0013-success)
 - `worktree` — [T-0002](#t-0002-success)
 
@@ -181,6 +183,19 @@ Source: [`reports/T-0022.md`](tasks/reports/T-0022.md)
 Tags: `feat`, `breaking`, `husky`, `pre-push`, `gitflow`, `changelog`, `hooks`
 
 Source: [`reports/T-0023.md`](tasks/reports/T-0023.md)
+
+### T-0024 (success)
+
+- A refusal test cannot compare remote-tracking refs before and after, because the required
+  `git fetch origin` legitimately updates them. Compare `refs/heads` and `refs/tags` only.
+- `git branch -m` on the bare remote does not remove the stale `origin/<branch>` ref in the clone.
+  A test of a missing remote branch must also delete the tracking ref.
+- Commit before the final `scripts/gate.sh` so `tests/test_init_project.py` and the staged-file
+  checks see tracked files; keep the gate result tied to the commit hash.
+
+Tags: `feat`, `breaking`, `release`, `versioning`, `changelog`, `gitflow`
+
+Source: [`reports/T-0024.md`](tasks/reports/T-0024.md)
 
 ### T-0025 (success)
 
