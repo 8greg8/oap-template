@@ -92,7 +92,9 @@ finish() {
         section "back-merging $MAIN_BRANCH into $DEVELOP_BRANCH"
         git checkout "$DEVELOP_BRANCH"
         git merge --no-ff "$MAIN_BRANCH" -m "$(merge_message "$MAIN_BRANCH" "$DEVELOP_BRANCH")"
-        warn "remember: scripts/release.py to tag $MAIN_BRANCH per CONTRIBUTING.md § Versioning"
+        warn "hotfix merged into $MAIN_BRANCH and back into $DEVELOP_BRANCH; nothing is pushed or tagged yet."
+        warn "next: git push origin $MAIN_BRANCH $DEVELOP_BRANCH"
+        warn "then: git checkout $MAIN_BRANCH && scripts/release.py --yes   (release.py refuses an unpushed branch)"
     fi
 
     git worktree remove "$worktree_dir" --force 2>/dev/null || warn "could not remove worktree $worktree_dir (may already be gone)"

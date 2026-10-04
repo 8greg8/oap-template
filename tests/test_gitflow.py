@@ -243,3 +243,30 @@ def test_finish_falls_back_to_local_base_without_origin_ref(scratch: Path):
     _gitflow(scratch, "docs", "finish", "T-0007-notes")
 
     assert (scratch / "change.py").is_file()
+
+
+def test_hotfix_finish_tells_you_to_push_both_branches_then_release(scratch: Path):
+    # A hotfix starts from main, so the scratch repo needs one, on origin as well.
+    _git(scratch, "branch", "main", "develop")
+    _git(scratch, "push", "-q", "origin", "main")
+    worktree = _start_commit(
+        scratch, "hotfix", "urgent", "fix: urgent repair", "urgent.fixed.md"
+    )
+    assert _git(worktree, "rev-parse", "--abbrev-ref", "HEAD") == "hotfix/urgent"
+
+    result = _gitflow(scratch, "hotfix", "finish", "urgent")
+
+    message = result.stdout + result.stderr
+    assert "git push origin main develop" in message
+    assert "git checkout main && scripts/release.py --yes" in message
+    assert "nothing is pushed or tagged yet" in message
+    # The merge into main and the back-merge into develop still happen, unpushed.
+    assert _git(scratch, "log", "-1", "--format=%s", "main") == (
+        "chore(merge): merge hotfix/urgent into main"
+    )
+    assert _git(scratch, "log", "-1", "--format=%s", "develop") == (
+        "chore(merge): merge main into develop"
+    )
+    assert _git(scratch, "rev-parse", "origin/main") != _git(
+        scratch, "rev-parse", "main"
+    )
