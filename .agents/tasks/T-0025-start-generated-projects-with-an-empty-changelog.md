@@ -42,6 +42,14 @@ names no template string, and its checklist says branch protection must allow th
   owner releases through pull requests.
 - Tests in `tests/test_init_project.py`.
 - `changelog.d/T-0025.added.md`: this task's entry.
+- Do the reset inside `step_seed_files` (update its docstring) and add both lines to
+  `plan_changes` next to the other `replace`/`remove` seed lines; no new step (the test harness's
+  `_THROUGH_SEEDING` filter would drop one).
+- The generated `CHANGELOG.md` is byte-identical to the header and `## [Unreleased]` part of
+  T-0022's `CHANGELOG.md`; a test runs `scripts/changelog.py assemble` on it with one fragment to
+  prove it parses.
+- Reword the branch-protection mention in `plan_changes`' closing checklist line as well as the
+  `step_checklist` item.
 
 ## Non-goals
 
@@ -76,7 +84,7 @@ None in this task; T-0026 documents generated-project behavior.
 - [ ] A generated project has no fragments and keeps `changelog.d/README.md`.
 - [ ] The dry run lists both changes.
 - [ ] The checklist's branch-protection item mentions the release push.
-- [ ] `changelog.d/T-0025.added.md` exists and passes `check`.
+- [ ] `changelog.d/T-0025.added.md` exists and `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch.
 - [ ] `uv run pytest tests/test_init_project.py -v` passes.
 - [ ] `scripts/gate.sh` passes.
 - [ ] Diff stays within `touches`, the report and `BACKLOG.md`.

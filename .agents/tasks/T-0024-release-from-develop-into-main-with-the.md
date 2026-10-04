@@ -50,6 +50,20 @@ and `next_version.py` follows the 0.x rule (D8).
   `release.py --yes` on `main`).
 - Tests: `tests/test_release.py`, `tests/test_next_version.py`, `tests/test_gitflow.py` (message).
 - `changelog.d/T-0024.changed.md`: this task's entry, describing the new release flow as breaking.
+- No new tracked file (`tests/test_release.py`, `tests/test_next_version.py`, the fragment)
+  contains `proj_template`, `proj-template`, `oap-template`, `8greg8` or the owner's email.
+- The dry run calls `python3 scripts/changelog.py preview <version>`.
+- On a failure after the first change (merge conflict, a hook failing on the release commit, a
+  rejected push), stop, print the current state and the exact commands to finish or undo by
+  hand; never reset or force anything. On a rejected `--push`, print the
+  `git push --atomic origin <main> <develop> vX.Y.Z` retry command.
+- Fast-forward versus `--no-ff` back-merge of `develop` is chosen by
+  `git merge-base --is-ancestor develop main`, not by the starting branch.
+- Refuse any starting branch other than `main` or `develop`. End with the starting branch checked
+  out.
+- "Latest tag" means the highest `vX.Y.Z` tag by SemVer (`v0.0.0` when none); `--version` accepts
+  only the `vX.Y.Z` form.
+- Release commit: stage with `git add -A -- CHANGELOG.md changelog.d` after `assemble`.
 
 ## Non-goals
 
@@ -67,7 +81,8 @@ and `next_version.py` follows the 0.x rule (D8).
 
 ## Required behavior
 
-The plan's normal-release and hotfix walkthroughs work end to end against a bare remote: after a
+The plan's § Release steps 1 to 4 work end to end against a bare remote, from `develop` (normal
+release) and from `main` after a pushed hotfix (step 1 skipped, `--no-ff` back-merge). After a
 release, `main` and `develop` contain the tagged `chore(release)` commit, no fragment remains,
 the next release does not fold anything twice, and the atomic push lands all three refs or none.
 
@@ -79,6 +94,10 @@ the next release does not fold anything twice, and the atomic push lands all thr
   `--push` to a bare remote is atomic (a rejected ref leaves the remote unchanged).
 - `uv run pytest tests/test_release.py tests/test_next_version.py tests/test_gitflow.py -v` and
   `scripts/gate.sh`.
+- Tests use only temporary repositories and fixtures; none reads this repository's `CHANGELOG.md`
+  or `changelog.d/` contents. They pass in a project produced by `init_project.py`.
+- The atomic-push test uses an `update` hook in the bare remote that rejects only
+  `refs/tags/*`, then asserts `main` and `develop` on the remote are unchanged.
 
 ## Documentation required
 
@@ -91,7 +110,7 @@ None in this task beyond docstrings; T-0026 documents the flow.
 - [ ] `release.py` refuses every case the plan lists before changing anything.
 - [ ] `--version` and `--push` behave as specified.
 - [ ] The hotfix finish message matches the plan.
-- [ ] `changelog.d/T-0024.changed.md` exists and passes `check`; the behavior commit is marked breaking.
+- [ ] `changelog.d/T-0024.changed.md` exists and `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch. The behavior commit is marked breaking.
 - [ ] `uv run pytest tests/test_release.py tests/test_next_version.py tests/test_gitflow.py -v` passes.
 - [ ] `scripts/gate.sh` passes.
 - [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
