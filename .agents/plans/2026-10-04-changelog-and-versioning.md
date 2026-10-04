@@ -161,7 +161,8 @@ Accepted 2026-10-04:
 - **D8. First release version.** The repository has no tags, so `next_version.py` starts from
   `v0.0.0`. T-0023 and T-0024 are breaking, which bumps major, so the first release would be
   `v1.0.0`. Accepted: adopt the SemVer 0.x convention. While the major version is 0, a
-  breaking change bumps minor and a `feat` or `fix` bumps patch, so the first release is
+  breaking change bumps minor instead of major; `feat` still bumps minor and `fix` patch (as
+  commitizen's `major_version_zero` does). The first release is therefore
   `v0.1.0` and the template stays pre-1.0 until the owner deliberately cuts `v1.0.0` with
   `release.py --version`.
 
