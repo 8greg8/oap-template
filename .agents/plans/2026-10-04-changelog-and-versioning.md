@@ -1,13 +1,13 @@
 # Plan: changelog and release versioning for the template
 
-Status: accepted except D8 (first release version), which is open. Tasks T-0022 to T-0026 are
-filed once D8 is settled.
+Status: accepted. Tasks T-0022 to T-0026.
 
 **Owner decisions (2026-10-04, session instructions):**
 - "accept the changelog plan as recommended": D1 to D7 below.
 - "lets make release and versioning only when we merge develop into main": versions and the
   changelog change only at a release, which merges `develop` into `main`. The earlier request for
   a bump at every merge into `develop` is withdrawn.
+- "D8 as recommended": the SemVer 0.x convention below.
 
 These are the owner's written approval for the "Ask first" and breaking-change items under
 § Approvals.
@@ -158,14 +158,12 @@ Accepted 2026-10-04:
   empty).
 - **D7:** a GitHub Release workflow stays out of scope.
 
-Open:
 - **D8. First release version.** The repository has no tags, so `next_version.py` starts from
   `v0.0.0`. T-0023 and T-0024 are breaking, which bumps major, so the first release would be
-  `v1.0.0`. Recommended: adopt the SemVer 0.x convention. While the major version is 0, a
+  `v1.0.0`. Accepted: adopt the SemVer 0.x convention. While the major version is 0, a
   breaking change bumps minor and a `feat` or `fix` bumps patch, so the first release is
   `v0.1.0` and the template stays pre-1.0 until the owner deliberately cuts `v1.0.0` with
-  `release.py --version`. The alternatives are to accept `v1.0.0`, or to keep today's rules and
-  add only the `--version` override.
+  `release.py --version`.
 
 ## Approvals
 
