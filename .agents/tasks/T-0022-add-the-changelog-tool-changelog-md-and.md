@@ -1,7 +1,7 @@
 ---
 id: T-0022
 title: Add the changelog tool, CHANGELOG.md and changelog fragments
-status: in_progress
+status: review
 type: feat
 priority: high
 depends_on: []
