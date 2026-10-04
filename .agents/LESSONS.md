@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-22 lesson(s) across 12 section(s). Generated 2026-10-04.
+24 lesson(s) across 12 section(s). Generated 2026-10-04.
 
 ## Tag index
 
@@ -19,8 +19,9 @@ to all lessons that carry it.
 - `backlog` — [T-0002](#t-0002-success)
 - `bash` — [T-0012](#t-0012-success)
 - `bash-3.2` — [T-0011](#t-0011-success)
-- `changelog` — [T-0022](#t-0022-success)
-- `changelog-fragments` — [T-0022](#t-0022-success)
+- `breaking` — [T-0023](#t-0023-success)
+- `changelog` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0025](#t-0025-success)
+- `changelog-fragments` — [T-0022](#t-0022-success), [T-0025](#t-0025-success)
 - `chore` — [T-0020](#t-0020-success)
 - `code-of-conduct` — [T-0021](#t-0021-success)
 - `commit` — [T-0018](#t-0018-success)
@@ -30,7 +31,7 @@ to all lessons that carry it.
 - `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success), [T-0013](#t-0013-success), [T-0014](#t-0014-success), [T-0019](#t-0019-success), [T-0021](#t-0021-success)
 - `end-to-end` — [T-0018](#t-0018-success)
 - `execution-loop` — [T-0001](#t-0001-success)
-- `feat` — [T-0022](#t-0022-success)
+- `feat` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0025](#t-0025-success)
 - `file-mode` — [T-0009](#t-0009-success)
 - `file-modes` — [T-0007](#t-0007-success)
 - `filter-repo` — [T-0020](#t-0020-success)
@@ -39,12 +40,12 @@ to all lessons that carry it.
 - `git-pathspec` — [T-0008](#t-0008-success)
 - `git-publish` — [T-0002](#t-0002-success)
 - `git-worktree` — [T-0010](#t-0010-success), [T-0011](#t-0011-success)
-- `gitflow` — [T-0004](#t-0004-success), [T-0011](#t-0011-success)
+- `gitflow` — [T-0004](#t-0004-success), [T-0011](#t-0011-success), [T-0023](#t-0023-success)
 - `history-rewrite` — [T-0020](#t-0020-success)
-- `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success)
+- `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success)
 - `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success)
-- `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success)
-- `init-project` — [T-0021](#t-0021-success)
+- `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success)
+- `init-project` — [T-0021](#t-0021-success), [T-0025](#t-0025-success)
 - `init-script` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
 - `merge-authority` — [T-0013](#t-0013-success), [T-0014](#t-0014-success)
 - `method-text` — [T-0014](#t-0014-success)
@@ -53,6 +54,7 @@ to all lessons that carry it.
 - `orchestrator` — [T-0005](#t-0005-success), [T-0013](#t-0013-success)
 - `port` — [T-0003](#t-0003-success)
 - `pre-commit` — [T-0008](#t-0008-success)
+- `pre-push` — [T-0023](#t-0023-success)
 - `process` — [T-0005](#t-0005-success)
 - `public-release` — [T-0019](#t-0019-success), [T-0020](#t-0020-success)
 - `rename` — [T-0015](#t-0015-success)
@@ -165,6 +167,34 @@ Source: [`reports/T-0021.md`](tasks/reports/T-0021.md)
 Tags: `feat`, `changelog`, `scripts`, `changelog-fragments`
 
 Source: [`reports/T-0022.md`](tasks/reports/T-0022.md)
+
+### T-0023 (success)
+
+- The `scratch` fixture in `tests/test_gitflow.py` runs `gitflow.sh start`, which fetches and
+  recreates `refs/remotes/origin/develop`. A test that needs that ref absent must delete it after
+  `start`, not before.
+- A new remote branch (all-zero `remote_sha`) never takes the `.agents/`-only skip, so a test of
+  that skip must push with a real `remote_sha`.
+- Remote-tracking refs for hook tests can be made with `git update-ref refs/remotes/origin/<name>
+  <sha>`, with no remote configured.
+
+Tags: `feat`, `breaking`, `husky`, `pre-push`, `gitflow`, `changelog`, `hooks`
+
+Source: [`reports/T-0023.md`](tasks/reports/T-0023.md)
+
+### T-0025 (success)
+
+- `tests/test_init_project.py` copies `git ls-files` into a scratch repo, so a new file must be
+  tracked, that is committed, before the tests see it. Untracked fragments are invisible to the
+  scratch copy.
+- Compare the generated changelog with the template's text up to `## [Unreleased]`, not with the
+  whole file. After the first release the template's file gains released sections.
+- The scratch-copy tests run the real `scripts/changelog.py`, so the generated project is proven
+  to parse, not only to match a string.
+
+Tags: `feat`, `init-project`, `changelog`, `changelog-fragments`
+
+Source: [`reports/T-0025.md`](tasks/reports/T-0025.md)
 
 ## git
 
