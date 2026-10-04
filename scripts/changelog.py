@@ -16,17 +16,28 @@ Subcommands:
       Look at the non-merge commits in `<base>..<tip>`. Fail when one is `feat`, `fix` or
       breaking (classified by next_version.py's own `classify`) and no commit in the range adds a
       fragment. Also fail on any invalid fragment present at `<tip>`: bad name, unknown
-      category, no bullet line, or placeholder text.
-  preview [version] [--date YYYY-MM-DD]
-      Print the section a release would write. Changes nothing. Without `version`, the next
-      version comes from next_version.py.
+      category, no bullet line, or placeholder text. Fragments are listed and read from git at
+      `<tip>`, never from the working tree.
+  preview [version]
+      Print the section `assemble` would write, headed `## [X.Y.Z] - <today>` when `version` is
+      given and `## [Unreleased]` otherwise. Reads the working tree, changes nothing and never
+      runs next_version.py.
   assemble <version> [--date YYYY-MM-DD]
       Write `## [X.Y.Z] - date` under `## [Unreleased]` in CHANGELOG.md, with the fragments
       grouped by category in Keep a Changelog order, then delete the folded fragments. Refuses
-      when `[Unreleased]` is not empty, so nothing is ever stranded there.
+      when `[Unreleased]` is not empty, so nothing is ever stranded there, and when any file in
+      `changelog.d/` other than `README.md` is not a valid fragment. Edits the working tree only;
+      the caller stages.
+
+Fragment rules: `<id>` matches `[A-Za-z0-9][A-Za-z0-9_-]*` (no dots). A bullet is a line starting
+with `- ` or `* `; indented lines after it continue it. A fragment needs at least one bullet, and
+a placeholder bullet is rejected: empty text, a match of `\bto-?do\b`, `TBD`, `FIXME` or the
+literal `<...>`, all case-insensitive. Any file in `changelog.d/` other than `README.md` that is
+not named `<id>.<category>.md` fails as a bad name.
 
 Exit codes: 0 success; 1 the check failed or the command refused to run (the reason is printed to
-stderr); 2 usage error or a git failure.
+stderr); 2 usage error (including a malformed version or date) or git cannot resolve a revision,
+list the range or run at all.
 
 See CONTRIBUTING.md § Versioning and .agents/plans/2026-10-04-changelog-and-versioning.md.
 """
@@ -35,6 +46,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import functools
 import importlib.util
 import re
 import subprocess
@@ -56,10 +68,9 @@ FRAGMENT_RE = re.compile(
 )
 # A name shaped like `<id>.<something>.md`, used to tell a bad category from a bad name.
 SHAPED_RE = re.compile(r"^(?P<id>[A-Za-z0-9][A-Za-z0-9_-]*)\.(?P<category>[^.]+)\.md$")
-BULLET_RE = re.compile(r"^[-*] +\S")
-PLACEHOLDER_RE = re.compile(
-    r"\b(?:TODO|TBD|FIXME|XXX)\b|(?i:lorem ipsum|describe (?:the|your) change)"
-)
+BULLET_RE = re.compile(r"^[-*] (?P<text>.*)$")
+# `to-?do` is word-bounded; the others match anywhere. All case-insensitive.
+PLACEHOLDER_RE = re.compile(r"\bto-?do\b|TBD|FIXME|<\.\.\.>", re.IGNORECASE)
 VERSION_RE = re.compile(r"^v?(\d+\.\d+\.\d+)$")
 # A Keep a Changelog footer link definition such as `[1.0.0]: https://...`.
 LINK_DEF_RE = re.compile(r"^\[[^\]]+\]:\s")
@@ -96,6 +107,7 @@ class Fragment(NamedTuple):
     text: str
 
 
+@functools.cache
 def _load_next_version() -> ModuleType:
     """Load the sibling next_version.py so commits are classified by the same code.
 
@@ -114,11 +126,10 @@ def _load_next_version() -> ModuleType:
     return module
 
 
-_NEXT_VERSION = _load_next_version()
-
-
 def classify(message: str) -> str | None:
     """Classify a commit message exactly as next_version.py does.
+
+    The sibling module is loaded on first use, so `preview` and `assemble` never touch it.
 
     Args:
         message: Full commit message (header and body).
@@ -126,7 +137,7 @@ def classify(message: str) -> str | None:
     Returns:
         'breaking', 'feat', 'fix', or None when the commit drives no version bump.
     """
-    return _NEXT_VERSION.classify(message)
+    return _load_next_version().classify(message)
 
 
 def git(*args: str, cwd: Path | None = None) -> str:
@@ -144,7 +155,13 @@ def git(*args: str, cwd: Path | None = None) -> str:
     """
     try:
         result = subprocess.run(
-            ["git", *args], capture_output=True, text=True, check=False, cwd=cwd
+            ["git", *args],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            cwd=cwd,
         )
     except OSError as exc:
         raise ChangelogError(f"cannot run git: {exc}", 2) from exc
@@ -166,8 +183,39 @@ def repo_root() -> Path:
     return Path(git("rev-parse", "--show-toplevel").strip())
 
 
+def bullet_texts(text: str) -> list[str]:
+    """Extract the text of each bullet in a fragment.
+
+    A bullet starts with `- ` or `* `. Indented lines directly after it continue it; a blank
+    line or an unindented line ends it.
+
+    Args:
+        text: The file content.
+
+    Returns:
+        One string per bullet: its first line after the marker plus its continuation lines,
+        stripped.
+    """
+    bullets: list[list[str]] = []
+    open_bullet = False
+    for line in text.splitlines():
+        match = BULLET_RE.match(line)
+        if match:
+            bullets.append([match.group("text")])
+            open_bullet = True
+        elif open_bullet and line[:1] in (" ", "\t") and line.strip():
+            bullets[-1].append(line.strip())
+        else:
+            open_bullet = False
+    return [
+        " ".join(part for part in parts if part.strip()).strip() for parts in bullets
+    ]
+
+
 def validate_fragment(name: str, text: str) -> tuple[str | None, list[str]]:
     """Validate one fragment's file name and content.
+
+    A bad name is reported alone; the content of a file that is not a fragment is not read.
 
     Args:
         name: The file name inside `changelog.d/`.
@@ -176,28 +224,30 @@ def validate_fragment(name: str, text: str) -> tuple[str | None, list[str]]:
     Returns:
         The category (None when the name is invalid) and a list of problems (empty when valid).
     """
-    problems: list[str] = []
     match = FRAGMENT_RE.match(name)
-    category: str | None = None
-    if match:
-        category = match.group("category")
-    else:
+    if not match:
         shaped = SHAPED_RE.match(name)
         if shaped:
-            problems.append(
+            detail = (
                 f"unknown category {shaped.group('category')!r}; "
                 f"use one of: {', '.join(CATEGORIES)}"
             )
         else:
-            problems.append("name must be `<id>.<category>.md`, e.g. `T-0023.added.md`")
+            detail = "name must be `<id>.<category>.md`, e.g. `T-0023.added.md`"
+        return None, [f"bad name: {detail}"]
 
-    lines = text.splitlines()
-    if not any(BULLET_RE.match(line) for line in lines):
+    problems: list[str] = []
+    bullets = bullet_texts(text)
+    if not bullets:
         problems.append("no bullet line (start a line with `- `)")
-    placeholder = PLACEHOLDER_RE.search(text)
-    if placeholder:
-        problems.append(f"placeholder text {placeholder.group(0)!r}")
-    return category, problems
+    for bullet in bullets:
+        if not bullet:
+            problems.append("placeholder text: empty bullet")
+            continue
+        placeholder = PLACEHOLDER_RE.search(bullet)
+        if placeholder:
+            problems.append(f"placeholder text {placeholder.group(0)!r}")
+    return match.group("category"), problems
 
 
 def normalize_body(text: str) -> str:
@@ -233,8 +283,7 @@ def format_problems(problems: list[tuple[str, list[str]]]) -> str:
 def read_working_fragments(root: Path) -> list[Fragment]:
     """Read and validate the fragments in the working tree.
 
-    Hidden files and `README.md` are not fragments. Any other file in `changelog.d/` must be a
-    valid fragment.
+    `README.md` is not a fragment. Any other file in `changelog.d/` must be a valid fragment.
 
     Args:
         root: Repository root.
@@ -251,11 +300,11 @@ def read_working_fragments(root: Path) -> list[Fragment]:
     fragments: list[Fragment] = []
     problems: list[tuple[str, list[str]]] = []
     for path in sorted(directory.iterdir()):
-        if path.name == README_NAME or path.name.startswith("."):
+        if path.name == README_NAME and path.is_file():
             continue
         relative = f"{FRAGMENT_DIR}/{path.name}"
         if not path.is_file():
-            problems.append((relative, ["not a file; fragments are files"]))
+            problems.append((relative, ["bad name: not a file; fragments are files"]))
             continue
         text = path.read_text(encoding="utf-8")
         category, errors = validate_fragment(path.name, text)
@@ -268,19 +317,18 @@ def read_working_fragments(root: Path) -> list[Fragment]:
     return fragments
 
 
-def build_section(version: str, date: str, fragments: list[Fragment]) -> str:
+def build_section(heading: str, fragments: list[Fragment]) -> str:
     """Build a release section from fragments.
 
     Args:
-        version: Version without a leading `v`, e.g. "1.2.3", or a label such as "Unreleased".
-        date: ISO date for the heading.
+        heading: The full heading line, e.g. `## [1.2.3] - 2026-10-04` or `## [Unreleased]`.
         fragments: Valid fragments.
 
     Returns:
-        The section text ending in one newline: a heading, then one `###` group per used
+        The section text ending in one newline: the heading, then one `###` group per used
         category in Keep a Changelog order, each holding its fragments' bullets by file name.
     """
-    parts = [f"## [{version}] - {date}"]
+    parts = [heading]
     for category in CATEGORIES:
         bodies = [f.text for f in fragments if f.category == category]
         if bodies:
@@ -328,14 +376,14 @@ def resolve_date(value: str | None) -> str:
         The date as `YYYY-MM-DD`.
 
     Raises:
-        ChangelogError: If the value is not a valid ISO date.
+        ChangelogError: With exit code 2 if the value is not a valid ISO date.
     """
     if value is None:
         return datetime.datetime.now().astimezone().date().isoformat()
     try:
         return datetime.date.fromisoformat(value).isoformat()
     except ValueError:
-        raise ChangelogError(f"--date {value!r} is not a YYYY-MM-DD date") from None
+        raise ChangelogError(f"--date {value!r} is not a YYYY-MM-DD date", 2) from None
 
 
 def resolve_version(value: str) -> str:
@@ -348,12 +396,25 @@ def resolve_version(value: str) -> str:
         The version without the leading `v`.
 
     Raises:
-        ChangelogError: If the value is not in that form.
+        ChangelogError: With exit code 2 if the value is not in that form.
     """
     match = VERSION_RE.match(value)
     if not match:
-        raise ChangelogError(f"version {value!r} is not in X.Y.Z or vX.Y.Z form")
+        raise ChangelogError(f"version {value!r} is not in X.Y.Z or vX.Y.Z form", 2)
     return match.group(1)
+
+
+def release_heading(version: str, date: str) -> str:
+    """Build a release heading line.
+
+    Args:
+        version: Version without a leading `v`.
+        date: ISO date.
+
+    Returns:
+        `## [version] - date`.
+    """
+    return f"## [{version}] - {date}"
 
 
 def assemble(root: Path, version: str, date: str) -> str:
@@ -387,7 +448,7 @@ def assemble(root: Path, version: str, date: str) -> str:
     if not fragments:
         raise ChangelogError(f"no fragments in {FRAGMENT_DIR}/ to assemble")
 
-    section = build_section(version, date, fragments)
+    section = build_section(release_heading(version, date), fragments)
     out = "\n".join(head) + "\n\n" + section
     if tail:
         out += "\n" + "\n".join(tail) + "\n"
@@ -395,34 +456,6 @@ def assemble(root: Path, version: str, date: str) -> str:
     for fragment in fragments:
         (root / FRAGMENT_DIR / fragment.name).unlink()
     return section
-
-
-def next_version_label(root: Path) -> str:
-    """Ask next_version.py for the version the next release would carry.
-
-    Args:
-        root: Repository root to run in.
-
-    Returns:
-        The version without a leading `v`, or "Unreleased" when nothing is releasable.
-    """
-    script = Path(__file__).resolve().with_name("next_version.py")
-    result = subprocess.run(
-        [sys.executable, str(script), "--quiet"],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=root,
-    )
-    match = VERSION_RE.match(result.stdout.strip())
-    if result.returncode != 0 or not match:
-        print(
-            "note: next_version.py found no version to release; "
-            "pass a version to preview one",
-            file=sys.stderr,
-        )
-        return "Unreleased"
-    return match.group(1)
 
 
 def commits_in_range(base: str, tip: str, root: Path) -> list[tuple[str, str]]:
@@ -491,27 +524,30 @@ def fragments_added_in_range(base: str, tip: str, root: Path) -> list[str]:
 
 
 def tip_fragment_problems(tip: str, root: Path) -> list[tuple[str, list[str]]]:
-    """Validate every fragment present in the tree at `tip`.
+    """Validate every entry of `changelog.d/` at `tip`, read from git.
+
+    Uses `git ls-tree` and `git show`; the working tree is never read.
 
     Args:
         tip: The revision to read.
         root: Repository root.
 
     Returns:
-        (path, problem list) pairs for the invalid fragments; empty when all are valid.
+        (path, problem list) pairs for the invalid entries; empty when all are valid.
+
+    Raises:
+        ChangelogError: With exit code 2 if git cannot list or read the tree.
     """
-    listing = git(
-        "ls-tree", "-r", "--name-only", "-z", tip, "--", f"{FRAGMENT_DIR}/", cwd=root
-    )
+    listing = git("ls-tree", "-z", tip, "--", f"{FRAGMENT_DIR}/", cwd=root)
     problems: list[tuple[str, list[str]]] = []
-    for path in sorted(p for p in listing.split("\0") if p):
-        directory, _, name = path.rpartition("/")
-        if directory != FRAGMENT_DIR:
-            problems.append(
-                (path, ["nested path; fragments sit directly in changelog.d/"])
-            )
+    for entry in sorted(e for e in listing.split("\0") if e):
+        meta, _, path = entry.partition("\t")
+        kind = meta.split()[1] if len(meta.split()) > 1 else ""
+        name = path.rpartition("/")[2]
+        if kind != "blob":
+            problems.append((path, ["bad name: not a file; fragments are files"]))
             continue
-        if name == README_NAME or name.startswith("."):
+        if name == README_NAME:
             continue
         text = git("show", f"{tip}:{path}", cwd=root)
         _, errors = validate_fragment(name, text)
@@ -529,6 +565,9 @@ def run_check(base: str, tip: str) -> int:
 
     Returns:
         0 when the range passes, 1 when it does not.
+
+    Raises:
+        ChangelogError: With exit code 2 if git cannot resolve a revision or list the range.
     """
     root = repo_root()
     failures: list[str] = []
@@ -560,23 +599,24 @@ def run_check(base: str, tip: str) -> int:
     return 0
 
 
-def run_preview(version: str | None, date: str | None) -> int:
+def run_preview(version: str | None) -> int:
     """Run the `preview` subcommand.
 
     Args:
-        version: Version to show, or None to ask next_version.py.
-        date: Heading date, or None for today.
+        version: Version to show, or None for the `[Unreleased]` heading.
 
     Returns:
         0 on success (including when there are no fragments), 1 when a fragment is invalid.
     """
     root = repo_root()
+    heading = UNRELEASED_HEADING
+    if version is not None:
+        heading = release_heading(resolve_version(version), resolve_date(None))
     fragments = read_working_fragments(root)
     if not fragments:
         print(f"no fragments in {FRAGMENT_DIR}/; nothing to preview", file=sys.stderr)
         return 0
-    label = resolve_version(version) if version else next_version_label(root)
-    sys.stdout.write(build_section(label, resolve_date(date), fragments))
+    sys.stdout.write(build_section(heading, fragments))
     return 0
 
 
@@ -589,6 +629,9 @@ def run_assemble(version: str, date: str | None) -> int:
 
     Returns:
         0 on success.
+
+    Raises:
+        ChangelogError: If the command refuses to run; nothing is changed in that case.
     """
     root = repo_root()
     resolved = resolve_version(version)
@@ -618,11 +661,10 @@ def build_parser() -> argparse.ArgumentParser:
     check.add_argument("base", help="exclusive start of the range")
     check.add_argument("tip", help="inclusive end of the range")
 
-    preview = sub.add_parser("preview", help="print the section a release would write")
+    preview = sub.add_parser("preview", help="print the section assemble would write")
     preview.add_argument(
-        "version", nargs="?", help="X.Y.Z; default: from next_version.py"
+        "version", nargs="?", help="X.Y.Z or vX.Y.Z; default: heading `## [Unreleased]`"
     )
-    preview.add_argument("--date", help="heading date, YYYY-MM-DD; default: today")
 
     assemble_cmd = sub.add_parser(
         "assemble", help="fold the fragments into CHANGELOG.md and delete them"
@@ -646,7 +688,7 @@ def main(argv: list[str]) -> int:
         if args.command == "check":
             return run_check(args.base, args.tip)
         if args.command == "preview":
-            return run_preview(args.version, args.date)
+            return run_preview(args.version)
         return run_assemble(args.version, args.date)
     except ChangelogError as exc:
         print(f"changelog.py: {exc}", file=sys.stderr)

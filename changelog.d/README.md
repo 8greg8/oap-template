@@ -13,30 +13,34 @@ parallel branches never conflict on `CHANGELOG.md`.
 
 Examples: `T-0023.changed.md`, `login-timeout.fixed.md`.
 
-Only files with this name shape are fragments. This README is not one. A change that needs two
+Every file in this directory except this README must have that name; any other name fails the
+check as a bad name. This README is never checked, folded or deleted. A change that needs two
 categories adds two files.
 
 ## Content
 
-One or more bullet lines, each starting with `- `. Write what changed for a user or maintainer of
-the project, in the past tense or as a plain statement, in one or two sentences. Indent a
-continuation line.
+One or more bullets, each a line starting with `- ` or `* `. Write what changed for a user or
+maintainer of the project, in the past tense or as a plain statement, in one or two sentences.
+Indent a continuation line.
 
 ```markdown
 - Added the `--dry-run` flag to the export command. It prints what would be written.
 ```
 
-A fragment is rejected when it has no bullet line or contains placeholder text such as `TODO`,
-`TBD`, `FIXME`, `XXX`, "describe the change" or "lorem ipsum".
+A fragment is rejected when it has no bullet or when a bullet is a placeholder: empty text, a
+whole-word to-do marker (`todo` or `to-do`), `TBD`, `FIXME` or the literal `<...>`, in any letter
+case.
 
 ## Check and release
 
 - `python scripts/changelog.py check <base> <tip>` fails when a `feat`, `fix` or breaking commit in
   `<base>..<tip>` has no fragment added in that range, or when any fragment at `<tip>` is invalid.
-- `python scripts/changelog.py preview` prints the section the next release would write and
-  changes nothing.
+- `python scripts/changelog.py preview [<version>]` prints the section `assemble` would write,
+  headed with today's date when a version is given and `## [Unreleased]` otherwise. It changes
+  nothing.
 - `python scripts/changelog.py assemble <version>` writes the dated section under
   `## [Unreleased]`, in the order Added, Changed, Deprecated, Removed, Fixed, Security, then
-  deletes the fragments. It refuses when `[Unreleased]` is not empty.
+  deletes the fragments. It refuses when `[Unreleased]` is not empty or any file here fails the
+  rules above. It edits the working tree and does not stage.
 
 Do not edit `CHANGELOG.md` by hand. It changes only at a release.

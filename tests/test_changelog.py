@@ -2,7 +2,8 @@
 
 The `check`, `preview` and `assemble` cases run the real script as a subprocess inside a scratch
 git repository, so the git plumbing (ranges, merges, per-commit additions, tree reads) is
-exercised for real.
+exercised for real. Every case uses temporary repositories and fixtures; none reads this
+repository's own CHANGELOG.md or changelog.d/, so the file also passes in a generated project.
 """
 
 from __future__ import annotations
@@ -10,6 +11,8 @@ from __future__ import annotations
 import datetime
 import importlib.util
 import os
+import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -245,14 +248,32 @@ def test_check_reads_fragments_at_tip_not_in_working_tree(repo: Path) -> None:
     write(repo, "changelog.d/T-0001.added.md", "- Added x.\n")
     git(repo, "add", "changelog.d")
     git(repo, "commit", "-q", "-m", "feat: add x")
-    write(repo, "changelog.d/T-0001.added.md", "TODO\n")  # uncommitted breakage
+    write(repo, "changelog.d/T-0001.added.md", "- TODO\n")  # uncommitted breakage
     assert run(repo, "check", base, "HEAD").returncode == 0
 
 
-def test_check_bad_revision_exits_2(repo: Path) -> None:
+def test_check_unknown_base_exits_2(repo: Path) -> None:
     result = run(repo, "check", "no-such-ref", "HEAD")
     assert result.returncode == 2
     assert "git log" in result.stderr
+
+
+def test_check_unknown_tip_exits_2(repo: Path) -> None:
+    result = run(repo, "check", "HEAD", "no-such-ref")
+    assert result.returncode == 2
+    assert "git log" in result.stderr
+
+
+def test_check_outside_a_repository_exits_2(tmp_path: Path) -> None:
+    outside = tmp_path / "plain"
+    outside.mkdir()
+    result = run(outside, "check", "a", "b")
+    assert result.returncode == 2
+
+
+@pytest.mark.parametrize("args", [[], ["check"], ["check", "only-base"], ["bogus"]])
+def test_usage_errors_exit_2(repo: Path, args: list[str]) -> None:
+    assert run(repo, *args).returncode == 2
 
 
 # --- check: fragment validation at the tip ---------------------------------------------------
@@ -261,22 +282,42 @@ def test_check_bad_revision_exits_2(repo: Path) -> None:
 @pytest.mark.parametrize(
     ("name", "content", "expected"),
     [
-        ("notes.md", "- Added x.\n", "name must be"),
-        ("T-0001.md", "- Added x.\n", "name must be"),
-        ("T-0001.added.txt", "- Added x.\n", "name must be"),
-        ("T 0001.added.md", "- Added x.\n", "name must be"),
+        ("notes.md", "- Added x.\n", "bad name"),
+        ("notes.txt", "- Added x.\n", "bad name"),
+        ("T-0001.md", "- Added x.\n", "bad name"),
+        ("T-0001.added.txt", "- Added x.\n", "bad name"),
+        ("T 0001.added.md", "- Added x.\n", "bad name"),
+        ("a.b.added.md", "- Added x.\n", "bad name"),
+        ("-lead.added.md", "- Added x.\n", "bad name"),
+        (".gitkeep", "", "bad name"),
+        (".hidden.added.md", "- Added x.\n", "bad name"),
+        ("README.txt", "- Added x.\n", "bad name"),
+        ("readme.md", "- Added x.\n", "bad name"),
         ("T-0001.feature.md", "- Added x.\n", "unknown category 'feature'"),
         ("T-0001.Added.md", "- Added x.\n", "unknown category 'Added'"),
         ("T-0001.added.md", "", "no bullet line"),
         ("T-0001.added.md", "\n\n", "no bullet line"),
         ("T-0001.added.md", "Added x.\n", "no bullet line"),
-        ("T-0001.added.md", "- \n", "no bullet line"),
+        ("T-0001.added.md", "-Added x.\n", "no bullet line"),
+        ("T-0001.added.md", "- \n", "empty bullet"),
+        ("T-0001.added.md", "- Added x.\n- \n", "empty bullet"),
+        ("T-0001.added.md", "* \n", "empty bullet"),
+        ("T-0001.added.md", "-  \n   \n", "empty bullet"),
         ("T-0001.added.md", "- TODO\n", "placeholder text 'TODO'"),
+        ("T-0001.added.md", "- todo\n", "placeholder text 'todo'"),
+        ("T-0001.added.md", "- To-Do: write this\n", "placeholder text 'To-Do'"),
+        ("T-0001.added.md", "- Added x (todo)\n", "placeholder text 'todo'"),
         ("T-0001.added.md", "- Added x. TBD\n", "placeholder text 'TBD'"),
+        ("T-0001.added.md", "- tbd\n", "placeholder text 'tbd'"),
         ("T-0001.fixed.md", "- FIXME later\n", "placeholder text 'FIXME'"),
-        ("T-0001.fixed.md", "- XXX\n", "placeholder text 'XXX'"),
-        ("T-0001.fixed.md", "- Describe the change here\n", "placeholder text"),
-        ("T-0001.fixed.md", "- Lorem ipsum dolor\n", "placeholder text"),
+        ("T-0001.fixed.md", "* fixme\n", "placeholder text 'fixme'"),
+        ("T-0001.fixed.md", "- Fixed <...> here\n", "placeholder text '<...>'"),
+        (
+            "T-0001.fixed.md",
+            "- Fixed x.\n  TODO continued\n",
+            "placeholder text 'TODO'",
+        ),
+        ("T-0001.fixed.md", "- Fixed x.\n\tTBD\n", "placeholder text 'TBD'"),
     ],
 )
 def test_check_rejects_invalid_fragment(
@@ -299,13 +340,14 @@ def test_check_rejects_nested_fragment_path(repo: Path) -> None:
     git(repo, "commit", "-q", "-m", "docs: add fragment")
     result = run(repo, "check", base, "HEAD")
     assert result.returncode == 1
-    assert "nested path" in result.stderr
+    assert "changelog.d/sub" in result.stderr
+    assert "not a file" in result.stderr
 
 
 def test_check_validates_existing_fragment_even_when_range_has_no_versioned_commit(
     repo: Path,
 ) -> None:
-    write(repo, "changelog.d/T-0001.added.md", "TODO\n")
+    write(repo, "changelog.d/T-0001.added.md", "- TODO\n")
     git(repo, "add", "changelog.d")
     git(repo, "commit", "-q", "-m", "docs: add fragment")
     base = base_of(repo)
@@ -327,17 +369,57 @@ def test_check_reports_missing_fragment_and_invalid_fragment_together(
     assert "changelog.d/bad.added.txt" in result.stderr
 
 
-def test_check_ignores_readme_and_hidden_files(repo: Path) -> None:
+def test_check_ignores_readme(repo: Path) -> None:
     base = base_of(repo)
     write(
         repo, "changelog.d/README.md", "# How to write a fragment\n\nNo bullets here.\n"
     )
-    write(repo, "changelog.d/.gitkeep", "")
     write(repo, "changelog.d/T-0001.added.md", "- Added x.\n")
     git(repo, "add", "changelog.d")
     git(repo, "commit", "-q", "-m", "feat: add x")
     result = run(repo, "check", base, "HEAD")
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "- Added x.\n",
+        "* Added x.\n",
+        "- Added x.\n  and a continuation line.\n",
+        "- Added x.\n\n- Added y.\n",
+        "Intro line.\n\n- Added x.\n",
+        "- Handled todos and to-dos in the parser.\n",
+        "- Documented the `changelog.d/<id>.<category>.md` pattern.\n",
+    ],
+)
+def test_check_accepts_valid_fragment_content(repo: Path, content: str) -> None:
+    base = base_of(repo)
+    write(repo, "changelog.d/T-0001.added.md", content)
+    git(repo, "add", "changelog.d")
+    git(repo, "commit", "-q", "-m", "feat: add x")
+    result = run(repo, "check", base, "HEAD")
+    assert result.returncode == 0, result.stderr
+
+
+def test_check_validates_committed_fragment_even_if_deleted_in_working_tree(
+    repo: Path,
+) -> None:
+    base = base_of(repo)
+    write(repo, "changelog.d/T-0001.added.md", "- TODO\n")
+    git(repo, "add", "changelog.d")
+    git(repo, "commit", "-q", "-m", "docs: add fragment")
+    (repo / "changelog.d" / "T-0001.added.md").unlink()
+    assert run(repo, "check", base, "HEAD").returncode == 1
+
+
+def test_check_checks_the_tip_revision_not_the_checked_out_one(repo: Path) -> None:
+    base = base_of(repo)
+    git(repo, "checkout", "-q", "-b", "task")
+    commit(repo, "feat: add x", {"src/a.py": "x = 1\n"})
+    git(repo, "checkout", "-q", "develop")
+    assert run(repo, "check", base, "task").returncode == 1
+    assert run(repo, "check", base, "develop").returncode == 0
 
 
 def test_readme_alone_is_not_a_fragment_for_a_feat_commit(repo: Path) -> None:
@@ -392,17 +474,11 @@ def test_assemble_writes_ordered_dated_section_and_deletes_fragments(
     ) == "# Readme\n"
 
 
-def test_assemble_accepts_v_prefix_and_defaults_date_to_today(repo: Path) -> None:
+def test_assemble_accepts_v_prefix(repo: Path) -> None:
     add_fragments(repo, T__0001_added="- Added x.\n")
-
-    def today() -> str:
-        return datetime.datetime.now().astimezone().date().isoformat()
-
-    before = today()
-    assert run(repo, "assemble", "v0.1.0").returncode == 0
-    after = today()
+    assert run(repo, "assemble", "v0.1.0", "--date", "2026-10-04").returncode == 0
     text = (repo / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert f"## [0.1.0] - {before}" in text or f"## [0.1.0] - {after}" in text
+    assert "## [0.1.0] - 2026-10-04\n" in text
 
 
 def test_assemble_places_new_section_above_older_sections_and_keeps_footer(
@@ -441,7 +517,7 @@ def test_assemble_refuses_non_empty_unreleased(repo: Path) -> None:
 
 
 def test_assemble_refuses_invalid_fragment_and_changes_nothing(repo: Path) -> None:
-    add_fragments(repo, T__0001_added="- Added x.\n", T__0002_fixed="TODO\n")
+    add_fragments(repo, T__0001_added="- Added x.\n", T__0002_fixed="- TODO\n")
     result = run(repo, "assemble", "0.1.0")
     assert result.returncode == 1
     assert "placeholder" in result.stderr
@@ -486,7 +562,7 @@ def test_assemble_refuses_missing_changelog(repo: Path) -> None:
 def test_assemble_rejects_bad_version(repo: Path, version: str) -> None:
     add_fragments(repo, T__0001_added="- Added x.\n")
     result = run(repo, "assemble", version)
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "X.Y.Z" in result.stderr
     assert (repo / "changelog.d" / "T-0001.added.md").exists()
 
@@ -494,7 +570,7 @@ def test_assemble_rejects_bad_version(repo: Path, version: str) -> None:
 def test_assemble_rejects_bad_date(repo: Path) -> None:
     add_fragments(repo, T__0001_added="- Added x.\n")
     result = run(repo, "assemble", "0.1.0", "--date", "04-10-2026")
-    assert result.returncode == 1
+    assert result.returncode == 2
     assert "YYYY-MM-DD" in result.stderr
     assert (repo / "changelog.d" / "T-0001.added.md").exists()
 
@@ -510,10 +586,76 @@ def test_assemble_output_then_passes_check_after_commit(repo: Path) -> None:
     assert run(repo, "check", base, "HEAD").returncode == 0
 
 
+def test_assemble_orders_fragments_by_file_name_within_a_category(repo: Path) -> None:
+    add_fragments(
+        repo,
+        T__0010_added="- Ten.\n",
+        T__0002_added="- Two a.\n- Two b.\n",
+        topic_added="- Topic.\n",
+        Alpha_added="- Alpha.\n",
+    )
+    assert run(repo, "assemble", "0.1.0", "--date", "2026-10-04").returncode == 0
+    text = (repo / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "### Added\n\n- Alpha.\n- Two a.\n- Two b.\n- Ten.\n- Topic.\n" in text
+
+
+def test_assemble_writes_no_compare_link_footer(repo: Path) -> None:
+    add_fragments(repo, T__0001_added="- Added x.\n")
+    assert run(repo, "assemble", "0.1.0", "--date", "2026-10-04").returncode == 0
+    text = (repo / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert not re.search(r"^\[[^\]]+\]:", text, re.MULTILINE)
+    assert "http" not in text.split("## [Unreleased]")[1]
+
+
+def test_assemble_edits_the_working_tree_without_staging(repo: Path) -> None:
+    write(repo, "changelog.d/T-0001.added.md", "- Added x.\n")
+    git(repo, "add", "changelog.d")
+    git(repo, "commit", "-q", "-m", "docs: add fragment")
+    assert git(repo, "diff", "--cached", "--name-only") == ""
+    assert run(repo, "assemble", "0.1.0", "--date", "2026-10-04").returncode == 0
+    assert git(repo, "diff", "--cached", "--name-only") == ""
+    unstaged = git(repo, "diff", "--name-only").splitlines()
+    assert sorted(unstaged) == ["CHANGELOG.md", "changelog.d/T-0001.added.md"]
+
+
+@pytest.mark.parametrize(
+    ("name", "content"),
+    [
+        (".gitkeep", ""),
+        ("notes.txt", "- Added x.\n"),
+        ("T-0002.feature.md", "- Added x.\n"),
+        ("T-0002.added.md", "- \n"),
+    ],
+)
+def test_assemble_refuses_when_any_file_fails_the_rules(
+    repo: Path, name: str, content: str
+) -> None:
+    add_fragments(repo, T__0001_added="- Added x.\n")
+    write(repo, f"changelog.d/{name}", content)
+    result = run(repo, "assemble", "0.1.0")
+    assert result.returncode == 1
+    assert f"changelog.d/{name}" in result.stderr
+    assert (repo / "CHANGELOG.md").read_text(encoding="utf-8") == EMPTY_CHANGELOG
+    assert (repo / "changelog.d" / "T-0001.added.md").exists()
+    assert (repo / "changelog.d" / name).exists()
+
+
+def test_assemble_with_no_fragments_changes_nothing(repo: Path) -> None:
+    result = run(repo, "assemble", "0.1.0")
+    assert result.returncode == 1
+    assert "no fragments" in result.stderr
+    assert (repo / "CHANGELOG.md").read_text(encoding="utf-8") == EMPTY_CHANGELOG
+    assert git(repo, "status", "--porcelain") == ""
+
+
 # --- preview ---------------------------------------------------------------------------------
 
 
-def test_preview_prints_section_and_changes_nothing(repo: Path) -> None:
+def local_today() -> str:
+    return datetime.datetime.now().astimezone().date().isoformat()
+
+
+def test_preview_with_version_prints_section_and_changes_nothing(repo: Path) -> None:
     add_fragments(
         repo,
         T__0001_added="- Added x.\n",
@@ -522,10 +664,14 @@ def test_preview_prints_section_and_changes_nothing(repo: Path) -> None:
     git(repo, "add", "-A")
     before = git(repo, "status", "--porcelain")
     changelog_before = (repo / "CHANGELOG.md").read_text(encoding="utf-8")
-    result = run(repo, "preview", "0.2.0", "--date", "2026-10-04")
+    first = local_today()
+    result = run(repo, "preview", "0.2.0")
+    second = local_today()
     assert result.returncode == 0, result.stderr
-    assert result.stdout == (
-        "## [0.2.0] - 2026-10-04\n\n### Added\n\n- Added x.\n\n### Fixed\n\n- Fixed y.\n"
+    body = "\n\n### Added\n\n- Added x.\n\n### Fixed\n\n- Fixed y.\n"
+    assert result.stdout in (
+        f"## [0.2.0] - {first}{body}",
+        f"## [0.2.0] - {second}{body}",
     )
     assert git(repo, "status", "--porcelain") == before
     assert (repo / "CHANGELOG.md").read_text(encoding="utf-8") == changelog_before
@@ -533,27 +679,46 @@ def test_preview_prints_section_and_changes_nothing(repo: Path) -> None:
     assert (repo / "changelog.d" / "T-0002.fixed.md").exists()
 
 
+def test_preview_accepts_v_prefix(repo: Path) -> None:
+    add_fragments(repo, T__0001_added="- Added x.\n")
+    result = run(repo, "preview", "v0.2.0")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.startswith("## [0.2.0] - ")
+
+
+def test_preview_without_version_is_headed_unreleased(repo: Path) -> None:
+    add_fragments(repo, T__0001_added="- Added x.\n", T__0002_fixed="- Fixed y.\n")
+    result = run(repo, "preview")
+    assert result.returncode == 0, result.stderr
+    assert result.stdout == (
+        "## [Unreleased]\n\n### Added\n\n- Added x.\n\n### Fixed\n\n- Fixed y.\n"
+    )
+
+
+def test_preview_never_calls_next_version(repo: Path, tmp_path: Path) -> None:
+    # A copy of the tool with no sibling next_version.py: preview must still work.
+    lonely = tmp_path / "lonely"
+    lonely.mkdir()
+    shutil.copy(SCRIPT, lonely / "changelog.py")
+    add_fragments(repo, T__0001_added="- Added x.\n")
+    for extra in ([], ["0.3.0"]):
+        result = subprocess.run(
+            [sys.executable, str(lonely / "changelog.py"), "preview", *extra],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=False,
+            env=_env(),
+        )
+        assert result.returncode == 0, result.stderr
+        assert "- Added x." in result.stdout
+
+
 def test_preview_matches_what_assemble_writes(repo: Path) -> None:
     add_fragments(repo, T__0001_added="- Added x.\n", T__0002_changed="- Changed y.\n")
-    previewed = run(repo, "preview", "0.2.0", "--date", "2026-10-04").stdout
-    assert run(repo, "assemble", "0.2.0", "--date", "2026-10-04").returncode == 0
+    previewed = run(repo, "preview", "0.2.0").stdout
+    assert run(repo, "assemble", "0.2.0").returncode == 0
     assert previewed in (repo / "CHANGELOG.md").read_text(encoding="utf-8")
-
-
-def test_preview_takes_version_from_next_version(repo: Path) -> None:
-    git(repo, "tag", "v0.1.0")
-    commit(repo, "feat: add x", {"src/a.py": "x = 1\n"})
-    add_fragments(repo, T__0001_added="- Added x.\n")
-    result = run(repo, "preview", "--date", "2026-10-04")
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.startswith("## [0.2.0] - 2026-10-04\n")
-
-
-def test_preview_falls_back_to_unreleased_when_nothing_to_release(repo: Path) -> None:
-    add_fragments(repo, T__0001_added="- Added x.\n")
-    result = run(repo, "preview", "--date", "2026-10-04")
-    assert result.returncode == 0, result.stderr
-    assert result.stdout.startswith("## [Unreleased] - 2026-10-04\n")
 
 
 def test_preview_with_no_fragments_prints_nothing(repo: Path) -> None:
@@ -563,46 +728,29 @@ def test_preview_with_no_fragments_prints_nothing(repo: Path) -> None:
     assert "no fragments" in result.stderr
 
 
+def test_preview_ignores_readme(repo: Path) -> None:
+    write(repo, "changelog.d/README.md", "- A bullet in the readme.\n")
+    result = run(repo, "preview", "0.1.0")
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
 def test_preview_fails_on_invalid_fragment(repo: Path) -> None:
-    add_fragments(repo, T__0001_added="TODO\n")
+    add_fragments(repo, T__0001_added="- TODO\n")
     result = run(repo, "preview", "0.1.0")
     assert result.returncode == 1
     assert "placeholder" in result.stderr
 
 
-# --- repository files ------------------------------------------------------------------------
+def test_preview_rejects_bad_version(repo: Path) -> None:
+    add_fragments(repo, T__0001_added="- Added x.\n")
+    assert run(repo, "preview", "1.2").returncode == 2
 
 
-def test_repository_changelog_has_header_and_empty_unreleased() -> None:
-    text = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert text.startswith("# Changelog\n")
-    assert "keepachangelog.com/en/1.1.0" in text
-    assert "semver.org" in text
-    head, unreleased, tail = changelog.split_changelog(text)
-    assert head[-1] == "## [Unreleased]"
-    assert not any(line.strip() for line in unreleased)
-    assert tail == []
-
-
-def test_repository_fragments_are_valid() -> None:
-    directory = REPO_ROOT / "changelog.d"
-    names = {p.name for p in directory.iterdir()}
-    assert {"README.md", "template.added.md", "T-0022.added.md"} <= names
-    for path in directory.iterdir():
-        if path.name == "README.md":
-            continue
-        _, problems = changelog.validate_fragment(path.name, path.read_text("utf-8"))
-        assert problems == [], path.name
-
-
-def test_repository_readme_names_no_template_string() -> None:
-    text = (REPO_ROOT / "changelog.d" / "README.md").read_text(encoding="utf-8").lower()
-    # Built from pieces so this file never names a template string itself (init scan).
-    forbidden_strings = (
-        "proj" + "_template",
-        "proj" + "-template",
-        "oap" + "-template",
-        "8gre" + "g8",
-    )
-    for forbidden in forbidden_strings:
-        assert forbidden not in text
+def test_assemble_default_date_is_local_today(repo: Path) -> None:
+    add_fragments(repo, T__0001_added="- Added x.\n")
+    first = local_today()
+    assert run(repo, "assemble", "0.1.0").returncode == 0
+    second = local_today()
+    text = (repo / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert f"## [0.1.0] - {first}\n" in text or f"## [0.1.0] - {second}\n" in text
