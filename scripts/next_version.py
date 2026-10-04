@@ -11,6 +11,11 @@ Algorithm (see DEV_TOOLING_SPEC.md § Version computation and CONTRIBUTING.md §
        breaking (`!` or BREAKING CHANGE: footer) > feat > fix > (unclassified, ignored).
   4. Bump the highest level found off the last tag; print the result.
 
+Bump rule (SemVer 0.x convention, as commitizen's `major_version_zero`): while the last tag's
+major version is 0, a breaking change bumps minor, so a project stays on 0.y.z until its owner
+moves to 1.0.0 on purpose (`release.py --version v1.0.0`). From major 1 onward a breaking change
+bumps major. In every case `feat` bumps minor and `fix` bumps patch.
+
 This script never creates a tag -- it only computes and prints. See release.py for tagging.
 """
 
@@ -116,6 +121,8 @@ def classify(message: str) -> str | None:
 def bump(tag: str, level: str) -> str:
     """Apply a SemVer bump to a `vX.Y.Z` tag.
 
+    While the major version is 0, a breaking change bumps minor instead of major.
+
     Args:
         tag: The current tag, e.g. "v1.2.3".
         level: One of "breaking", "feat", "fix".
@@ -128,6 +135,8 @@ def bump(tag: str, level: str) -> str:
         raise ValueError(f"tag {tag!r} is not in vX.Y.Z form")
     major, minor, patch = (int(x) for x in match.groups())
     if level == "breaking":
+        if major == 0:
+            return f"v0.{minor + 1}.0"
         return f"v{major + 1}.0.0"
     if level == "feat":
         return f"v{major}.{minor + 1}.0"
