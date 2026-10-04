@@ -18,49 +18,83 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+`scripts/release.py` releases `develop` into `main` (or a pushed hotfix on `main`) with the
+changelog section, the tag and `develop` brought up to date, as the plan's § Release defines,
+and `next_version.py` follows the 0.x rule (D8).
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-04-changelog-and-versioning.md`, accepted by the owner on 2026-10-04 (D1 to D8). Its § Design is the source of
+  truth for behavior; where this file and the plan differ, stop and report.
+- The plan's § Approvals records the owner's written approval for the "Ask first" and
+  breaking-change items this task touches; the orchestrator cites it at merge.
+- Re-check against `develop` before starting and report any discrepancy.
+- Depends on T-0023.
+- `scripts/release.py` today only tags `main` and refuses other branches; `scripts/next_version.py`
+  uses `git describe --abbrev=0` and bumps major on breaking. No `tests/test_release.py` or
+  `tests/test_next_version.py` exists.
+- `scripts/gitflow.sh` hotfix finish prints a reminder to run `release.py` (near line 82).
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- `scripts/next_version.py`: while the latest tag's major is 0, breaking bumps minor; `feat`
+  minor; `fix` patch. Update its docstring.
+- `scripts/release.py`: dry run by default; `--yes` sequence (merge from `develop` with
+  `chore(merge): merge develop into main`, `changelog.py assemble`, `chore(release): vX.Y.Z`,
+  annotated tag on that commit, fast-forward or `--no-ff` back-merge of `develop`);
+  `--version vX.Y.Z` (must be higher than the latest tag); `--push` as
+  `git push --atomic origin main develop vX.Y.Z`; `git fetch origin` first and every refusal the
+  plan lists (dirty tree, either branch not equal to origin, either branch checked out in another
+  worktree, nothing to release). Refusals happen before any change.
+- `scripts/gitflow.sh`: the hotfix finish message per the plan (push both branches, then run
+  `release.py --yes` on `main`).
+- Tests: `tests/test_release.py`, `tests/test_next_version.py`, `tests/test_gitflow.py` (message).
+- `changelog.d/T-0024.changed.md`: this task's entry, describing the new release flow as breaking.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change `scripts/changelog.py` behavior (fix bugs only if found, and report them).
+- Do not change `.husky/` hooks or the gate.
+- Do not add CI, GitHub Release creation or any network call other than `git fetch`/`git push`.
+- Do not change documentation (T-0026).
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-04-changelog-and-versioning.md`
+- `scripts/release.py`, `scripts/next_version.py`, `scripts/gitflow.sh`, `scripts/changelog.py`,
+  `scripts/config/gate.sh` (branch names)
+- `tests/test_gitflow.py` (bare-remote fixtures)
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+The plan's normal-release and hotfix walkthroughs work end to end against a bare remote: after a
+release, `main` and `develop` contain the tagged `chore(release)` commit, no fragment remains,
+the next release does not fold anything twice, and the atomic push lands all three refs or none.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- `tests/test_next_version.py`: 0.x rule cases and the >= 1.0 rules unchanged.
+- `tests/test_release.py`: dry run changes nothing; normal release; hotfix release; first release
+  from no tags is `v0.1.0` with a breaking commit; `--version` higher and lower; each refusal;
+  `--push` to a bare remote is atomic (a rejected ref leaves the remote unchanged).
+- `uv run pytest tests/test_release.py tests/test_next_version.py tests/test_gitflow.py -v` and
+  `scripts/gate.sh`.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason.
+None in this task beyond docstrings; T-0026 documents the flow.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] `next_version.py` applies the 0.x rule and its docstring says so.
+- [ ] `release.py` performs the plan's `--yes` sequence from `develop` and from `main` after a hotfix.
+- [ ] `release.py` refuses every case the plan lists before changing anything.
+- [ ] `--version` and `--push` behave as specified.
+- [ ] The hotfix finish message matches the plan.
+- [ ] `changelog.d/T-0024.changed.md` exists and passes `check`; the behavior commit is marked breaking.
+- [ ] `uv run pytest tests/test_release.py tests/test_next_version.py tests/test_gitflow.py -v` passes.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 
 ## Workflow
 

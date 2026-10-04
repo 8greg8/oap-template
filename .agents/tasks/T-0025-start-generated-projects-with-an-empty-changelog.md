@@ -18,49 +18,68 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+A project created with `init_project.py` starts with an empty `CHANGELOG.md` and no fragments,
+names no template string, and its checklist says branch protection must allow the release push.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-04-changelog-and-versioning.md`, accepted by the owner on 2026-10-04 (D1 to D8). Its § Design is the source of
+  truth for behavior; where this file and the plan differ, stop and report.
+- The plan's § Approvals records the owner's written approval for the "Ask first" and
+  breaking-change items this task touches; the orchestrator cites it at merge.
+- Re-check against `develop` before starting and report any discrepancy.
+- Depends on T-0022 (the files it resets).
+- `init_project.py` builds a dry-run change list (`plan_changes`), removes task state, seeds
+  files (`step_seed_files`) and prints a checklist (`step_checklist`, branch-protection item near
+  line 789). `tests/test_init_project.py` greps generated projects for template strings.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- Replace `CHANGELOG.md` with the Keep a Changelog header and an empty `[Unreleased]`.
+- Remove every fragment matching `changelog.d/<id>.<category>.md`; keep `changelog.d/README.md`.
+- List both in the dry-run change list.
+- Reword the checklist's branch-protection item so protection allows the release push or the
+  owner releases through pull requests.
+- Tests in `tests/test_init_project.py`.
+- `changelog.d/T-0025.added.md`: this task's entry.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change any other init step.
+- Do not change `scripts/`, `.husky/` or documentation files.
+- Do not delete git tags.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-04-changelog-and-versioning.md`
+- `init_project.py`, `tests/test_init_project.py`, `changelog.d/README.md`, `CHANGELOG.md`
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+After `python init_project.py ...`, `CHANGELOG.md` holds only the header and `[Unreleased]`,
+`changelog.d/` holds only `README.md`, the dry run lists both changes, and the end-to-end
+template-string grep still finds nothing.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- Dry-run list, generated `CHANGELOG.md` content, fragments removed, README kept, checklist
+  wording, end-to-end grep.
+- `uv run pytest tests/test_init_project.py -v` and `scripts/gate.sh`.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason.
+None in this task; T-0026 documents generated-project behavior.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] A generated project's `CHANGELOG.md` has only the header and an empty `[Unreleased]`.
+- [ ] A generated project has no fragments and keeps `changelog.d/README.md`.
+- [ ] The dry run lists both changes.
+- [ ] The checklist's branch-protection item mentions the release push.
+- [ ] `changelog.d/T-0025.added.md` exists and passes `check`.
+- [ ] `uv run pytest tests/test_init_project.py -v` passes.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 
 ## Workflow
 

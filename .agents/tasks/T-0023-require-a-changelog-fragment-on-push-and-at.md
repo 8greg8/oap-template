@@ -18,49 +18,74 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+A push or a `gitflow.sh finish` that carries a `feat`, `fix` or breaking change without a
+changelog fragment is rejected, with the ranges and skips the plan defines.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-04-changelog-and-versioning.md`, accepted by the owner on 2026-10-04 (D1 to D8). Its § Design is the source of
+  truth for behavior; where this file and the plan differ, stop and report.
+- The plan's § Approvals records the owner's written approval for the "Ask first" and
+  breaking-change items this task touches; the orchestrator cites it at merge.
+- Re-check against `develop` before starting and report any discrepancy.
+- Depends on T-0022 (`scripts/changelog.py check`).
+- `.husky/pre-push` reads `local_ref local_sha remote_ref remote_sha` lines, skips deleted refs
+  and `.agents/`-only pushes, and runs `scripts/gate.sh`. `tests/test_hooks.py` covers it.
+- `scripts/gitflow.sh finish` runs the gate in the branch worktree, then merges with `--no-ff`.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- `.husky/pre-push`: run `changelog.py check` per pushed ref before the gate, as the plan's
+  § Fragment check on push defines: branch from `remote_ref`; `main`/`develop` use
+  `<remote_sha>..<local_sha>`; a first push of either is not checked; other branches use the
+  merge base with `origin/develop` (`origin/main` for `hotfix/*`); tags and deleted refs skipped;
+  `.agents/`-only skip kept; an unlistable range skips the fragment check and runs the gate.
+- `scripts/gitflow.sh finish`: run the same branch check before merging; stop with a clear
+  message on failure.
+- Tests in `tests/test_hooks.py` and `tests/test_gitflow.py`.
+- `changelog.d/T-0023.changed.md`: this task's entry, describing the new rule as breaking.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change `scripts/changelog.py` behavior (fix bugs only if found, and report them).
+- Do not change `scripts/release.py`, `scripts/next_version.py` or the hotfix message (T-0024).
+- Do not change the gate commands or `.husky/pre-commit`, `.husky/commit-msg`.
+- Do not change documentation (T-0026).
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-04-changelog-and-versioning.md`
+- `.husky/pre-push`, `scripts/gitflow.sh`, `scripts/changelog.py`
+- `tests/test_hooks.py`, `tests/test_gitflow.py`
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+Each case in the plan's § Fragment check on push, and the walkthroughs a feature push, fix round,
+merge to `develop`, docs-only task and hotfix branch, behave as the plan states.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- Hook cases: feat branch without fragment rejected; with fragment passes; fix round on a branch
+  that has a fragment passes; docs-only passes; `HEAD:feat/x` push classified by `remote_ref`;
+  `hotfix/*` uses `origin/main`; tag ref skipped; first push of `main`/`develop` skipped;
+  `.agents/`-only skip kept; unlistable range runs the gate.
+- `gitflow.sh finish` refuses a feat branch without a fragment and merges one with it.
+- `uv run pytest tests/test_hooks.py tests/test_gitflow.py -v` and `scripts/gate.sh`.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason.
+None in this task; T-0026 documents the rule.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] Pre-push applies the fragment check with exactly the ranges and skips the plan defines.
+- [ ] `gitflow.sh finish` runs the branch check before merging.
+- [ ] The existing pre-push and gitflow behavior is otherwise unchanged and its tests still pass.
+- [ ] `changelog.d/T-0023.changed.md` exists and passes `check`.
+- [ ] The commit introducing the hook rule is marked breaking.
+- [ ] `uv run pytest tests/test_hooks.py tests/test_gitflow.py -v` passes.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 
 ## Workflow
 

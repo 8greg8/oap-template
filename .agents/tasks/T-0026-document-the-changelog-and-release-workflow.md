@@ -18,49 +18,71 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+The repository's process documents describe the changelog fragments, the push check, the release
+flow, the 0.x rule and the agent rules exactly as T-0022 to T-0025 implemented them.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-04-changelog-and-versioning.md`, accepted by the owner on 2026-10-04 (D1 to D8). Its § Design is the source of
+  truth for behavior; where this file and the plan differ, stop and report.
+- The plan's § Approvals records the owner's written approval for the "Ask first" and
+  breaking-change items this task touches; the orchestrator cites it at merge.
+- Re-check against `develop` before starting and report any discrepancy.
+- Depends on T-0024 and T-0025. Read the merged code, not only the plan; where they differ,
+  document the code and report the difference.
+- `DEV_TOOLING_SPEC.md` lists "No changelog generation" as a non-goal (line 48).
+  `CONTRIBUTING.md` § Versioning (line 121) and the branching model (lines 12-22) predate the
+  new flow. `PYTHON_CONVENTIONS.md` lines 56-57 say to publish with `git tag ... && git push --tags`.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- Each item in the plan's § Agent rules: `CONTRIBUTING.md` (§ Versioning with the 0.x rule and
+  `release.py --version`, branching model for `main` and `develop`, branch protection note),
+  `PYTHON_CONVENTIONS.md`, `CLAUDE.md` (fragment rule for tasks; releases stay human; § Merge
+  authority unchanged), `.agents/README.md` (verifier checks the fragment),
+  `.agents/tasks/templates/task.md` (one guidance line; schema unchanged).
+- `DEV_TOOLING_SPEC.md`: replace the changelog non-goal and describe `changelog.py`, the pre-push
+  check and the release flow.
+- `scripts/README.md`: commands and hook table.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change any script, hook, test or `init_project.py`.
+- Do not change the task or report schema or `task.py validate`.
+- Do not change § Merge authority or the "Ask first" list beyond what the plan states.
+- No fragment: this is a `docs` task.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-04-changelog-and-versioning.md`
+- The merged `scripts/changelog.py`, `scripts/release.py`, `scripts/next_version.py`,
+  `.husky/pre-push`, `scripts/gitflow.sh`, `init_project.py`
+- Every file in `touches`
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+A contributor or agent following only the documents adds a correct fragment, passes the push
+check, and can release and hotfix as the code does.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- `scripts/gate.sh` passes.
+- `python .agents/tasks/scripts/task.py validate` passes for every task.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason.
+The files in `touches`, as in Scope.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] Every item in the plan's § Agent rules is documented.
+- [ ] `DEV_TOOLING_SPEC.md` no longer lists changelog generation as a non-goal.
+- [ ] `PYTHON_CONVENTIONS.md` points to `release.py` for publishing.
+- [ ] The 0.x rule and `release.py --version` are documented in `CONTRIBUTING.md`.
+- [ ] Every statement matches the merged code; differences are reported.
+- [ ] The task schema and `task.py validate` are unchanged.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 
 ## Workflow
 
