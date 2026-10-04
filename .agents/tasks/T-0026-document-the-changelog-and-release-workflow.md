@@ -44,6 +44,15 @@ flow, the 0.x rule and the agent rules exactly as T-0022 to T-0025 implemented t
 - `DEV_TOOLING_SPEC.md`: replace the changelog non-goal and describe `changelog.py`, the pre-push
   check and the release flow.
 - `scripts/README.md`: commands and hook table.
+- No edit adds `proj_template`, `proj-template`, `oap-template`, `8greg8` or the owner's email. Do not name the source project of the practice.
+- Also update the sections that still describe the old flow: `CONTRIBUTING.md` § Commits table
+  (a breaking change's version impact under the 0.x rule), § Agent
+  verify/resolve workflow step 6 hotfix bullet, the hooks bullets ("pre-push runs the full gate",
+  "release.py ... not wired into any hook") and "Every merge into `main` is tagged";
+  `DEV_TOOLING_SPEC.md` § Version computation, § Release tagging, the hook description, the file
+  tree and the hotfix line.
+- Keep `## Working unit: the task` as the first `##` heading of `CLAUDE.md`
+  (`init_project.py`'s `PROJECT_SECTION_ANCHOR` and its test depend on it).
 
 ## Non-goals
 
