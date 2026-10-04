@@ -61,8 +61,9 @@ and `next_version.py` follows the 0.x rule (D8).
   `git merge-base --is-ancestor develop main`, not by the starting branch.
 - Refuse any starting branch other than `main` or `develop`. End with the starting branch checked
   out.
-- "Latest tag" means the highest `vX.Y.Z` tag by SemVer (`v0.0.0` when none); `--version` accepts
-  only the `vX.Y.Z` form.
+- For the `--version` check only, "latest tag" means the highest `vX.Y.Z` tag by SemVer
+  (`v0.0.0` when none); `--version` accepts only the `vX.Y.Z` form. `next_version.py` keeps its
+  `git describe` lookup; only its bump rule changes (D8).
 - Release commit: stage with `git add -A -- CHANGELOG.md changelog.d` after `assemble`.
 
 ## Non-goals

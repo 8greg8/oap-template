@@ -51,8 +51,10 @@ holds a README, the template summary fragment and this task's own fragment.
 - `changelog.d/T-0022.added.md`: this task's entry.
 - `tests/test_changelog.py` with real temporary git repositories.
 - No new tracked file (`CHANGELOG.md`, every `changelog.d/*` file, `tests/test_changelog.py`)
-  contains `proj_template`, `proj-template`, `oap-template`, `8greg8` or the owner's email. `tests/test_init_project.py::test_template_strings_remain_only_in_allowed_files`
-  already checks `changelog.d/README.md`, so `test_changelog.py` does not repeat the strings.
+  contains `proj_template`, `proj-template`, `oap-template`, `8greg8` or the owner's email. `tests/test_init_project.py::test_template_strings_remain_only_in_allowed_files` scans every
+  generated file for the three template strings, including `changelog.d/` and
+  `tests/test_changelog.py` (which is not in its `ALLOWED_HITS`), so do not write any of the
+  strings into `test_changelog.py`.
 - Exit codes: `check` exits 0 on pass, 1 on a missing or invalid fragment, 2 on a usage error or
   when git cannot resolve `<base>` or `<tip>` or list the range.
 - `check` lists and reads fragments at `<tip>` from git (`git ls-tree <tip> -- changelog.d/`,
@@ -60,15 +62,17 @@ holds a README, the template summary fragment and this task's own fragment.
   tree.
 - Fragment rules: `<id>` matches `[A-Za-z0-9][A-Za-z0-9_-]*` (no dots); a bullet is a line
   starting with `- ` or `* `, indented continuation lines allowed; a placeholder is a bullet whose
-  text is empty, matches the to-do marker regex `\bto-?do\b`, or contains `TBD`, `FIXME` or
-  `<...>` filler (all case-insensitive). The task and report validators reject the upper-case
-  to-do word anywhere in a section, so describe it by that regex in the report too; any file
+  text is empty, contains a match of the regex `\bto-?do\b`, or contains `TBD`, `FIXME` or the
+  literal `<...>` (all case-insensitive); a bullet that names a pattern such as
+  `changelog.d/<id>.<category>.md` is valid. Any file
   in `changelog.d/` other than `README.md` that does not match `<id>.<category>.md` fails as a bad
   name; `assemble` ignores `README.md` and refuses (exit 1, no changes) when any file fails these
   rules.
+- The task and report validators reject the upper-case to-do word anywhere in a section; in the
+  report, refer to that marker by the regex above.
 - Versions: `assemble` accepts `X.Y.Z` or `vX.Y.Z` and writes `## [X.Y.Z] - YYYY-MM-DD`; `--date`
   defaults to today's local date. `preview [<version>]` prints the section `assemble` would
-  write, headed with `<version>` when given or `## [Unreleased]` otherwise; it never calls
+  write, headed `## [X.Y.Z] - <today>` when `<version>` is given or `## [Unreleased]` otherwise; it never calls
   `next_version.py` and changes nothing.
 - `assemble` with zero fragments exits 1 and writes nothing. Within a category, fragments are
   ordered by file name and bullets keep file order. No compare-link footers. `assemble` edits and
@@ -113,7 +117,7 @@ added and later deleted in the range. `assemble` turns fragments into one dated 
 - [ ] `changelog.py check`, `preview` and `assemble` behave as the plan specifies.
 - [ ] Only `changelog.d/<id>.<category>.md` files are fragments; `README.md` is never validated, folded or deleted.
 - [ ] `CHANGELOG.md` has the Keep a Changelog header and an empty `[Unreleased]`.
-- [ ] `changelog.d/template.added.md` and `changelog.d/T-0022.added.md` exist and pass `check`.
+- [ ] `changelog.d/template.added.md` and `changelog.d/T-0022.added.md` exist, and `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch.
 - [ ] `changelog.d/README.md` names no template string.
 - [ ] `uv run pytest tests/test_changelog.py -v` passes.
 - [ ] `scripts/gate.sh` passes.

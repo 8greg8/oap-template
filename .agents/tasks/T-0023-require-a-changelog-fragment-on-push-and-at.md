@@ -83,7 +83,10 @@ branch is ranged from `origin/main`; a release push of `main`, `develop` and the
   that has a fragment passes; docs-only passes; `HEAD:feat/x` push classified by `remote_ref`;
   `hotfix/*` uses `origin/main`; tag ref skipped; first push of `main`/`develop` skipped;
   `.agents/`-only skip kept; unlistable range runs the gate.
-- `gitflow.sh finish` refuses a feat branch without a fragment and merges one with it.
+- Ranges: pushing `develop` after merging a feat task with its fragment passes; a release push of
+  `main`, `develop` and the tag passes.
+- `gitflow.sh finish` refuses a feat branch without a fragment and merges one with it; it uses
+  `origin/$base` when that ref exists and falls back to the local `$base` when it does not.
 - `uv run pytest tests/test_hooks.py tests/test_gitflow.py -v` and `scripts/gate.sh`.
 
 ## Documentation required
