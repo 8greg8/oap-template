@@ -138,9 +138,13 @@ Step 7 runs as follows, for every task:
    - A separate fresh agent verifies the pushed branch: the full gate
      (`scripts/gate.sh`), every acceptance criterion checked against the
      files, `git diff --name-only` against `touches`, and, for test changes,
-     that each expected value comes from spec text. It reports every failure
-     and fixes nothing. It must also check and report whether the change is a
-     breaking change (as `CLAUDE.md` defines it) or crosses any "Ask first"
+     that each expected value comes from spec text. For a `feat`, `fix` or
+     breaking change it also checks that the branch adds a changelog fragment
+     (`changelog.d/<id>.<category>.md`, listed in `touches`) that describes the
+     change, and that each commit's type matches what the change does, since a
+     wrongly typed commit needs no fragment and drives no release. It reports
+     every failure and fixes nothing. It must also check and report whether
+     the change is a breaking change (as `CLAUDE.md` defines it) or crosses any "Ask first"
      item, including edits to `scripts/` or `pyproject.toml` `[tool]`
      sections, or to hooks or CI outside the task's own scope. If either is
      true, the orchestrator

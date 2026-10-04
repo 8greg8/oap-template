@@ -1,11 +1,13 @@
 # scripts/
 
-Deterministic pipelines for the lint/typecheck/test gate, commit validation, SemVer/release
-tagging, and Gitflow branch operations. Full design: [`../DEV_TOOLING_SPEC.md`](../DEV_TOOLING_SPEC.md).
+Deterministic pipelines for the lint/typecheck/test gate, commit validation, SemVer versioning,
+the changelog and release, and Gitflow branch operations. Full design: [`../DEV_TOOLING_SPEC.md`](../DEV_TOOLING_SPEC.md).
 
 ## Copying this into another repo
 
-This folder moves together with `../.husky/` and `../package.json` — copy all three:
+This folder moves together with `../.husky/` and `../package.json` — copy all three. To use the
+changelog and release flow, also copy `../CHANGELOG.md` (reset to the empty header) and
+`../changelog.d/README.md`:
 
 ```bash
 cp -r scripts .husky package.json /path/to/target-repo/
@@ -42,14 +44,23 @@ scripts/autofix.sh --staged  # same, but only on staged files matching STAGED_GL
 
 scripts/commit_lint.py <msg-file>    # validate a commit message (used by .husky/commit-msg)
 scripts/next_version.py              # print the next SemVer version from commits since last tag
-scripts/release.py                   # dry-run preview of the next release tag
-scripts/release.py --yes             # create the tag locally
-scripts/release.py --yes --push      # create and push the tag
+                                     # (0.x rule: while the major is 0, a breaking change bumps minor)
+
+scripts/changelog.py check <base> <tip>       # fail if a feat/fix/breaking commit in the range adds
+                                              # no changelog.d/ fragment, or a fragment is invalid
+scripts/changelog.py preview [vX.Y.Z]         # print the section a release would write
+scripts/changelog.py assemble vX.Y.Z [--date YYYY-MM-DD]   # fold fragments into CHANGELOG.md, delete them
+
+scripts/release.py                   # dry run: version, commits, changelog section; changes nothing
+scripts/release.py --yes             # merge develop into main, changelog, tag, update develop; local
+scripts/release.py --yes --push      # same, then git push --atomic origin main develop vX.Y.Z
+scripts/release.py --yes --version v1.0.0   # override the version (canonical vX.Y.Z, SemVer-higher)
 
 scripts/gitflow.sh feature start <topic>    # worktree + branch from develop
-scripts/gitflow.sh feature finish <topic>   # gate, merge to develop, clean up worktree
+scripts/gitflow.sh feature finish <topic>   # changelog check, gate, merge to develop, clean up worktree
 scripts/gitflow.sh bugfix  start|finish <topic>
-scripts/gitflow.sh hotfix  start|finish <topic>   # from/into main, with back-merge to develop
+scripts/gitflow.sh hotfix  start|finish <topic>   # from/into main, with back-merge to develop;
+                                                  # then push both and run release.py --yes on main
 scripts/gitflow.sh docs|chore|fix start|finish <T-NNNN-slug>   # task branches, from/into develop
 ```
 
@@ -59,10 +70,26 @@ scripts/gitflow.sh docs|chore|fix start|finish <T-NNNN-slug>   # task branches, 
 |---|---|
 | `pre-commit` | `autofix.sh --staged`, re-stages the files that were staged, then `gate.sh --staged` (no tests). Skipped when only `.agents/` records are staged |
 | `commit-msg` | `commit_lint.py` against the message being committed (lines <= 100 chars) |
-| `pre-push` | the full `gate.sh`. Skipped when every pushed commit changes only `.agents/` records |
+| `pre-push` | `changelog.py check` for each pushed branch, then the full `gate.sh`. Both are skipped when every pushed commit changes only `.agents/` records |
 
 Code under `.agents/tasks/scripts/` is never skipped by either hook. A new remote branch, or a
-range git cannot list, always runs the full gate. `gitflow.sh finish` merges with
+range git cannot list, always runs the full gate.
+
+The fragment check in `pre-push` takes its range from the remote ref being updated: for `main` and
+`develop`, `<remote sha>..<local sha>` (a first push of either is not checked); for `hotfix/*`, from
+the merge base with `origin/main`; for any other branch, from the merge base with `origin/develop`.
+Deleted refs, tags and other non-branch refs are skipped. A range it cannot list (`changelog.py`
+exits 2, no merge base, no `origin` ref) skips the check for that ref with a message and the gate
+still runs. Any other failure, including a failed check or a missing `python3`, rejects the push
+before the gate starts. `gitflow.sh finish` runs the same check first, from the merge base with
+`origin/<base>` (the local base when there is no such ref), and stops on every failure.
+
+`release.py` is not run by any hook. It needs a clean tree, local `main` and `develop` equal to
+`origin`, and neither branch checked out in another worktree; on failure it prints the exact
+commands to finish or undo by hand and never runs a reset or force itself. A repository that
+protects `main` or `develop` must allow its push (`main`, `develop` and the tag). Fragment rules,
+the 0.x rule and the hotfix flow are in `../CONTRIBUTING.md` § Versioning; the full specification is
+in `../DEV_TOOLING_SPEC.md`. `gitflow.sh finish` merges with
 `chore(merge): merge task NNNN into <base>` (task branches) or
 `chore(merge): merge <branch> into <base>`. The `STAGED_GLOB` pathspec in
 `config/gate.sh` selects the files `--staged` checks.

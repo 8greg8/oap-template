@@ -49,6 +49,16 @@ In brief:
 - **`touches` is what makes parallel tasks safe.** It declares the files/paths a task will modify;
   `backlog.py ready --parallel N` uses it to pick a conflict-free batch. Keep a task's actual edits
   inside its declared `touches` — `housekeep.py touches` audits this after the fact.
+- **A `feat`, `fix` or breaking change adds a changelog fragment.** The task commits
+  `changelog.d/<id>.<category>.md` (`<id>` is the task ID, for example `T-0023.added.md`) with one
+  or more bullet lines saying what changed, and lists that file in its `touches`, never
+  `CHANGELOG.md`. Commits are classified by type, so choose the type by the change: a `chore` that
+  should be a `feat` gets no fragment and no release. `docs`, `chore`, `test` and other
+  non-versioned changes need none. The `pre-push` hook and `gitflow.sh finish` reject a branch
+  that lacks it; the naming and content rules are in `changelog.d/README.md` and `CONTRIBUTING.md`
+  § Versioning. Agents never edit `CHANGELOG.md` and never cut a release: versions, the changelog
+  section and the tag come from a human running `scripts/release.py`, as the "Ask first" list
+  requires. § Merge authority does not cover releases.
 - **One task, one context.** Don't carry assumptions from a previous task into a new one without
   re-verifying current repository state — a task's "Context / current verified state" section
   should be checked against reality, not trusted from memory or an earlier handoff.
