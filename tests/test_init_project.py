@@ -722,6 +722,9 @@ def test_failure_in_task_state_reset_prints_undo_and_undo_restores_tree(
 TEMPLATE_README_TITLE = "# OAP Template"
 TEMPLATE_README_SENTENCE = "This is a **template**, not a working project"
 WORKING_UNIT = "## Working unit: the task"
+POLICY_FILES = ("CODE_OF_CONDUCT.md", "SECURITY.md")
+# The template owner's contacts in those two files; a generated project must not carry them.
+OWNER_CONTACTS = ("gregor.koporec@gmail.com",)
 
 
 def _text(repo: Path, rel: str) -> str:
@@ -739,6 +742,8 @@ def test_dry_run_lists_every_seeded_replaced_and_removed_file(scratch: Scratch):
     lines = _change_lines(out)
     expected = [
         ("replace", "README.md"),
+        ("remove", "CODE_OF_CONDUCT.md"),
+        ("remove", "SECURITY.md"),
         ("edit", "CLAUDE.md"),
         ("write", "docs/spec/README.md"),
         ("replace", "src/my_project/__init__.py"),
@@ -753,6 +758,8 @@ def test_dry_run_lists_every_seeded_replaced_and_removed_file(scratch: Scratch):
     assert _status(scratch.repo) == ""
     assert not (scratch.repo / "docs").exists()
     assert (scratch.repo / "tests" / "test_greet.py").is_file()
+    for rel in POLICY_FILES:
+        assert (scratch.repo / rel).is_file(), rel
 
 
 def test_readme_is_a_fresh_short_project_readme(initialized: Scratch):
@@ -850,6 +857,25 @@ def test_sample_tests_are_gone_and_smoke_test_imports_the_package(
     functions = [n.name for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]
     assert any(name.startswith("test_") for name in functions)
     assert "greet" not in smoke.read_text(encoding="utf-8")
+
+
+def test_code_of_conduct_and_security_policy_are_removed(initialized: Scratch):
+    for rel in POLICY_FILES:
+        assert not (initialized.repo / rel).exists(), rel
+
+
+def test_no_owner_contact_remains_outside_the_script_files(initialized: Scratch):
+    hits: set[str] = set()
+    for path in initialized.repo.rglob("*"):
+        rel = path.relative_to(initialized.repo)
+        if not path.is_file() or rel.parts[0] in (".git", "node_modules", ".venv"):
+            continue
+        if rel.as_posix() in SCRIPT_FILES:
+            continue
+        text = path.read_text(encoding="utf-8", errors="ignore")
+        if any(contact in text for contact in OWNER_CONTACTS):
+            hits.add(rel.as_posix())
+    assert hits == set(), sorted(hits)
 
 
 def test_smoke_test_passes_against_the_renamed_package(initialized: Scratch):
@@ -1100,6 +1126,15 @@ def test_full_run_prints_the_human_checklist(scratch: Scratch):
     assert "## Project" in out
     assert "first spec" in lowered
     assert "docs/spec" in out
+    policy_line = next(
+        line for line in lowered.splitlines() if line.strip().startswith("5.")
+    )
+    assert "code of conduct" in policy_line, policy_line
+    assert "security policy" in policy_line, policy_line
+    assert "CODE_OF_CONDUCT.md" in out
+    assert "SECURITY.md" in out
+    assert not (scratch.repo / "CODE_OF_CONDUCT.md").exists()
+    assert not (scratch.repo / "SECURITY.md").exists()
     assert "git restore --source=HEAD" not in out
 
 
@@ -1385,6 +1420,8 @@ def test_end_to_end_template_copy_becomes_a_working_project(scratch: Scratch):
     assert _status(repo) == ""
     for rel in SCRIPT_FILES:
         assert not (repo / rel).exists()
+    for rel in POLICY_FILES:
+        assert not (repo / rel).exists(), rel
 
     # No template name survives in a tracked file, uv.lock and package-lock.json included.
     tracked = [n for n in _git(repo, "ls-files", "-z").split("\0") if n]
