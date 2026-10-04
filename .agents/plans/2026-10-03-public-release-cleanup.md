@@ -30,10 +30,10 @@ rewritten itself. They are found in the repository as described below.
 - Local path (L1): the absolute home-directory path in `.agents/LESSONS.md:139` and
   `.agents/tasks/reports/T-0004.md:85`.
 - Downstream project name (L2): the backticked project name in
-  `.agents/tasks/T-0001-*.md` lines 25, 56 and 86, and in the body of commit `b973ccf`.
+  `.agents/tasks/T-0001-*.md` lines 25, 56 and 86, and in the body of commit `3375f7b`.
 - Source project name (L3): the project named in the title of
   `.agents/plans/2026-10-03-workflow-sync.md`. On `develop` it is on 37 lines (45 occurrences)
-  in 11 files, and it appears in commit messages such as `0b32945`. L1 contains L3. L3u, the same
+  in 11 files, and it appears in commit messages such as `8f890ac`. L1 contains L3. L3u, the same
   name with the hyphen written as an underscore, is at `.agents/plans/2026-10-03-workflow-sync.md:129`.
 - Short form of L3 (L3s): the lowercase two-letter abbreviation of L3, used as a whole word in
   prose and path prefixes (for example `L3s:CLAUDE.md`, `L3s's`). About 71 occurrences, plus 3 of L3V, in 8 of

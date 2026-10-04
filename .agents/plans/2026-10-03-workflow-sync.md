@@ -6,7 +6,7 @@ is in scope. Product code, specs and source-project's history are not.
 
 - **Source:** `source-project` at `develop` `87f9edf`. Paths without a prefix refer to this
   template; `source-project:` marks a source-project path.
-- **Template baseline:** `develop` `d8e224a`. The template has its own `scripts/` tooling
+- **Template baseline:** `develop` `ddaea40`. The template has its own `scripts/` tooling
   bundle (`DEV_TOOLING_SPEC.md`), which source-project never adopted. That bundle stays and
   absorbs source-project's hook and merge rules.
 - **Owner decisions (2026-10-03):**
