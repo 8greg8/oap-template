@@ -1,7 +1,7 @@
 ---
 id: T-0024
 title: Release from develop into main with the changelog
-status: open
+status: in_progress
 type: feat
 priority: high
 depends_on: [T-0023]

@@ -6,7 +6,7 @@
 
 26 task(s). Generated 2026-10-04.
 
-| open: 2 | in_progress: 0 | blocked: 0 | review: 0 | done: 24 | abandoned: 0 |
+| open: 1 | in_progress: 1 | blocked: 0 | review: 0 | done: 24 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -24,7 +24,7 @@
 | T-0020 | [Rewrite history into a clean public repository copy](T-0020-rewrite-history-into-a-clean-public-repository.md) | done | high | chore | T-0015, T-0016, T-0017, T-0018, T-0019 | [report](reports/T-0020.md) |
 | T-0022 | [Add the changelog tool, CHANGELOG.md and changelog fragments](T-0022-add-the-changelog-tool-changelog-md-and.md) | done | high | feat | — | [report](reports/T-0022.md) |
 | T-0023 | [Require a changelog fragment on push and at finish](T-0023-require-a-changelog-fragment-on-push-and-at.md) | done | high | feat | T-0022 | [report](reports/T-0023.md) |
-| T-0024 | [Release from develop into main with the changelog](T-0024-release-from-develop-into-main-with-the.md) | open | high | feat | T-0023 | — |
+| T-0024 | [Release from develop into main with the changelog](T-0024-release-from-develop-into-main-with-the.md) | in_progress | high | feat | T-0023 | — |
 | T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
 | T-0008 | [Fix pre-commit re-staging for unusual filenames](T-0008-fix-pre-commit-re-staging-for-unusual-filenames.md) | done | medium | fix | — | [report](reports/T-0008.md) |
 | T-0012 | [Make staged-file handling NUL-safe in gate and autofix scripts](T-0012-make-staged-file-handling-nul-safe-in-gate-and.md) | done | medium | fix | — | [report](reports/T-0012.md) |
@@ -42,11 +42,7 @@
 
 ## Ready to dispatch
 
-Dependencies satisfied, not yet started:
-
-- **T-0024** Release from develop into main with the changelog — `scripts/release.py`, `scripts/next_version.py`, `scripts/gitflow.sh`, `tests/test_release.py`, `tests/test_next_version.py`, `tests/test_gitflow.py`, `changelog.d/T-0024.changed.md`
-
-Suggested conflict-free parallel batch: T-0024
+*Nothing ready — every open task is blocked or already in flight.*
 
 ## Waiting on dependencies
 
