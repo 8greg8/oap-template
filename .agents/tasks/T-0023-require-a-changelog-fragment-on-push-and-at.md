@@ -1,7 +1,7 @@
 ---
 id: T-0023
 title: Require a changelog fragment on push and at finish
-status: open
+status: in_progress
 type: feat
 priority: high
 depends_on: [T-0022]
