@@ -4,9 +4,9 @@
 
 # Task Backlog
 
-20 task(s). Generated 2026-10-03.
+20 task(s). Generated 2026-10-04.
 
-| open: 1 | in_progress: 0 | blocked: 0 | review: 0 | done: 19 | abandoned: 0 |
+| open: 0 | in_progress: 0 | blocked: 0 | review: 0 | done: 20 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -21,7 +21,7 @@
 | T-0007 | [Make task scripts executable](T-0007-make-task-scripts-executable.md) | done | high | fix | — | [report](reports/T-0007.md) |
 | T-0013 | [Make orchestrator merge into develop the default](T-0013-make-orchestrator-merge-into-develop-the-default.md) | done | high | docs | — | [report](reports/T-0013.md) |
 | T-0019 | [Scrub private references and attribute the method text](T-0019-scrub-private-references-and-attribute-the.md) | done | high | docs | — | [report](reports/T-0019.md) |
-| T-0020 | [Rewrite history into a clean public repository copy](T-0020-rewrite-history-into-a-clean-public-repository.md) | open | high | chore | T-0015, T-0016, T-0017, T-0018, T-0019 | — |
+| T-0020 | [Rewrite history into a clean public repository copy](T-0020-rewrite-history-into-a-clean-public-repository.md) | done | high | chore | T-0015, T-0016, T-0017, T-0018, T-0019 | [report](reports/T-0020.md) |
 | T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
 | T-0008 | [Fix pre-commit re-staging for unusual filenames](T-0008-fix-pre-commit-re-staging-for-unusual-filenames.md) | done | medium | fix | — | [report](reports/T-0008.md) |
 | T-0012 | [Make staged-file handling NUL-safe in gate and autofix scripts](T-0012-make-staged-file-handling-nul-safe-in-gate-and.md) | done | medium | fix | — | [report](reports/T-0012.md) |
@@ -36,8 +36,4 @@
 
 ## Ready to dispatch
 
-Dependencies satisfied, not yet started:
-
-- **T-0020** Rewrite history into a clean public repository copy — `.agents/tasks`, `.agents/plans`, `.agents/LESSONS.md`
-
-Suggested conflict-free parallel batch: T-0020
+*Nothing ready — every open task is blocked or already in flight.*

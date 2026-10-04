@@ -1,7 +1,7 @@
 ---
 id: T-0020
 title: Rewrite history into a clean public repository copy
-status: open
+status: done
 type: chore
 priority: high
 depends_on: [T-0015, T-0016, T-0017, T-0018, T-0019]

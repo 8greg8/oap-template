@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-19 lesson(s) across 10 section(s). Generated 2026-10-03.
+20 lesson(s) across 11 section(s). Generated 2026-10-04.
 
 ## Tag index
 
@@ -19,6 +19,7 @@ to all lessons that carry it.
 - `backlog` — [T-0002](#t-0002-success)
 - `bash` — [T-0012](#t-0012-success)
 - `bash-3.2` — [T-0011](#t-0011-success)
+- `chore` — [T-0020](#t-0020-success)
 - `commit` — [T-0018](#t-0018-success)
 - `commit-lint` — [T-0004](#t-0004-success)
 - `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
@@ -28,12 +29,14 @@ to all lessons that carry it.
 - `execution-loop` — [T-0001](#t-0001-success)
 - `file-mode` — [T-0009](#t-0009-success)
 - `file-modes` — [T-0007](#t-0007-success)
+- `filter-repo` — [T-0020](#t-0020-success)
 - `gate` — [T-0004](#t-0004-success), [T-0018](#t-0018-success)
 - `git` — [T-0007](#t-0007-success), [T-0012](#t-0012-success)
 - `git-pathspec` — [T-0008](#t-0008-success)
 - `git-publish` — [T-0002](#t-0002-success)
 - `git-worktree` — [T-0010](#t-0010-success), [T-0011](#t-0011-success)
 - `gitflow` — [T-0004](#t-0004-success), [T-0011](#t-0011-success)
+- `history-rewrite` — [T-0020](#t-0020-success)
 - `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success)
 - `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success)
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success)
@@ -46,7 +49,7 @@ to all lessons that carry it.
 - `port` — [T-0003](#t-0003-success)
 - `pre-commit` — [T-0008](#t-0008-success)
 - `process` — [T-0005](#t-0005-success)
-- `public-release` — [T-0019](#t-0019-success)
+- `public-release` — [T-0019](#t-0019-success), [T-0020](#t-0020-success)
 - `rename` — [T-0015](#t-0015-success)
 - `report-gate` — [T-0001](#t-0001-success)
 - `report-validation` — [T-0003](#t-0003-success)
@@ -215,6 +218,24 @@ Source: [`reports/T-0017.md`](tasks/reports/T-0017.md)
 Tags: `init-script`, `template`, `gate`, `commit`, `end-to-end`, `tests`
 
 Source: [`reports/T-0018.md`](tasks/reports/T-0018.md)
+
+## public-release
+
+### T-0020 (success)
+
+- After a repository rename, a cloud session's git access still follows the old name; attach the
+  renamed and the new repository explicitly before cloning or pushing.
+- A newly created repository needs the Claude GitHub App granted to it before any push; the
+  symptom is a 403 from `git ls-remote`.
+- Pushing a rewritten history to a fresh repository, and writing files that describe it, can be
+  blocked by the session's permission classifier; the owner's explicit approval in the session
+  is what unblocks it.
+- filter-repo applies plain-text rules before regex rules, so a regex rule must not depend on a
+  plain-text rule's output, and a rule that does must be ordered accordingly.
+
+Tags: `public-release`, `history-rewrite`, `filter-repo`, `chore`
+
+Source: [`reports/T-0020.md`](tasks/reports/T-0020.md)
 
 ## report-validation
 
