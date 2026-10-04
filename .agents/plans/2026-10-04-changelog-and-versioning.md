@@ -53,7 +53,9 @@ What does not fit this template:
 
 ### Changelog fragments
 
-A change adds `changelog.d/<id>.<category>.md` with one or more bullet lines.
+A change adds `changelog.d/<id>.<category>.md` with one or more bullet lines. Only files matching
+that pattern are fragments; `changelog.d/README.md` is not one, and `check`, `assemble` and
+`init_project.py` all leave it alone.
 - `<id>` is the task ID (`T-0023`) or the branch topic.
 - `<category>` is one of `added`, `changed`, `deprecated`, `removed`, `fixed`, `security`.
 
@@ -66,7 +68,7 @@ is not empty, so nothing is ever stranded there.
 
 - `check <base> <tip>`: looks at the non-merge commits in `<base>..<tip>`, classified with the
   same regex and rules as `next_version.py` (merges excluded). It fails when one of them is
-  `feat`, `fix` or breaking and no commit in the range adds a file under `changelog.d/`
+  `feat`, `fix` or breaking and no commit in the range adds a fragment
   (per commit, `git log --diff-filter=A`, so fragments added and later folded in by a release in
   the same range still count). It also validates every fragment present at `<tip>`: name,
   category, at least one bullet, no placeholder text.
@@ -76,16 +78,21 @@ is not empty, so nothing is ever stranded there.
 
 ### Fragment check on push
 
-`.husky/pre-push` runs `changelog.py check` for each pushed ref before the gate:
-- `main` and `develop`: `<remote_sha>..<local_sha>`.
+`.husky/pre-push` runs `changelog.py check` for each pushed ref before the gate. The branch is
+taken from `remote_ref`, not `local_ref`, which can be `HEAD`.
+- `main` and `develop`: `<remote_sha>..<local_sha>`. A first push of either (all-zero
+  `remote_sha`, as in a new project's `git push -u origin main develop`) is not checked.
 - Any other branch, new or not: from its merge base with `origin/develop` (`origin/main` for
   `hotfix/*`) to the tip. A fix round that adds only `fix` commits to a branch that already has
   its fragment therefore passes.
 - `refs/tags/*` and deleted refs are skipped, as are `.agents/`-only pushes (the current skip).
+- When a range cannot be listed (the remote commit is missing locally), the fragment check is
+  skipped and the full gate runs, as the hook does today.
 
-A release push needs no special case: the range on `main` contains the released commits and the
-commits that added their fragments, and the range on `develop` holds only the merge and the
-release commit. `gitflow.sh finish` runs the same branch check before it merges. Only `feat`, `fix` and breaking changes need an entry.
+A release push needs no special case. The range on `main` contains the released commits and the
+commits that added their fragments. The range on `develop` holds only merge commits and the
+`chore(release)` commit. `gitflow.sh finish` runs the same branch check before it merges. Only
+`feat`, `fix` and breaking changes need an entry.
 
 ### Release: `scripts/release.py`
 
@@ -113,14 +120,18 @@ Run by a human on a clean `develop` (or on `main` after `gitflow.sh hotfix finis
 - It runs `git fetch origin` first and refuses to run when:
   - the working tree is dirty;
   - local `main` or `develop` differs from `origin` (behind, ahead or diverged);
-  - `main` is checked out in another worktree;
+  - `main` or `develop` is checked out in another worktree (the run checks out both);
   - `next_version.py` finds nothing to release.
 
-`gitflow.sh hotfix finish` keeps merging into `main` and back into `develop`. Its closing
-message changes to: check out `main` and run `scripts/release.py --yes`.
+`gitflow.sh hotfix finish` keeps merging into `main` and back into `develop` without pushing. Its
+closing message changes to: push `main` and `develop` (the pre-push check sees the hotfix
+branch's fragment in the `main` range), then check out `main` and run `scripts/release.py --yes`.
+`release.py` keeps refusing a local branch that is ahead of `origin`, so an unpushed hotfix
+cannot be released by mistake.
 
 A repository with branch protection on `main` or `develop` must allow the release push, or the
-owner runs the release through pull requests instead. The documentation says so.
+owner runs the release through pull requests instead. The documentation says so, and the
+branch-protection item in `init_project.py`'s checklist says the same (T-0025).
 
 Tagging stays a deliberate human step, as `CLAUDE.md` "Ask first" requires. `release.py` is the
 "tagging step defined in `CONTRIBUTING.md`" that rule refers to.
@@ -129,13 +140,16 @@ Tagging stays a deliberate human step, as `CLAUDE.md` "Ask first" requires. `rel
 
 - `CONTRIBUTING.md`:
   - § Versioning: fragments, the release command and what it does to both branches; tags sit on
-    the `chore(release)` commit on `main`, not on the merge;
+    the `chore(release)` commit on `main`, not on the merge; the 0.x rule (D8) and
+    `release.py --version`;
   - § branching model: `main` accepts the `chore(release)` commit from `release.py`; `develop`
     accepts the release fast-forward or back-merge from `main`.
 - `PYTHON_CONVENTIONS.md`: the "build and publish via git tags" lines point to `release.py`.
 - `CLAUDE.md`: a task whose change is `feat`, `fix` or breaking adds its fragment and lists it
   in `touches`. Releases stay a human step; § Merge authority is unchanged.
 - `.agents/README.md`: the verifier checks the fragment exists and describes the change.
+- `.agents/tasks/templates/task.md`: one guidance line under "Documentation required" naming the
+  fragment. The task schema and `task.py validate` do not change.
 
 ### Generated projects
 
@@ -157,14 +171,11 @@ Accepted 2026-10-04:
   stands, shipped as the fragment `changelog.d/template.added.md` (so `[Unreleased]` stays
   empty).
 - **D7:** a GitHub Release workflow stays out of scope.
-
-- **D8. First release version.** The repository has no tags, so `next_version.py` starts from
-  `v0.0.0`. T-0023 and T-0024 are breaking, which bumps major, so the first release would be
-  `v1.0.0`. Accepted: adopt the SemVer 0.x convention. While the major version is 0, a
-  breaking change bumps minor instead of major; `feat` still bumps minor and `fix` patch (as
-  commitizen's `major_version_zero` does). The first release is therefore
-  `v0.1.0` and the template stays pre-1.0 until the owner deliberately cuts `v1.0.0` with
-  `release.py --version`.
+- **D8:** the SemVer 0.x convention. There are no tags yet, so `next_version.py` starts from
+  `v0.0.0`, and the breaking T-0023 and T-0024 would make the first release `v1.0.0`. Instead,
+  while the major version is 0, a breaking change bumps minor; `feat` bumps minor and `fix`
+  patch, as commitizen's `major_version_zero` does. The first release is `v0.1.0`. The owner
+  moves to `v1.0.0` deliberately with `release.py --version`.
 
 ## Approvals
 
@@ -197,11 +208,14 @@ Each `feat` or breaking task adds its own fragment and lists it in `touches`.
    - Touches: `scripts/release.py`, `scripts/next_version.py` (D8), `scripts/gitflow.sh` (hotfix
      message), `tests/test_release.py`, `tests/test_next_version.py`, `tests/test_gitflow.py`,
      `changelog.d/T-0024.changed.md`.
-   - Scope includes the refusals listed under § Release and their tests.
+   - Scope includes the refusals listed under § Release and their tests, the 0.x rule with the
+     `next_version.py` docstring, and the new hotfix message in `gitflow.sh`.
 4. **T-0025: Generated projects start with an empty changelog** (feat). Depends on T-0022.
    - Touches: `init_project.py`, `tests/test_init_project.py`, `changelog.d/T-0025.added.md`.
-   - Scope: the new lines in the dry-run change list; the generated project names no template.
-5. **T-0026: Document the changelog and release workflow** (docs). Depends on T-0024.
+   - Scope: the new lines in the dry-run change list; the generated project names no template;
+     the checklist's branch-protection item says protection must allow the release push.
+5. **T-0026: Document the changelog and release workflow** (docs). Depends on T-0024 and
+   T-0025.
    - Touches: `CONTRIBUTING.md`, `CLAUDE.md`, `PYTHON_CONVENTIONS.md`, `DEV_TOOLING_SPEC.md`,
      `scripts/README.md`, `.agents/README.md`, `.agents/tasks/templates/task.md`.
 
