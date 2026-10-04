@@ -6,7 +6,7 @@
 
 26 task(s). Generated 2026-10-04.
 
-| open: 2 | in_progress: 1 | blocked: 0 | review: 1 | done: 22 | abandoned: 0 |
+| open: 2 | in_progress: 1 | blocked: 0 | review: 0 | done: 23 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -34,7 +34,7 @@
 | T-0017 | [Seed project files in the init script](T-0017-seed-project-files-in-the-init-script.md) | done | medium | feat | T-0016 | [report](reports/T-0017.md) |
 | T-0018 | [Finish the init script with gate, commit, branch and self-removal](T-0018-finish-the-init-script-with-gate-commit-branch.md) | done | medium | feat | T-0017 | [report](reports/T-0018.md) |
 | T-0021 | [Add a code of conduct and a security policy](T-0021-add-a-code-of-conduct-and-a-security-policy.md) | done | medium | docs | — | [report](reports/T-0021.md) |
-| T-0025 | [Start generated projects with an empty changelog](T-0025-start-generated-projects-with-an-empty-changelog.md) | review | medium | feat | T-0022 | — |
+| T-0025 | [Start generated projects with an empty changelog](T-0025-start-generated-projects-with-an-empty-changelog.md) | done | medium | feat | T-0022 | [report](reports/T-0025.md) |
 | T-0026 | [Document the changelog and release workflow](T-0026-document-the-changelog-and-release-workflow.md) | open | medium | docs | T-0024, T-0025 | — |
 | T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | done | low | chore | — | [report](reports/T-0009.md) |
 | T-0010 | [Fix agent-doc wording and stale AGENTS.md references](T-0010-fix-agent-doc-wording-and-stale-agents-md.md) | done | low | docs | — | [report](reports/T-0010.md) |
