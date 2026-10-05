@@ -881,3 +881,381 @@ def test_hotfix_finishing_after_a_failed_tag_ends_with_the_no_ff_merge(repo: Pat
     assert git(repo, "merge-base", "--is-ancestor", "v0.1.1", "develop") == ""
     assert git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
     assert git(repo, "status", "--porcelain") == ""
+
+
+# ------------------------------------------------------------ --push does not imply --yes
+
+
+@pytest.mark.parametrize("extra", [(), ("--version", "v1.0.0")])
+def test_push_without_yes_is_a_usage_error_and_changes_nothing(
+    repo: Path, extra: tuple[str, ...]
+):
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+    before = snapshot(repo)
+
+    result = release(repo, "--push", *extra)
+
+    assert result.returncode == 2, output(result)
+    assert "usage:" in result.stderr
+    assert "--push requires --yes" in result.stderr
+    assert snapshot(repo) == before
+    assert git(repo, "tag", "--list") == ""
+
+
+def test_help_says_push_requires_yes(repo: Path):
+    result = release(repo, "--help", expect=0)
+
+    text = " ".join(result.stdout.split())
+    assert "requires --yes" in text
+    assert "implies --yes" not in text
+
+
+# ------------------------------------------------------------- output of a failed step
+
+
+def test_failed_step_prints_stdout_and_stderr_both_labelled(repo: Path):
+    # Both branches change one file in different places: git merges it (and prints
+    # "Auto-merging" on stdout), then pre-merge-commit rejects the merge (stderr).
+    numbered = "".join(f"{n}\n" for n in range(1, 21))
+    git(repo, "checkout", "-q", "main")
+    commit(repo, "clash.txt", "chore: base", content=numbered)
+    git(repo, "push", "-q", "origin", "main")
+    git(repo, "checkout", "-q", "develop")
+    git(repo, "merge", "-q", "main")
+    commit(
+        repo,
+        "clash.txt",
+        "feat: develop side",
+        "a.added.md",
+        content=numbered.replace("2\n", "two\n", 1),
+    )
+    git(repo, "push", "-q", "origin", "develop")
+    git(repo, "checkout", "-q", "main")
+    commit(
+        repo,
+        "clash.txt",
+        "chore: main side",
+        content=numbered.replace("19\n", "nineteen\n", 1),
+    )
+    git(repo, "push", "-q", "origin", "main")
+    git(repo, "checkout", "-q", "develop")
+    hooks = repo.parent / "hooks"
+    hooks.mkdir()
+    hook = hooks / "pre-merge-commit"
+    hook.write_text(
+        '#!/bin/sh\necho "merge rejected by hook" >&2\nexit 1\n', encoding="utf-8"
+    )
+    hook.chmod(hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    git(repo, "config", "core.hooksPath", str(hooks))
+
+    result = release(repo, "--yes")
+
+    text = result.stderr
+    assert result.returncode == 1
+    assert "FAILED at step 'merge-main'" in text
+    report = text.split("Current state:")[0]
+    assert "stdout:\n  Auto-merging clash.txt" in report
+    assert "stderr:\n  merge rejected by hook" in report
+    assert report.index("stdout:") < report.index("stderr:")
+
+
+def test_failed_step_with_no_output_on_a_stream_labels_it_empty(repo: Path):
+    reject_tags(repo)
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+
+    result = release(repo, "--yes")
+
+    report = result.stderr.split("Current state:")[0]
+    assert "FAILED at step 'tag'" in report
+    assert "stdout:\n  (empty)" in report
+    assert "stderr:\n  " in report
+    assert "tag rejected by hook" in report
+
+
+# -------------------------------------------- fragment conflict while updating develop
+
+
+def _modify_delete_conflict_setup(repo: Path) -> None:
+    """A hotfix fragment that develop reworded after the hotfix; main is checked out.
+
+    Releasing from main folds the fragment and deletes it there, so merging main into develop
+    is a modify/delete conflict on `changelog.d/x.fixed.md`.
+    """
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+    release(repo, "--yes", "--push", expect=0)
+    feat(repo, "b")  # develop-only work: develop will not be an ancestor of main
+    git(repo, "push", "-q", "origin", "develop")
+    _hotfix_on_main(repo)  # develop now holds x.fixed.md too
+    git(repo, "checkout", "-q", "develop")
+    (repo / "changelog.d" / "x.fixed.md").write_text(
+        "- Change from x.txt, reworded on develop.\n", encoding="utf-8"
+    )
+    git(repo, "add", "changelog.d/x.fixed.md")
+    git(repo, "commit", "-q", "-m", "docs: reword the hotfix fragment")
+    git(repo, "push", "-q", "origin", "develop")
+    git(repo, "checkout", "-q", "main")
+
+
+def test_fragment_conflict_on_the_develop_update_advises_git_rm(repo: Path):
+    _modify_delete_conflict_setup(repo)
+
+    result = release(repo, "--yes")
+
+    text = result.stderr
+    assert result.returncode == 1
+    assert "FAILED at step 'develop'" in text
+    assert "merge in progress: yes" in text
+    finish = text.split("To finish by hand")[1].split("To undo")[0]
+    assert "git rm changelog.d/x.fixed.md" in finish
+    assert "resolve it as deleted" in finish
+    assert finish.index("git rm changelog.d/x.fixed.md") < finish.index(
+        "git commit --no-edit"
+    )
+    # The advice is for fragments only: README.md and other paths get no `git rm` line.
+    assert finish.count("git rm") == 1
+
+
+def test_following_the_git_rm_advice_folds_the_fragment_once(repo: Path):
+    _modify_delete_conflict_setup(repo)
+    result = release(repo, "--yes")
+    assert result.returncode == 1
+
+    commands = run_finish(repo, result)
+
+    assert "git rm changelog.d/x.fixed.md" in commands
+    assert git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+    assert "changelog.d/x.fixed.md" not in git(repo, "ls-tree", "-r", "develop")
+    git(repo, "push", "-q", "origin", "main", "develop", "v0.1.1")
+    git(repo, "checkout", "-q", "develop")
+    release(repo, "--yes", "--push", expect=0)
+    changelog = (repo / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert changelog.count("Change from x.txt") == 1
+    assert changelog.count("- Change from b.txt.") == 1
+
+
+def test_a_conflict_on_another_file_gets_no_git_rm_advice(repo: Path):
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+    release(repo, "--yes", "--push", expect=0)
+    commit(repo, "clash.txt", "feat: develop side", "b.added.md", content="develop\n")
+    git(repo, "push", "-q", "origin", "develop")
+    git(repo, "checkout", "-q", "main")
+    git(repo, "checkout", "-q", "-b", "hotfix/x")
+    commit(repo, "clash.txt", "fix: hotfix side", "x.fixed.md", content="hotfix\n")
+    git(repo, "checkout", "-q", "main")
+    git(
+        repo, "merge", "-q", "--no-ff", "hotfix/x", "-m", "chore(merge): merge hotfix/x"
+    )
+    git(repo, "push", "-q", "origin", "main")
+
+    result = release(repo, "--yes")
+
+    assert "FAILED at step 'develop'" in result.stderr
+    assert "git rm" not in result.stderr
+
+
+# ------------------------------------------------------------------- a rejected push
+
+
+def test_rejected_push_names_the_race_and_a_local_pre_push_hook(repo: Path):
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+    hooks = repo.parent / "hooks"
+    hooks.mkdir()
+    hook = hooks / "pre-push"
+    hook.write_text(
+        '#!/bin/sh\necho "pre-push hook says no" >&2\nexit 1\n', encoding="utf-8"
+    )
+    hook.chmod(hook.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    git(repo, "config", "core.hooksPath", str(hooks))
+
+    result = release(repo, "--yes", "--push")
+
+    text = result.stderr
+    assert result.returncode == 1, output(result)
+    assert "pre-push hook says no" in text
+    assert "push rejected" in text
+    assert "another push won the race" in text
+    assert "git fetch origin" in text
+    assert "local pre-push hook failed" in text
+    assert text.rstrip().endswith("git push --atomic origin main develop v0.1.0")
+    assert git(origin_of(repo), "tag", "--list") == ""
+    assert git(repo, "tag", "--list") == "v0.1.0"
+
+
+# ------------------------------------------------------------------- no commits at all
+
+
+def test_refuses_a_repository_with_no_commits(tmp_path: Path):
+    work = tmp_path / "empty"
+    work.mkdir()
+    git(work, "init", "-q", "-b", "main")
+    (work / "scripts" / "config").mkdir(parents=True)
+    for name in ("release.py", "next_version.py", "changelog.py"):
+        shutil.copy(SCRIPTS / name, work / "scripts" / name)
+    shutil.copy(SCRIPTS / "config" / "gate.sh", work / "scripts" / "config" / "gate.sh")
+
+    for args in ((), ("--yes",)):
+        result = release(work, *args)
+
+        assert result.returncode == 1, output(result)
+        assert "refusing to release" in result.stderr
+        assert "no commits" in result.stderr
+        assert "Traceback" not in output(result)
+    assert git(work, "status", "--porcelain").startswith("??")
+    assert git(work, "branch", "--list") == ""
+
+
+# ----------------------------------------------------- the finish list repeats nothing
+
+
+def test_finish_list_does_not_print_the_checkout_of_develop_twice(repo: Path):
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+    reject_tags(repo)
+
+    result = release(repo, "--yes", "--push")
+
+    commands = finish_lines(result)
+    assert result.returncode == 1
+    assert commands.count("git checkout develop") == 1
+    assert len(commands) == len(set(commands))
+    assert commands[-2:] == [
+        "git merge --ff-only main",
+        "git push --atomic origin main develop v0.1.0",
+    ]
+
+
+def test_finish_list_still_returns_to_main_after_a_hotfix_release(repo: Path):
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+    release(repo, "--yes", "--push", expect=0)
+    feat(repo, "b")
+    git(repo, "push", "-q", "origin", "develop")
+    _hotfix_on_main(repo)
+    reject_tags(repo)
+
+    result = release(repo, "--yes")
+
+    commands = finish_lines(result)
+    assert result.returncode == 1
+    assert commands.count("git checkout develop") == 1
+    assert commands[-1] == "git checkout main"
+    assert len(commands) == len(set(commands))
+
+
+# --------------------------------------------------- the real hooks on release.py's commits
+
+HOOK_FILES = (
+    ".husky/commit-msg",
+    ".husky/pre-commit",
+    ".husky/pre-push",
+    "scripts/commit_lint.py",
+    "scripts/autofix.sh",
+    "scripts/lib/common.sh",
+)
+
+
+def install_real_hooks(repo: Path) -> None:
+    """Copy the real hooks and their helpers into the fixture, a stub gate, hooks switched on.
+
+    The files are committed on develop and pushed while `core.hooksPath` is still `/dev/null`;
+    afterwards every commit, merge and push in the fixture runs the real `.husky` hooks.
+    """
+    for name in HOOK_FILES:
+        target = repo / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_ROOT / name, target)
+    gate = repo / "scripts" / "gate.sh"
+    gate.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    gate.chmod(gate.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    # The hooks run changelog.py, which leaves a bytecode cache that a clean tree must ignore.
+    (repo / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "chore: add the hooks")
+    git(repo, "push", "-q", "origin", "develop")
+    git(repo, "config", "core.hooksPath", ".husky")
+
+
+def traced_release(
+    repo: Path, trace: Path, *args: str
+) -> subprocess.CompletedProcess[str]:
+    """Run release.py with GIT_TRACE on, so the log shows which hooks git ran."""
+    env = {**_env(), "GIT_TRACE": str(trace)}
+    result = subprocess.run(
+        [sys.executable, "scripts/release.py", *args],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, output(result)
+    return result
+
+
+def hook_runs(trace: Path, hook: str) -> int:
+    """Count how often git ran a hook, from a GIT_TRACE log."""
+    pattern = re.compile(rf"run_command: .*\.husky/{hook}\b")
+    return sum(
+        1
+        for line in trace.read_text(encoding="utf-8").splitlines()
+        if pattern.search(line)
+    )
+
+
+def test_release_commits_pass_the_real_commit_msg_pre_commit_and_pre_push_hooks(
+    repo: Path, tmp_path: Path
+):
+    install_real_hooks(repo)
+    feat(repo, "a")  # the fixture's own commit already runs the hooks
+    git(repo, "push", "-q", "origin", "develop")
+    trace = tmp_path / "trace.log"
+
+    result = traced_release(repo, trace, "--yes", "--push")
+
+    assert "pushed main, develop and v0.1.0 to origin" in result.stdout
+    assert subject(repo, "main") == "chore(release): v0.1.0"
+    assert subject(repo, "main~1") == "chore(merge): merge develop into main"
+    # commit-msg ran on the merge commit and on the release commit.
+    assert hook_runs(trace, "commit-msg") == 2
+    # pre-commit ran on the release commit only: a merge runs commit-msg but there is no
+    # pre-merge-commit hook, and develop is fast-forwarded, so no other commit is made.
+    assert hook_runs(trace, "pre-commit") == 1
+    # pre-push ran once on the atomic push; its changelog check passed for main and develop.
+    assert hook_runs(trace, "pre-push") == 1
+    assert result.stdout.count("changelog check passed") == 2
+    bare = origin_of(repo)
+    assert git(bare, "rev-parse", "main") == git(repo, "rev-parse", "main")
+    assert git(bare, "rev-parse", "develop") == git(repo, "rev-parse", "develop")
+    assert git(bare, "rev-parse", "v0.1.0^{commit}") == git(repo, "rev-parse", "main")
+
+
+def test_hotfix_release_commits_pass_the_real_hooks_including_the_back_merge(
+    repo: Path, tmp_path: Path
+):
+    install_real_hooks(repo)
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+    release(repo, "--yes", "--push", expect=0)
+    feat(repo, "b")
+    git(repo, "push", "-q", "origin", "develop")
+    _hotfix_on_main(repo)
+    trace = tmp_path / "trace.log"
+
+    result = traced_release(repo, trace, "--yes", "--push")
+
+    assert subject(repo, "main") == "chore(release): v0.1.1"
+    assert subject(repo, "develop") == "chore(merge): merge main into develop"
+    # The release commit and the back-merge into develop each ran commit-msg; only the
+    # release commit ran pre-commit.
+    assert hook_runs(trace, "commit-msg") == 2
+    assert hook_runs(trace, "pre-commit") == 1
+    assert hook_runs(trace, "pre-push") == 1
+    assert result.stdout.count("changelog check passed") == 2
+    assert git(origin_of(repo), "rev-parse", "v0.1.1^{commit}") == git(
+        repo, "rev-parse", "main"
+    )
