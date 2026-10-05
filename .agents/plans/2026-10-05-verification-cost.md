@@ -1,6 +1,10 @@
 # Plan: cut the verification cost per task
 
-Status: proposed. Owner decisions V1 to V9 are open. No tasks are filed yet.
+Status: accepted. Tasks T-0033 to T-0036.
+
+**Owner decision (2026-10-05, session instruction):** "all recommended and agreed. proceed with the
+steps." V1 to V9 are accepted as recommended (V6: no parallel tests now). This is the owner's
+written approval for the "Ask first" and breaking-change items under § Approvals.
 
 ## Goal
 
@@ -184,23 +188,23 @@ The report's verify line becomes
 - The owner's acceptance of this plan, recorded here, is the written approval the orchestrator
   cites when merging these tasks.
 
-## Tasks (filed after acceptance)
+## Tasks
 
-1. **Gate records and `--if-needed`** (feat, breaking). `scripts/gate.sh`,
+1. **T-0033: Gate records and `--if-needed`** (feat, breaking). `scripts/gate.sh`,
    `scripts/config/gate.sh`, `.husky/pre-push`, `.husky/pre-commit`, `scripts/gitflow.sh`,
    `tests/test_release.py` (a hotfix `release.py --push` passes the new hook),
    `tests/test_gate.py` (new),
    `tests/test_hooks.py`, `tests/test_gitflow.py`, `scripts/README.md`, `DEV_TOOLING_SPEC.md`, a
    fragment.
-2. **Slow marker and safe-list skipping** (feat, breaking). Depends on 1. `pyproject.toml`,
+2. **T-0034: Slow marker and safe-list skipping** (feat, breaking). Depends on 1. `pyproject.toml`,
    `tests/test_init_project.py` (the marker and the fast template-name test for safe-listed docs), `scripts/gate.sh`, `scripts/config/gate.sh`, `.husky/pre-push`
    (`main` always runs everything), `tests/test_gate.py`, `tests/test_hooks.py`,
    `scripts/README.md`, `DEV_TOOLING_SPEC.md`, a fragment.
-3. **Process tooling: leftovers report and verify line** (feat, breaking). Parallel with 1.
+3. **T-0035: Process tooling: leftovers report and verify line** (feat, breaking). Parallel with 1.
    `.agents/tasks/scripts/housekeep.py`, `.agents/tasks/scripts/report.py`,
    `.agents/tasks/templates/report.md`, `tests/test_task_scripts.py`,
    `tests/test_report_scripts.py`, a fragment.
-4. **Rewrite the verification rules** (docs, breaking). Depends on 1, 2 and 3. `CLAUDE.md`,
+4. **T-0036: Rewrite the verification rules** (docs, breaking). Depends on 1, 2 and 3. `CLAUDE.md`,
    `CONTRIBUTING.md`, `.agents/README.md`, `.agents/tasks/templates/task.md`,
    `PYTHON_CONVENTIONS.md`, `README.md`, `DEV_TOOLING_SPEC.md`, `scripts/README.md`, a fragment.
 
