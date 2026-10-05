@@ -1,7 +1,7 @@
 ---
 id: T-0031
 title: Fold the post-batch fragments and document the pre-release wording rule
-status: in_progress
+status: review
 type: docs
 priority: medium
 depends_on: []
