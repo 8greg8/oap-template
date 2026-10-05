@@ -69,6 +69,8 @@ below are what they found wrong.
      applies to `--version` only; behavior changed by T-0028 and T-0029.
    - `DEV_TOOLING_SPEC.md`: drop the stale "README step 4" reference; T-0028/T-0029 behavior.
    - `README.md`: the table row for `DEV_TOOLING_SPEC.md` mentions the changelog.
+   - `scripts/README.md` and `changelog.d/README.md`: the behavior T-0028 and T-0029 change
+     (added by the pre-batch review; documentation only).
    - `.agents/README.md`: the orchestrator runs `git pull --ff-only origin develop` before
      `set-status` or dispatch, and rebases an unpushed status commit instead of merging (T-0022
      was started from a stale `develop`, which cost a fix round and left a
@@ -90,7 +92,8 @@ below are what they found wrong.
 
 ## Process corrections made with this plan
 
-- The T-0022 to T-0026 reports gain a line citing the owner approval in
+- The T-0022, T-0023, T-0024 and T-0026 reports gain a line citing (T-0025 had no "Ask first" or
+  breaking item) the owner approval in
   `.agents/plans/2026-10-04-changelog-and-versioning.md` § Approvals, which `CLAUDE.md` § Merge
   authority requires and none of them had.
 - Stale remote branches (`docs/changelog-and-versioning-plan`, `docs/pre-batch-review-T-0022-T-0026`,

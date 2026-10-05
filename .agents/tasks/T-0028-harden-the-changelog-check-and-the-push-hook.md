@@ -46,26 +46,51 @@ and `gitflow.sh finish` check against the right, fresh base.
 ## Scope
 
 - Fragment content: a fragment may contain only bullet lines (`- ` or `* `), indented
-  continuation lines and blank lines; anything else fails `check` and makes `assemble` refuse.
+  continuation lines and blank lines; anything else fails `check` and makes `assemble` refuse. An
+  indented line is a continuation only directly after a bullet or another continuation line; an
+  indented line after a blank line, or before the first bullet, is rejected. Move the
+  intro-line case at `tests/test_changelog.py:390` from the valid to the rejected cases. Update the
+  module docstring (`:32-40`) and `main`'s docstring (`:684`) for the content rule, strict UTF-8
+  and exit 3.
 - Decode fragments strictly as UTF-8 in every path; a non-UTF-8 fragment is a fragment problem
   (exit 1 with a clear message), never a traceback. Strip one leading BOM before parsing.
-- `--date` accepts only `^\d{4}-\d{2}-\d{2}$` and a valid date.
+- `--date`: `re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", value)`, then `date.fromisoformat`;
+  otherwise exit 2 (unchanged).
 - Exit codes: 0 pass, 1 missing or invalid fragment, 2 usage error or unlistable range (as
   today), 3 internal error (import or load failure, unexpected exception) with a one-line
-  message. The hook treats 3 as "changelog check failed" with that message and rejects the push;
-  it never reports 3 as a missing fragment.
-- A fragment counts as added only if its path does not exist at `<base>` (a rename of an existing
-  fragment does not satisfy `check`).
-- `.husky/pre-push`: use the push's remote name (`$1`) for `<remote>/develop` and
-  `<remote>/main`.
-- `scripts/gitflow.sh finish`: `git fetch <remote> "$base"` before choosing `origin/$base`; on fetch
-  failure fall back to the local `$base` with a warning.
+  message. The hook: 0 passes; 1 prints the existing missing/invalid-fragment message and
+  rejects; 2 skips; any other code (3, 127, a signal) prints
+  "pre-push: changelog check failed (exit N) for <remote_ref>" and rejects, without the
+  missing-fragment text.
+- A fragment counts as added only if a non-merge commit in the range adds it with rename detection
+  on (`git log --no-merges -M --diff-filter=A`, replacing `--no-renames`) and its path does not
+  exist at `<base>`. A rename of an existing fragment (status R) and a delete-and-re-add of the
+  same path do not satisfy `check`. A fragment added and later deleted inside the range (folded by
+  a release) still counts.
+- `.husky/pre-push`: use `remote=${1:-origin}` for `refs/remotes/$remote/develop` and
+  `.../main`. When that ref is missing (including `$1` being a URL), skip the check with the
+  existing message. Update the hook's header comment (`.husky/pre-push:12-22`).
+- `scripts/gitflow.sh finish`: run `git fetch origin "$base"` (the remote `start()` already uses,
+  `scripts/gitflow.sh:46`) before choosing `origin/$base`; on fetch failure warn and use the local
+  `$base`. Print the add-a-fragment advice only for exit 1, and "changelog check failed (exit N)"
+  otherwise.
 - `scripts/config/gate.sh`: a comment that the file must stay POSIX-sourceable (plain
   assignments); a test sources it with `sh`.
 - Tests: fix the two tests above so they fail when the behavior is removed; add tests for every
   item in this list.
 - `changelog.d/T-0028.fixed.md`: this task's entry. The behavior commit is `fix(changelog)!:` with
-  a `BREAKING CHANGE:` footer naming exit status 3.
+  the footer: "BREAKING CHANGE: changelog.py exits 3 on an internal error (load failure or
+  unexpected exception) instead of 1; fragments may contain only bullet, indented continuation
+  and blank lines; --date accepts only YYYY-MM-DD."
+- Hook tests: `_run_pre_push` (`tests/test_hooks.py:110-125`) passes `origin <url>` as the hook's
+  arguments; add a test that pushes to a second remote name. Rework
+  `test_finish_falls_back_to_local_base_without_origin_ref` (`tests/test_gitflow.py:236-245`) so
+  the fetch fails (`git remote set-url origin <missing path>` after start) and assert the
+  warning. Add a test that release-folded fragments in a `main` push range still pass.
+- The task's fragment holds only bullet and indented continuation lines and no placeholder
+  words, so it passes T-0028's content rule whichever task merges first.
+- The report must not contain the upper-case placeholder word that `_schema.py:128` rejects;
+  refer to those fixtures by test name only.
 
 ## Non-goals
 
