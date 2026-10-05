@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-27 lesson(s) across 13 section(s). Generated 2026-10-05.
+28 lesson(s) across 14 section(s). Generated 2026-10-05.
 
 ## Tag index
 
@@ -19,7 +19,7 @@ to all lessons that carry it.
 - `backlog` — [T-0002](#t-0002-success)
 - `bash` — [T-0012](#t-0012-success)
 - `bash-3.2` — [T-0011](#t-0011-success)
-- `breaking` — [T-0023](#t-0023-success), [T-0024](#t-0024-success)
+- `breaking` — [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0029](#t-0029-success)
 - `changelog` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0025](#t-0025-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success)
 - `changelog-fragments` — [T-0022](#t-0022-success), [T-0025](#t-0025-success)
 - `chore` — [T-0020](#t-0020-success)
@@ -42,7 +42,7 @@ to all lessons that carry it.
 - `git-worktree` — [T-0010](#t-0010-success), [T-0011](#t-0011-success)
 - `gitflow` — [T-0004](#t-0004-success), [T-0011](#t-0011-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success)
 - `history-rewrite` — [T-0020](#t-0020-success)
-- `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success)
+- `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success), [T-0029](#t-0029-success)
 - `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success)
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success)
 - `init` — [T-0027](#t-0027-success)
@@ -58,7 +58,7 @@ to all lessons that carry it.
 - `pre-push` — [T-0023](#t-0023-success)
 - `process` — [T-0005](#t-0005-success)
 - `public-release` — [T-0019](#t-0019-success), [T-0020](#t-0020-success)
-- `release` — [T-0024](#t-0024-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success)
+- `release` — [T-0024](#t-0024-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success), [T-0029](#t-0029-success)
 - `rename` — [T-0015](#t-0015-success)
 - `report-gate` — [T-0001](#t-0001-success)
 - `report-validation` — [T-0003](#t-0003-success)
@@ -74,7 +74,7 @@ to all lessons that carry it.
 - `task-state` — [T-0016](#t-0016-success)
 - `task-tooling` — [T-0001](#t-0001-success), [T-0002](#t-0002-success)
 - `template` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
-- `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success), [T-0027](#t-0027-success)
+- `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success), [T-0027](#t-0027-success), [T-0029](#t-0029-success)
 - `upstream-tracking` — [T-0010](#t-0010-success)
 - `uv` — [T-0006](#t-0006-success)
 - `versioning` — [T-0024](#t-0024-success), [T-0026](#t-0026-success)
@@ -327,6 +327,24 @@ Source: [`reports/T-0018.md`](tasks/reports/T-0018.md)
 Tags: `public-release`, `history-rewrite`, `filter-repo`, `chore`
 
 Source: [`reports/T-0020.md`](tasks/reports/T-0020.md)
+
+## release
+
+### T-0029 (success)
+
+- Git sends a commit or merge hook's stdout to stderr, so a hook cannot make `git` print on both
+  streams. To test both streams, use a case where git itself writes stdout (`Auto-merging <file>`
+  from a clean two-sided merge) and a `pre-merge-commit` hook that writes to stderr.
+- Running real hooks in a fixture leaves `scripts/__pycache__/` (from `changelog.py`), which makes
+  the tree dirty, so `release.py` refuses. The fixture needs a `.gitignore` for `__pycache__/`.
+- `GIT_TRACE=<file>` on the `release.py` subprocess records `run_command: ... .husky/<hook>` lines.
+  That proves which hooks git ran without editing the copied hooks.
+- A merge made by `git merge --no-ff` runs `commit-msg` only (on `.git/MERGE_MSG`); with
+  `core.hooksPath=.husky` there is no `pre-merge-commit` hook.
+
+Tags: `release`, `tests`, `hooks`, `breaking`
+
+Source: [`reports/T-0029.md`](tasks/reports/T-0029.md)
 
 ## report-validation
 
