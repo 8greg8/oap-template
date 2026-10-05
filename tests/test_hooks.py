@@ -426,7 +426,7 @@ def test_feature_branch_without_origin_develop_skips_check_and_runs_gate(
 
 
 @pytest.mark.parametrize("remote_ref", ["refs/tags/v0.1.0", "refs/notes/commits"])
-def test_non_branch_ref_is_not_checked(repo: Path, remote_ref: str) -> None:
+def test_tag_ref_is_not_checked(repo: Path, remote_ref: str) -> None:
     """origin/develop exists, so a ref treated as a branch would be rejected for its feat commit."""
     _set_origin(repo, "develop", _git(repo, "rev-parse", "HEAD"))
     head = _commit(repo, {"src/app.py": "x = 2\n"}, "feat(app): change it")
