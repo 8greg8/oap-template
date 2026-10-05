@@ -72,15 +72,26 @@ finish() {
 
     # The same fragment check .husky/pre-push runs on a branch: from the merge base with the
     # base branch to the tip. The remote-tracking ref is preferred (it is what a push is
-    # checked against); the local base is the fallback when there is no such ref.
+    # checked against), so it is fetched first, from the same remote start() uses; a stale ref
+    # would check against the wrong range. When the fetch fails, or there is no such ref, the
+    # local base is the fallback.
     base_ref="$base"
-    if git show-ref --verify --quiet "refs/remotes/origin/$base"; then
-        base_ref="origin/$base"
+    if git fetch origin "$base" 2>/dev/null; then
+        if git show-ref --verify --quiet "refs/remotes/origin/$base"; then
+            base_ref="origin/$base"
+        fi
+    else
+        warn "could not fetch origin $base; checking the changelog against the local $base"
     fi
     merge_base="$(git merge-base "$base_ref" "refs/heads/$branch")" \
         || die "no merge base between $base_ref and $branch -- cannot check the changelog"
-    python3 "$SCRIPTS_DIR/changelog.py" check "$merge_base" "refs/heads/$branch" \
-        || die "changelog check failed on $branch -- add changelog.d/<id>.<category>.md and commit it before finishing"
+    check_rc=0
+    python3 "$SCRIPTS_DIR/changelog.py" check "$merge_base" "refs/heads/$branch" || check_rc=$?
+    if [[ "$check_rc" -eq 1 ]]; then
+        die "changelog check failed on $branch -- add changelog.d/<id>.<category>.md and commit it before finishing"
+    elif [[ "$check_rc" -ne 0 ]]; then
+        die "changelog check failed (exit $check_rc) on $branch"
+    fi
 
     ( cd "$worktree_dir" && "$SCRIPTS_DIR/gate.sh" ) || die "gate failed on $branch -- fix before finishing"
 
