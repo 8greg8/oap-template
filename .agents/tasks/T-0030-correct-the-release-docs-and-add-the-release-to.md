@@ -1,7 +1,7 @@
 ---
 id: T-0030
 title: Correct the release docs and add the release to Ask first
-status: open
+status: in_progress
 type: docs
 priority: medium
 depends_on: [T-0028, T-0029]
