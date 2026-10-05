@@ -69,6 +69,8 @@ below are what they found wrong.
      applies to `--version` only; behavior changed by T-0028 and T-0029.
    - `DEV_TOOLING_SPEC.md`: drop the stale "README step 4" reference; T-0028/T-0029 behavior.
    - `README.md`: the table row for `DEV_TOOLING_SPEC.md` mentions the changelog.
+   - `scripts/README.md` and `changelog.d/README.md`: the behavior T-0028 and T-0029 change
+     (added by the pre-batch review; documentation only).
    - `.agents/README.md`: the orchestrator runs `git pull --ff-only origin develop` before
      `set-status` or dispatch, and rebases an unpushed status commit instead of merging (T-0022
      was started from a stale `develop`, which cost a fix round and left a
@@ -82,15 +84,17 @@ below are what they found wrong.
   - T-0029: `--push` without `--yes` now refuses. Today it implies `--yes`, which is documented
     in `release.py --help`, `CONTRIBUTING.md` and `DEV_TOOLING_SPEC.md`, so this changes the CLI
     of a tool under `scripts/`.
-  - T-0028: `changelog.py check` gains a distinct exit status for load and unexpected errors,
-    which changes its documented exit codes.
+  - T-0028: `changelog.py` gains exit status 3 for load and unexpected errors, accepts only
+    bullet, indented continuation and blank lines in a fragment, and accepts `--date` only as
+    `YYYY-MM-DD`; each changes a documented contract.
   - T-0030: adds an item to "Ask first" (a rule change).
   Each marks its behavior commit breaking; T-0028 and T-0029 are typed `fix!`.
 - The owner decisions above are the written approval the orchestrator cites when merging.
 
 ## Process corrections made with this plan
 
-- The T-0022 to T-0026 reports gain a line citing the owner approval in
+- The T-0022, T-0023, T-0024 and T-0026 reports gain a line citing (T-0025 had no "Ask first" or
+  breaking item) the owner approval in
   `.agents/plans/2026-10-04-changelog-and-versioning.md` § Approvals, which `CLAUDE.md` § Merge
   authority requires and none of them had.
 - Stale remote branches (`docs/changelog-and-versioning-plan`, `docs/pre-batch-review-T-0022-T-0026`,

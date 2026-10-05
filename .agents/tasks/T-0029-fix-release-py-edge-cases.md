@@ -55,6 +55,13 @@ repository with no commits.
   `release.py` makes (the fixture sets `core.hooksPath=/dev/null` today).
 - `changelog.d/T-0029.fixed.md`: this task's entry. The behavior commit is `fix(release)!:` with a
   `BREAKING CHANGE:` footer: `--push` no longer implies `--yes`.
+- The real-hooks test copies `.husky/{commit-msg,pre-commit,pre-push}`, `scripts/commit_lint.py`,
+  `scripts/autofix.sh`, `scripts/lib/common.sh` and a stub `scripts/gate.sh` (`exit 0`) into the
+  fixture, sets `core.hooksPath=.husky`, runs `release.py --yes --push`, and asserts that the
+  merge and release commits pass `commit-msg` and `pre-commit` and the push passes pre-push's
+  changelog check.
+- The task's fragment holds only bullet and indented continuation lines and no placeholder
+  words, so it passes T-0028's content rule whichever task merges first.
 
 ## Non-goals
 

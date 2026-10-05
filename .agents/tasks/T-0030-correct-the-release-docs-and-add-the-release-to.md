@@ -5,7 +5,7 @@ status: open
 type: docs
 priority: medium
 depends_on: [T-0028, T-0029]
-touches: [CLAUDE.md, CONTRIBUTING.md, DEV_TOOLING_SPEC.md, README.md, scripts/README.md, .agents/README.md, changelog.d/T-0030.changed.md]
+touches: [CLAUDE.md, CONTRIBUTING.md, DEV_TOOLING_SPEC.md, README.md, scripts/README.md, changelog.d/README.md, .agents/README.md, changelog.d/T-0030.changed.md]
 created: 2026-10-05
 report: reports/T-0030.md
 ---
@@ -40,6 +40,10 @@ match the code after T-0028 and T-0029.
   longer exists. `README.md:18` describes `DEV_TOOLING_SPEC.md` without the changelog.
 - T-0022 was started from a stale local `develop`, which needed a fix round and left
   `3412c0d chore(merge): merge origin/develop into develop`.
+- `scripts/README.md` and `changelog.d/README.md` are documentation added to the plan's T-0030
+  scope by the pre-batch review: they describe `--push`, the hook exit codes
+  (`scripts/README.md:56,79-86`) and the fragment rules (`changelog.d/README.md:21-33`).
+  `changelog.d/README.md` is copied into generated projects.
 
 ## Scope
 
@@ -50,6 +54,12 @@ match the code after T-0028 and T-0029.
   status 3 and the fragment content rule (T-0028).
 - `DEV_TOOLING_SPEC.md`: drop or fix the stale README step reference; T-0028 and T-0029 behavior.
 - `scripts/README.md`: `--push` requires `--yes`; exit status 3.
+- `changelog.d/README.md`: the content rule (bullets, indented continuations, blank lines only),
+  UTF-8 required, a leading BOM ignored. No template-name strings.
+- Wherever the docs describe T-0028's behavior (`CONTRIBUTING.md:176-188`,
+  `DEV_TOOLING_SPEC.md:164-175`, `scripts/README.md:79-86`): the hook uses the push's remote;
+  `gitflow.sh finish` fetches the base first; a renamed fragment does not count as added; strict
+  UTF-8 and BOM handling; strict `--date`.
 - `README.md`: the `DEV_TOOLING_SPEC.md` table row mentions the changelog.
 - `.agents/README.md`: before `set-status` or dispatch the orchestrator runs
   `git pull --ff-only origin develop`; if local `develop` has diverged, it rebases its unpushed
