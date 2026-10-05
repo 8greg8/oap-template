@@ -31,8 +31,8 @@ gate run is canonical, and match the code from T-0033 to T-0035.
 - Depends on T-0033, T-0034 and T-0035; document the merged code and report any difference from
   the plan.
 - `CLAUDE.md` § "Verification is not optional" points to the per-commit loop in `CONTRIBUTING.md`
-  § "Agent verify/resolve workflow" (which opens "Before any commit is written…"); `.agents/README.md`
-  § "Verify, resolve, merge" has the branch-level verifier and the post-merge gate rerun.
+  § "Agent verify/resolve workflow" (which opens "Before any commit is written…"); the section "Verify, resolve, merge" in
+  `.agents/README.md` has the branch-level verifier and the post-merge gate rerun.
   `PYTHON_CONVENTIONS.md` and `README.md` also describe the per-commit verifier or the full
   pre-push gate.
 
@@ -43,7 +43,7 @@ gate run is canonical, and match the code from T-0033 to T-0035.
 - `CONTRIBUTING.md` § "Agent verify/resolve workflow": implement, iterate with `--fast` and
   targeted tests, commit freely; one independent verify of the finished branch; resolve; merge.
   The hooks section: records, `--if-needed`, task-branch `--fast`, slow-test selection.
-- `.agents/README.md` § "Verify, resolve, merge": the verifier works in a detached worktree of the
+- `.agents/README.md`, section "Verify, resolve, merge": the verifier works in a detached worktree of the
   orchestrator's checkout, always runs the full gate itself, does the judgment checks, and writes
   the new verify line; fix rounds per V7; one verifier per task per round in the foreground (V8);
   the post-merge check uses `--if-needed`.
