@@ -4,9 +4,7 @@ This document specifies the copy-pasteable `scripts/` + `.husky/` + `package.jso
 turns the process described in [`CONTRIBUTING.md`](CONTRIBUTING.md) (branching, commits,
 versioning, verify/resolve) into deterministic, agent-runnable commands instead of prose an agent
 has to interpret freshly each time. It implements the gate, the Husky-managed hooks, the changelog
-and the release flow that `CONTRIBUTING.md` describes, including the tagging step `CLAUDE.md` refers
-to ("outside the tagging step defined in `CONTRIBUTING.md`"). `README.md` step 3 installs the
-bundle in a generated project.
+and the release flow that `CONTRIBUTING.md` describes.
 
 It is written to be **copy-pasted as a unit** into an existing or new repository: the `scripts/`
 folder, `.husky/`, and `package.json` move together, and the one file a target repo edits to adapt

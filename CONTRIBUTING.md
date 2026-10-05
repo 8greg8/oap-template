@@ -225,9 +225,9 @@ only `fix` commits make it `v0.0.1`. From major 1 on, a breaking change bumps ma
 
 A release is a deliberate human step. Running `scripts/release.py --yes` or `--push` is an "Ask
 first" item in `CLAUDE.md`: an agent runs it only when the owner asks for that release, and a dry
-run stays free. `scripts/release.py` is also the tagging step that `CLAUDE.md` mentions, so it is
-not exempt. It is never run from a hook. Run it in the primary checkout, on a clean `develop` (a
-normal release) or on `main` (after a hotfix, see below).
+run stays free. Only `scripts/release.py` creates release tags; creating one by hand is a separate
+"Ask first" item in `CLAUDE.md`. The script is never run from a hook. Run it in the primary
+checkout, on a clean `develop` (a normal release) or on `main` (after a hotfix, see below).
 
 ```bash
 scripts/release.py                         # dry run: version, commits, changelog section; changes nothing
