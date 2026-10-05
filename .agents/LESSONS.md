@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-26 lesson(s) across 12 section(s). Generated 2026-10-04.
+27 lesson(s) across 13 section(s). Generated 2026-10-05.
 
 ## Tag index
 
@@ -20,7 +20,7 @@ to all lessons that carry it.
 - `bash` — [T-0012](#t-0012-success)
 - `bash-3.2` — [T-0011](#t-0011-success)
 - `breaking` — [T-0023](#t-0023-success), [T-0024](#t-0024-success)
-- `changelog` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0025](#t-0025-success), [T-0026](#t-0026-success)
+- `changelog` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0025](#t-0025-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success)
 - `changelog-fragments` — [T-0022](#t-0022-success), [T-0025](#t-0025-success)
 - `chore` — [T-0020](#t-0020-success)
 - `code-of-conduct` — [T-0021](#t-0021-success)
@@ -45,6 +45,7 @@ to all lessons that carry it.
 - `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success)
 - `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success)
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success)
+- `init` — [T-0027](#t-0027-success)
 - `init-project` — [T-0021](#t-0021-success), [T-0025](#t-0025-success)
 - `init-script` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
 - `merge-authority` — [T-0013](#t-0013-success), [T-0014](#t-0014-success)
@@ -57,7 +58,7 @@ to all lessons that carry it.
 - `pre-push` — [T-0023](#t-0023-success)
 - `process` — [T-0005](#t-0005-success)
 - `public-release` — [T-0019](#t-0019-success), [T-0020](#t-0020-success)
-- `release` — [T-0024](#t-0024-success), [T-0026](#t-0026-success)
+- `release` — [T-0024](#t-0024-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success)
 - `rename` — [T-0015](#t-0015-success)
 - `report-gate` — [T-0001](#t-0001-success)
 - `report-validation` — [T-0003](#t-0003-success)
@@ -73,7 +74,7 @@ to all lessons that carry it.
 - `task-state` — [T-0016](#t-0016-success)
 - `task-tooling` — [T-0001](#t-0001-success), [T-0002](#t-0002-success)
 - `template` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
-- `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
+- `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success), [T-0027](#t-0027-success)
 - `upstream-tracking` — [T-0010](#t-0010-success)
 - `uv` — [T-0006](#t-0006-success)
 - `versioning` — [T-0024](#t-0024-success), [T-0026](#t-0026-success)
@@ -375,3 +376,16 @@ Source: [`reports/T-0001.md`](tasks/reports/T-0001.md)
 Tags: `task-tooling`, `git-publish`, `backlog`, `worktree`
 
 Source: [`reports/T-0002.md`](tasks/reports/T-0002.md)
+
+## tests
+
+### T-0027 (success)
+
+- A test that needs changelog fragments must plant its own. The repository's `changelog.d/` is
+  empty after every release, so assertions on it break the next push.
+- `git rm` of tracked fragments can be denied by the permission layer. Get the owner's approval
+  for the exact files first.
+
+Tags: `tests`, `init`, `changelog`, `release`
+
+Source: [`reports/T-0027.md`](tasks/reports/T-0027.md)
