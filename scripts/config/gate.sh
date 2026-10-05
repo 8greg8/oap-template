@@ -5,6 +5,10 @@
 # Every other script sources this file for commands and branch names instead of hardcoding
 # them, so changing a repo's stack means editing four command strings here, not chasing
 # them through gate.sh, autofix.sh, gitflow.sh, and release.py.
+#
+# This file must stay POSIX-sourceable: plain NAME="value" assignments only, no bash arrays or
+# other bash-only syntax. The bash scripts source it, and so does .husky/pre-push, which runs
+# under POSIX sh (dash on many systems) and would fail on bash-only syntax.
 
 # The four verify/resolve gates, in the order CONTRIBUTING.md's verify/resolve workflow runs
 # them. Defaults below match PYTHON_CONVENTIONS.md exactly for this template.

@@ -16,8 +16,11 @@ Subcommands:
       Look at the non-merge commits in `<base>..<tip>`. Fail when one is `feat`, `fix` or
       breaking (classified by next_version.py's own `classify`) and no commit in the range adds a
       fragment. Also fail on any invalid fragment present at `<tip>`: bad name, unknown
-      category, no bullet line, or placeholder text. Fragments are listed and read from git at
-      `<tip>`, never from the working tree.
+      category, no bullet line, a line that is not a bullet, an indented continuation or blank,
+      a file that is not valid UTF-8, or placeholder text. Fragments are listed and read from git
+      at `<tip>`, never from the working tree. A fragment counts as added when a non-merge
+      commit in the range adds it, with rename detection on, and the path is absent at `<base>`;
+      a rename or a delete-and-re-add of a fragment that exists at `<base>` does not count.
   preview [version]
       Print the section `assemble` would write, headed `## [X.Y.Z] - <today>` when `version` is
       given and `## [Unreleased]` otherwise. Reads the working tree, changes nothing and never
@@ -29,15 +32,20 @@ Subcommands:
       `changelog.d/` other than `README.md` is not a valid fragment. Edits the working tree only;
       the caller stages.
 
-Fragment rules: `<id>` matches `[A-Za-z0-9][A-Za-z0-9_-]*` (no dots). A bullet is a line starting
-with `- ` or `* `; indented lines after it continue it. A fragment needs at least one bullet, and
-a placeholder bullet is rejected: empty text, a match of `\bto-?do\b`, `TBD`, `FIXME` or the
-literal `<...>`, all case-insensitive. Any file in `changelog.d/` other than `README.md` that is
-not named `<id>.<category>.md` fails as a bad name.
+Fragment rules: `<id>` matches `[A-Za-z0-9][A-Za-z0-9_-]*` (no dots). A fragment may hold only
+bullet lines (`- ` or `* `), indented continuation lines and blank lines; any other line is
+rejected, because the whole file is folded into `CHANGELOG.md`. An indented line continues a
+bullet only directly after that bullet or another continuation line; after a blank line or before
+the first bullet it is rejected. A fragment needs at least one bullet, and a placeholder bullet is
+rejected: empty text, a match of `\bto-?do\b`, `TBD`, `FIXME` or the literal `<...>`, all
+case-insensitive. Fragments are decoded strictly as UTF-8 on every path, and one leading BOM is
+ignored. Any file in `changelog.d/` other than `README.md` that is not named
+`<id>.<category>.md` fails as a bad name. `--date` takes exactly `YYYY-MM-DD`.
 
-Exit codes: 0 success; 1 the check failed or the command refused to run (the reason is printed to
-stderr); 2 usage error (including a malformed version or date) or git cannot resolve a revision,
-list the range or run at all.
+Exit codes: 0 success; 1 the check failed, a fragment is invalid or not UTF-8, or the command
+refused to run (the reason is printed to stderr); 2 usage error (including a malformed version or
+date) or git cannot resolve a revision, list the range or run at all; 3 internal error (a
+sibling script cannot be loaded or an unexpected exception), reported as one line on stderr.
 
 See CONTRIBUTING.md § Versioning and .agents/plans/2026-10-04-changelog-and-versioning.md.
 """
@@ -69,6 +77,8 @@ FRAGMENT_RE = re.compile(
 # A name shaped like `<id>.<something>.md`, used to tell a bad category from a bad name.
 SHAPED_RE = re.compile(r"^(?P<id>[A-Za-z0-9][A-Za-z0-9_-]*)\.(?P<category>[^.]+)\.md$")
 BULLET_RE = re.compile(r"^[-*] (?P<text>.*)$")
+DATE_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+BOM = "\ufeff"
 # `to-?do` is word-bounded; the others match anywhere. All case-insensitive.
 PLACEHOLDER_RE = re.compile(r"\bto-?do\b|TBD|FIXME|<\.\.\.>", re.IGNORECASE)
 VERSION_RE = re.compile(r"^v?(\d+\.\d+\.\d+)$")
@@ -88,6 +98,7 @@ class ChangelogError(Exception):
         Args:
             message: Text to print to stderr.
             exit_code: Process exit code; 1 for a failed check or refusal, 2 for a git failure.
+                Internal errors never use this class; `main` reports them as 3.
         """
         super().__init__(message)
         self.exit_code = exit_code
@@ -171,6 +182,36 @@ def git(*args: str, cwd: Path | None = None) -> str:
     return result.stdout
 
 
+def git_bytes(*args: str, cwd: Path | None = None) -> bytes:
+    """Run a git command and return its raw stdout, undecoded.
+
+    Used to read fragment blobs, so that their encoding is checked strictly by the caller.
+
+    Args:
+        args: Arguments after `git`.
+        cwd: Directory to run in; defaults to the current directory.
+
+    Returns:
+        Stdout of the command as bytes.
+
+    Raises:
+        ChangelogError: With exit code 2 if git fails or is missing.
+    """
+    try:
+        result = subprocess.run(
+            ["git", *args], capture_output=True, check=False, cwd=cwd
+        )
+    except OSError as exc:
+        raise ChangelogError(f"cannot run git: {exc}", 2) from exc
+    if result.returncode != 0:
+        detail = result.stderr.decode("utf-8", errors="replace").strip()
+        raise ChangelogError(
+            f"git {' '.join(args)} failed: {detail or f'exit status {result.returncode}'}",
+            2,
+        )
+    return result.stdout
+
+
 def repo_root() -> Path:
     """Find the top level of the repository containing the current directory.
 
@@ -183,46 +224,77 @@ def repo_root() -> Path:
     return Path(git("rev-parse", "--show-toplevel").strip())
 
 
-def bullet_texts(text: str) -> list[str]:
-    """Extract the text of each bullet in a fragment.
+def parse_content(text: str) -> tuple[list[str], list[str]]:
+    """Split a fragment's text into bullets and report lines that are not allowed.
 
-    A bullet starts with `- ` or `* `. Indented lines directly after it continue it; a blank
-    line or an unindented line ends it.
+    A fragment may hold only bullet lines (`- ` or `* `), indented continuation lines and blank
+    lines. An indented line continues a bullet only directly after that bullet or another
+    continuation line; a blank line ends the bullet, so an indented line after a blank line, or
+    before the first bullet, is not allowed.
 
     Args:
-        text: The file content.
+        text: The file content, without a BOM.
 
     Returns:
-        One string per bullet: its first line after the marker plus its continuation lines,
-        stripped.
+        The text of each bullet (its first line after the marker plus its continuation lines,
+        stripped) and one message per disallowed line, naming its line number.
     """
     bullets: list[list[str]] = []
+    problems: list[str] = []
     open_bullet = False
-    for line in text.splitlines():
+    for number, line in enumerate(text.splitlines(), start=1):
         match = BULLET_RE.match(line)
         if match:
             bullets.append([match.group("text")])
             open_bullet = True
-        elif open_bullet and line[:1] in (" ", "\t") and line.strip():
+        elif not line.strip():
+            open_bullet = False
+        elif open_bullet and line[:1] in (" ", "\t"):
             bullets[-1].append(line.strip())
         else:
             open_bullet = False
-    return [
+            shown = line.strip()
+            if len(shown) > 40:
+                shown = shown[:37] + "..."
+            reason = (
+                "indented line without a bullet directly before it"
+                if line[:1] in (" ", "\t")
+                else "not a bullet or an indented continuation"
+            )
+            problems.append(f"line {number}: {reason}: {shown!r}")
+    texts = [
         " ".join(part for part in parts if part.strip()).strip() for parts in bullets
     ]
+    return texts, problems
 
 
-def validate_fragment(name: str, text: str) -> tuple[str | None, list[str]]:
+def decode_fragment(raw: bytes) -> str:
+    """Decode a fragment strictly as UTF-8 and drop one leading BOM.
+
+    Args:
+        raw: The file content.
+
+    Returns:
+        The text.
+
+    Raises:
+        UnicodeDecodeError: If the content is not valid UTF-8.
+    """
+    return raw.decode("utf-8").removeprefix(BOM)
+
+
+def validate_fragment(name: str, raw: bytes) -> tuple[str | None, list[str], str]:
     """Validate one fragment's file name and content.
 
     A bad name is reported alone; the content of a file that is not a fragment is not read.
 
     Args:
         name: The file name inside `changelog.d/`.
-        text: The file content.
+        raw: The file content, undecoded.
 
     Returns:
-        The category (None when the name is invalid) and a list of problems (empty when valid).
+        The category (None when the name is invalid), a list of problems (empty when valid) and
+        the decoded text (empty when the name or the encoding is invalid).
     """
     match = FRAGMENT_RE.match(name)
     if not match:
@@ -234,10 +306,17 @@ def validate_fragment(name: str, text: str) -> tuple[str | None, list[str]]:
             )
         else:
             detail = "name must be `<id>.<category>.md`, e.g. `T-0023.added.md`"
-        return None, [f"bad name: {detail}"]
+        return None, [f"bad name: {detail}"], ""
 
-    problems: list[str] = []
-    bullets = bullet_texts(text)
+    try:
+        text = decode_fragment(raw)
+    except UnicodeDecodeError as exc:
+        return (
+            match.group("category"),
+            [f"not valid UTF-8 (byte {exc.start}); save the file as UTF-8"],
+            "",
+        )
+    bullets, problems = parse_content(text)
     if not bullets:
         problems.append("no bullet line (start a line with `- `)")
     for bullet in bullets:
@@ -247,7 +326,7 @@ def validate_fragment(name: str, text: str) -> tuple[str | None, list[str]]:
         placeholder = PLACEHOLDER_RE.search(bullet)
         if placeholder:
             problems.append(f"placeholder text {placeholder.group(0)!r}")
-    return match.group("category"), problems
+    return match.group("category"), problems, text
 
 
 def normalize_body(text: str) -> str:
@@ -306,8 +385,7 @@ def read_working_fragments(root: Path) -> list[Fragment]:
         if not path.is_file():
             problems.append((relative, ["bad name: not a file; fragments are files"]))
             continue
-        text = path.read_text(encoding="utf-8")
-        category, errors = validate_fragment(path.name, text)
+        category, errors, text = validate_fragment(path.name, path.read_bytes())
         if errors or category is None:
             problems.append((relative, errors))
         else:
@@ -367,7 +445,7 @@ def split_changelog(text: str) -> tuple[list[str], list[str], list[str]]:
 
 
 def resolve_date(value: str | None) -> str:
-    """Return a validated ISO date, defaulting to today.
+    """Return a validated `YYYY-MM-DD` date, defaulting to today.
 
     Args:
         value: The `--date` argument, or None.
@@ -376,11 +454,13 @@ def resolve_date(value: str | None) -> str:
         The date as `YYYY-MM-DD`.
 
     Raises:
-        ChangelogError: With exit code 2 if the value is not a valid ISO date.
+        ChangelogError: With exit code 2 if the value is not a real date written `YYYY-MM-DD`.
     """
     if value is None:
         return datetime.datetime.now().astimezone().date().isoformat()
     try:
+        if not DATE_RE.fullmatch(value):
+            raise ValueError(value)
         return datetime.date.fromisoformat(value).isoformat()
     except ValueError:
         raise ChangelogError(f"--date {value!r} is not a YYYY-MM-DD date", 2) from None
@@ -492,6 +572,9 @@ def commits_in_range(base: str, tip: str, root: Path) -> list[tuple[str, str]]:
 def fragments_added_in_range(base: str, tip: str, root: Path) -> list[str]:
     """List the fragment paths added by any non-merge commit in `base..tip`.
 
+    A commit adds a fragment when `git log -M --diff-filter=A` reports the path as added, so a
+    rename of an existing fragment (status R) is not an addition. A path that exists at `base`
+    never counts either, which rejects a fragment deleted and added again under the same name.
     A fragment added and deleted again inside the range (for example folded in by a release)
     still counts, because each commit is inspected on its own.
 
@@ -501,12 +584,15 @@ def fragments_added_in_range(base: str, tip: str, root: Path) -> list[str]:
         root: Repository root.
 
     Returns:
-        Paths of added files named like a fragment.
+        Paths of added files named like a fragment that are absent at `base`.
+
+    Raises:
+        ChangelogError: With exit code 2 if git cannot list the range or the tree at `base`.
     """
     out = git(
         "log",
         "--no-merges",
-        "--no-renames",
+        "-M",
         "--diff-filter=A",
         "--name-only",
         "--format=",
@@ -515,10 +601,19 @@ def fragments_added_in_range(base: str, tip: str, root: Path) -> list[str]:
         f"{FRAGMENT_DIR}/",
         cwd=root,
     )
+    at_base = set(
+        git(
+            "ls-tree", "-z", "--name-only", base, "--", f"{FRAGMENT_DIR}/", cwd=root
+        ).split("\0")
+    )
     added = []
     for path in out.splitlines():
         directory, _, name = path.rpartition("/")
-        if directory == FRAGMENT_DIR and FRAGMENT_RE.match(name):
+        if (
+            directory == FRAGMENT_DIR
+            and FRAGMENT_RE.match(name)
+            and path not in at_base
+        ):
             added.append(path)
     return added
 
@@ -549,8 +644,9 @@ def tip_fragment_problems(tip: str, root: Path) -> list[tuple[str, list[str]]]:
             continue
         if name == README_NAME:
             continue
-        text = git("show", f"{tip}:{path}", cwd=root)
-        _, errors = validate_fragment(name, text)
+        _, errors, _ = validate_fragment(
+            name, git_bytes("show", f"{tip}:{path}", cwd=root)
+        )
         if errors:
             problems.append((path, errors))
     return problems
@@ -681,7 +777,9 @@ def main(argv: list[str]) -> int:
         argv: Command-line arguments after the program name.
 
     Returns:
-        Process exit code: 0 success, 1 failed check or refusal, 2 usage or git error.
+        Process exit code: 0 success, 1 failed check, invalid fragment (including one that is not
+        UTF-8) or refusal, 2 usage or git error, 3 internal error (a load failure or an
+        unexpected exception, printed as one line).
     """
     args = build_parser().parse_args(argv)
     try:
@@ -693,6 +791,10 @@ def main(argv: list[str]) -> int:
     except ChangelogError as exc:
         print(f"changelog.py: {exc}", file=sys.stderr)
         return exc.exit_code
+    except Exception as exc:  # noqa: BLE001 - every unexpected failure must exit 3, not 1.
+        detail = " ".join(f"{type(exc).__name__}: {exc}".split())
+        print(f"changelog.py: internal error: {detail}", file=sys.stderr)
+        return 3
 
 
 if __name__ == "__main__":
