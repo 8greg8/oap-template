@@ -946,13 +946,18 @@ FRAGMENT_NAME = re.compile(
 )
 
 
-def _template_fragments(repo: Path) -> list[str]:
-    """Return the tracked fragments of the template copy, as they exist before the run."""
-    return [
-        n
-        for n in _tracked_in(repo, CHANGELOG_FRAGMENT_DIR)
-        if FRAGMENT_NAME.fullmatch(n.rsplit("/", 1)[-1])
-    ]
+def _plant_fragment(repo: Path) -> str:
+    """Write and commit a test-owned fragment in the scratch copy, and return its relative path.
+
+    The tests assert on this fragment, never on the repository's own `changelog.d/` contents,
+    which are empty after a release.
+    """
+    rel = f"{CHANGELOG_FRAGMENT_DIR}/init-test.added.md"
+    assert FRAGMENT_NAME.fullmatch(rel.rsplit("/", 1)[-1])
+    (repo / rel).write_text("- Added a test-owned fragment.\n", encoding="utf-8")
+    _git(repo, "add", rel)
+    _git(repo, "commit", "-q", "--no-verify", "-m", "test: plant a fragment")
+    return rel
 
 
 def _changelog_head(text: str) -> str:
@@ -961,8 +966,7 @@ def _changelog_head(text: str) -> str:
 
 
 def test_dry_run_lists_the_changelog_reset_and_changes_nothing(scratch: Scratch):
-    fragments = _template_fragments(scratch.repo)
-    assert fragments, "the scratch copy should carry fragments to remove"
+    fragment = _plant_fragment(scratch.repo)
     before = _text(scratch.repo, "CHANGELOG.md")
 
     result, out = _run(scratch, "--dry-run")
@@ -973,13 +977,11 @@ def test_dry_run_lists_the_changelog_reset_and_changes_nothing(scratch: Scratch)
         line.startswith("replace ") and line.split(":")[0].endswith("CHANGELOG.md")
         for line in lines
     ), out
-    for rel in fragments:
-        assert f"remove {rel}" in lines, f"`remove {rel}` missing:\n{out}"
+    assert f"remove {fragment}" in lines, f"`remove {fragment}` missing:\n{out}"
     assert f"remove {CHANGELOG_FRAGMENT_DIR}/README.md" not in lines
     assert _status(scratch.repo) == ""
     assert _text(scratch.repo, "CHANGELOG.md") == before
-    for rel in fragments:
-        assert (scratch.repo / rel).is_file(), rel
+    assert (scratch.repo / fragment).is_file(), fragment
 
 
 def test_generated_changelog_is_the_header_and_an_empty_unreleased_section(
@@ -999,7 +1001,7 @@ def test_generated_changelog_is_the_header_and_an_empty_unreleased_section(
 def test_generated_project_has_no_fragments_and_keeps_the_fragment_readme(
     scratch: Scratch,
 ):
-    assert _template_fragments(scratch.repo), "the scratch copy should carry fragments"
+    fragment = _plant_fragment(scratch.repo)
     readme_before = _text(scratch.repo, f"{CHANGELOG_FRAGMENT_DIR}/README.md")
 
     result, out = _run(scratch, "--yes", "--skip-install")
@@ -1009,6 +1011,7 @@ def test_generated_project_has_no_fragments_and_keeps_the_fragment_readme(
         p.name for p in (scratch.repo / CHANGELOG_FRAGMENT_DIR).iterdir()
     )
     assert remaining == ["README.md"]
+    assert not (scratch.repo / fragment).exists()
     assert _text(scratch.repo, f"{CHANGELOG_FRAGMENT_DIR}/README.md") == readme_before
     assert not any(t in readme_before for t in TEMPLATE_STRINGS)
 
