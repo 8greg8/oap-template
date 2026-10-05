@@ -18,51 +18,79 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+The process documents state one independent verifier per change, at branch level, whose own full
+gate run is canonical, and match the code from T-0033 to T-0035.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-05-verification-cost.md`, accepted by the owner on 2026-10-05 (V1 to V9 as recommended). Its § Design is the
+  source of truth and its § Approvals is the owner's written approval for this task's "Ask first"
+  and breaking items; cite it in the report. Where this file and the plan differ, stop and report.
+- Sync first (`git pull --ff-only origin develop`) and re-check every cited line against
+  `develop`; report any discrepancy.
+- Depends on T-0033, T-0034 and T-0035; document the merged code and report any difference from
+  the plan.
+- `CLAUDE.md` § "Verification is not optional" points to the per-commit loop in `CONTRIBUTING.md`
+  § "Agent verify/resolve workflow" (which opens "Before any commit is written…"); `.agents/README.md`
+  § "Verify, resolve, merge" has the branch-level verifier and the post-merge gate rerun.
+  `PYTHON_CONVENTIONS.md` and `README.md` also describe the per-commit verifier or the full
+  pre-push gate.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- `CLAUDE.md` § "Verification is not optional" and § Merge authority: V1, V2, V7, V9. Keep
+  `## Working unit: the task` as the first `##` heading.
+- `CONTRIBUTING.md` § "Agent verify/resolve workflow": implement, iterate with `--fast` and
+  targeted tests, commit freely; one independent verify of the finished branch; resolve; merge.
+  The hooks section: records, `--if-needed`, task-branch `--fast`, slow-test selection.
+- `.agents/README.md` § "Verify, resolve, merge": the verifier works in a detached worktree of the
+  orchestrator's checkout, always runs the full gate itself, does the judgment checks, and writes
+  the new verify line; fix rounds per V7; one verifier per task per round in the foreground (V8);
+  the post-merge check uses `--if-needed`.
+- `.agents/tasks/templates/task.md`, `PYTHON_CONVENTIONS.md`, `README.md`, `DEV_TOOLING_SPEC.md`,
+  `scripts/README.md`: remove the per-commit verifier and describe the new flow.
+- `changelog.d/T-0036.changed.md`. The `CLAUDE.md` commit is `docs(claude)!:` with a footer naming
+  the new verification rule.
+- The task's fragment holds only bullet and indented continuation lines and no placeholder words.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change any script, hook, test or `init_project.py`.
+- Do not change the "Ask first" list or any other `CLAUDE.md` section than the two named.
+- Do not change the task or report schema.
+- No new or edited tracked file contains `proj_template`, `proj-template`, `oap-template`, `8greg8`
+  or the owner's email.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-05-verification-cost.md`
+- Every file in `touches`; the merged `scripts/gate.sh`, `scripts/config/gate.sh`, `.husky/pre-push`,
+  `.agents/tasks/scripts/housekeep.py`, `.agents/tasks/scripts/report.py`
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+An agent following only the documents spawns no verifier per commit, runs exactly one
+independent verifier per change, and every documented gate behavior matches the code.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- `scripts/gate.sh` (the init test checks the `CLAUDE.md` anchor).
+- `python .agents/tasks/scripts/task.py validate`.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason. A `feat`, `fix` or breaking change also adds a changelog fragment,
-`changelog.d/<id>.<category>.md`, listed in `touches` (see `CONTRIBUTING.md`
-§ Versioning).
+The files in `touches`, as in Scope.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] No document requires an independent verifier per commit.
+- [ ] `CLAUDE.md` and `.agents/README.md` require exactly one independent verifier per change, running the full gate itself.
+- [ ] Fix rounds, foreground verifiers and bookkeeping commits are described as the plan states.
+- [ ] Every documented gate and hook behavior matches the merged code.
+- [ ] `CLAUDE.md`'s first `##` heading is unchanged.
+- [ ] `changelog.d/T-0036.changed.md` exists and `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 
 ## Workflow
 

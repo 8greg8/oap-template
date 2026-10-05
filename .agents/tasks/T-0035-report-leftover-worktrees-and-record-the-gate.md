@@ -18,51 +18,75 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+`housekeep.py` reports leftover worktrees and local branches of finished tasks, and the report's
+verify line can name the gate record the verifier wrote.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-05-verification-cost.md`, accepted by the owner on 2026-10-05 (V1 to V9 as recommended). Its § Design is the
+  source of truth and its § Approvals is the owner's written approval for this task's "Ask first"
+  and breaking items; cite it in the report. Where this file and the plan differ, stop and report.
+- Sync first (`git pull --ff-only origin develop`) and re-check every cited line against
+  `develop`; report any discrepancy.
+- `.agents/tasks/scripts/housekeep.py:396` `check_worktrees()` flags worktrees of merged
+  branches and `develop`/`main` checked out in a secondary worktree. Its tests are in
+  `tests/test_report_scripts.py`.
+- `.agents/tasks/scripts/report.py:65-71` (`VERIFY_LINE_RE`, `VERIFY_COMMIT_RE`) and
+  `.agents/tasks/templates/report.md` define the verify line `passed (commit <hash>; ...)`.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- Extend `check_worktrees()`: also report worktrees and local branches whose task is `done` or
+  `abandoned`, including unmerged ones and branches with no worktree. Keep the documented exit
+  status rules; if a new finding changes the exit status of `housekeep.py worktrees` or `all`,
+  say so in the report as a CLI change.
+- Verify line: `passed (commit <hash>; gate <record-key>; <counts>)` per the plan's § "The verify
+  line". `report.py validate` accepts it and keeps accepting the existing form for old reports.
+  The template documents it.
+- Tests in `tests/test_report_scripts.py` (and `tests/test_task_scripts.py` if the task scripts'
+  shared helpers change).
+- `changelog.d/T-0035.added.md`. The verify-line change is marked breaking (`feat(tasks)!:`) only
+  if old reports stop validating; the plan expects they do not.
+- The task's fragment holds only bullet and indented continuation lines and no placeholder words.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not delete or remove anything; report only.
+- Do not change the task schema or `task.py`.
+- Do not change process documents (T-0036).
+- No new or edited tracked file contains `proj_template`, `proj-template`, `oap-template`, `8greg8`
+  or the owner's email.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-05-verification-cost.md`
+- Every file in `touches`
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+`housekeep.py worktrees` lists every leftover the Scope names; every existing report still
+validates; a report with the new verify line validates.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- `uv run pytest tests/test_report_scripts.py tests/test_task_scripts.py -v`.
+- `python .agents/tasks/scripts/report.py validate` over every existing report.
+- `scripts/gate.sh`.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason. A `feat`, `fix` or breaking change also adds a changelog fragment,
-`changelog.d/<id>.<category>.md`, listed in `touches` (see `CONTRIBUTING.md`
-§ Versioning).
+`.agents/tasks/templates/report.md`, as in Scope.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] `housekeep.py worktrees` reports worktrees and branches of `done` or `abandoned` tasks, merged or not, with or without a worktree.
+- [ ] The new verify-line form validates and every existing report still validates.
+- [ ] The report template documents the new form.
+- [ ] Any exit-status change of `housekeep.py` is stated in the report.
+- [ ] `changelog.d/T-0035.added.md` exists and `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch.
+- [ ] `uv run pytest tests/test_report_scripts.py tests/test_task_scripts.py -v` passes.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 
 ## Workflow
 

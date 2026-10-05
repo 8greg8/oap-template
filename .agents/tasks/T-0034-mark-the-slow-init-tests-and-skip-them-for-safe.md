@@ -18,51 +18,81 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+The two end-to-end init tests run only when a change can affect them: the gate skips them for
+safe-list-only changes, always runs them for `main` and `--all`, and records which it did.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-05-verification-cost.md`, accepted by the owner on 2026-10-05 (V1 to V9 as recommended). Its § Design is the
+  source of truth and its § Approvals is the owner's written approval for this task's "Ask first"
+  and breaking items; cite it in the report. Where this file and the plan differ, stop and report.
+- Sync first (`git pull --ff-only origin develop`) and re-check every cited line against
+  `develop`; report any discrepancy.
+- Depends on T-0033 (records, `--if-needed`, `RECORD_PATHS`).
+- The two slow cases are the end-to-end tests in `tests/test_init_project.py` (about 250 to 300 s
+  together); the file's other tests take about 40 s. `pyproject.toml` has no `[tool.pytest]`
+  section. `TEST_CMD` is `uv run pytest`.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+Implement the plan's § "Slow tests run unless the change is provably safe" exactly:
+- Mark the two end-to-end cases `slow`; register the marker in `pyproject.toml`
+  `[tool.pytest.ini_options]`.
+- `SLOW_SAFE_PATHS` in `scripts/config/gate.sh` (the plan's list). `scripts/gate.sh` runs
+  `-m "not slow"` only when every path changed since the base is on it; `--all` runs everything.
+  The base: merge base with `origin/$DEVELOP_BRANCH` (`origin/$MAIN_BRANCH` for `hotfix/*`),
+  falling back to the local branch.
+- The record notes whether slow tests ran; `--if-needed` treats a record without them as
+  insufficient for `main` and for any commit whose change is not safe-list-only.
+- `.husky/pre-push`: a push to `main` always requires slow tests.
+- A fast (not `slow`) test that greps the safe-listed docs for the template-name strings.
+- `scripts/README.md`, `DEV_TOOLING_SPEC.md`: the selection rule.
+- Tests in `tests/test_gate.py` and `tests/test_hooks.py`.
+- `changelog.d/T-0034.added.md`. The behavior commit is marked breaking (`feat(gate)!:`) with a
+  footer saying the default gate may skip the slow tests.
+- The task's fragment holds only bullet and indented continuation lines and no placeholder words.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change which tests exist or what they assert, beyond the marker and the new grep test.
+- Do not add `pytest-xdist` or any dependency (V6).
+- Do not change the gate commands other than test selection.
+- Do not change `CLAUDE.md`, `CONTRIBUTING.md` or `.agents/README.md` (T-0036).
+- No new or edited tracked file contains `proj_template`, `proj-template`, `oap-template`, `8greg8`
+  or the owner's email.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-05-verification-cost.md`
+- Every file in `touches`; `init_project.py` (what it copies, edits and removes)
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+A change only to safe-listed paths runs the gate without the two slow tests; any other change, a
+`main` push and `--all` run them; a record without slow tests never satisfies a check that needs
+them.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- `uv run pytest -m slow --co -q` lists exactly the two end-to-end cases.
+- `uv run pytest tests/test_gate.py tests/test_hooks.py -v`.
+- `scripts/gate.sh --all`.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason. A `feat`, `fix` or breaking change also adds a changelog fragment,
-`changelog.d/<id>.<category>.md`, listed in `touches` (see `CONTRIBUTING.md`
-§ Versioning).
+`scripts/README.md` and `DEV_TOOLING_SPEC.md`, as in Scope.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] Exactly the two end-to-end cases are marked `slow` and the marker is registered.
+- [ ] Safe-list-only changes skip them; other changes, `main` pushes and `--all` run them.
+- [ ] The base is defined as the plan states, with the local fallback.
+- [ ] Records carry the slow flag and `--if-needed` honors it.
+- [ ] A fast test greps the safe-listed docs for the template-name strings.
+- [ ] `changelog.d/T-0034.added.md` exists and `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch.
+- [ ] `uv run pytest tests/test_gate.py tests/test_hooks.py -v` passes.
+- [ ] `scripts/gate.sh --all` passes.
+- [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 
 ## Workflow
 
