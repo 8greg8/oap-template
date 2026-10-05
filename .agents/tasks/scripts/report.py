@@ -71,8 +71,9 @@ VERIFY_LINE_RE = re.compile(
 VERIFY_COMMIT_RE = re.compile(r"\bcommit [0-9a-f]{7,40}\b")
 
 #: The gate record a verify line may name: ``gate <record-key>`` is one
-#: ``;``-separated part of the status, the key being 7 to 64 hex digits.
-VERIFY_GATE_RE = re.compile(r"gate [0-9a-f]{7,64}")
+#: ``;``-separated part of the status. A gate record key is 40 or 64 lowercase hex
+#: characters; the verify line may cite 12 to 64 of them.
+VERIFY_GATE_RE = re.compile(r"gate [0-9a-f]{12,64}")
 
 #: A part of the verify status that is ``gate`` alone, or starts with ``gate`` and a
 #: space, claims to name a gate record, so it must match :data:`VERIFY_GATE_RE` exactly.
@@ -209,7 +210,7 @@ def _verify_gate_problems(status: str) -> list[str]:
 
     The form is ``passed (commit <hash>; gate <record-key>; <counts>)``. The part is
     optional so reports written before it existed keep validating; when a part starts
-    with ``gate`` and a space, its key must be 7 to 64 hex digits.
+    with ``gate`` and a space, its key must be 12 to 64 lowercase hex characters.
 
     Args:
         status: The text after ``::`` on the verify line.
@@ -220,7 +221,7 @@ def _verify_gate_problems(status: str) -> list[str]:
     inner = status[status.find("(") + 1 :].rstrip(")") if "(" in status else ""
     return [
         f"verify line names a gate record {part!r} that is not 'gate <record-key>' "
-        "with a record key of 7 to 64 hex digits"
+        "with a record key of 12 to 64 lowercase hex characters"
         for part in (p.strip() for p in inner.split(";"))
         if _VERIFY_GATE_CLAIM_RE.match(part) and not VERIFY_GATE_RE.fullmatch(part)
     ]

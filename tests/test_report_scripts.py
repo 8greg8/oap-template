@@ -171,9 +171,12 @@ def test_done_report_with_gate_record_verify_line_is_accepted():
     assert report_module.validate_report(report, task) == []
 
 
-def test_done_report_accepts_short_gate_key():
+@pytest.mark.parametrize(
+    "key", ["0123456789ab", "0123456789abcdef0123456789abcdef01234567"]
+)
+def test_done_report_accepts_gate_key_of_12_to_64_characters(key):
     task = _done_task("T-0001", ["src"])
-    line = _verify_line("passed (commit abc1234; gate 0123abc; 551 passed)")
+    line = _verify_line(f"passed (commit abc1234; gate {key}; 551 passed)")
     report = _report_for("T-0001", line, _TOUCHES_UNTICKED)
     assert report_module.validate_report(report, task) == []
 
@@ -185,6 +188,8 @@ def test_done_report_accepts_short_gate_key():
         "passed (commit abc1234; gate ; 10 passed)",
         "passed (commit abc1234; gate xyz; 10 passed)",
         "passed (commit abc1234; gate 0123; 10 passed)",
+        "passed (commit abc1234; gate 0123456789a; 10 passed)",
+        "passed (commit abc1234; gate 0123456789ABCDEF; 10 passed)",
         f"passed (commit abc1234; gate {_GATE_KEY}0; 10 passed)",
     ],
 )
