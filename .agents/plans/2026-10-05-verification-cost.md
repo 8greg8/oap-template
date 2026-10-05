@@ -181,8 +181,8 @@ The report's verify line becomes
 ## Approvals this plan needs
 
 - **Ask first:** `CLAUDE.md` § "Verification is not optional" and § Merge authority text;
-  `scripts/gate.sh`, `scripts/config/gate.sh`, `scripts/gitflow.sh`; `pyproject.toml`
-  `[tool.pytest]`.
+  `scripts/gate.sh`, `scripts/config/gate.sh`, `scripts/gitflow.sh`, `scripts/README.md`;
+  `pyproject.toml` `[tool.pytest]`.
 - **Breaking:** the verification rules; the pre-push behavior (task 1: records; task 2: slow-test
   skipping; both change what the hook checks by default); the report verify-line format.
 - The owner's acceptance of this plan, recorded here, is the written approval the orchestrator

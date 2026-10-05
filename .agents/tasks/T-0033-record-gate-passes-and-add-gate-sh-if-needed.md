@@ -5,7 +5,7 @@ status: open
 type: feat
 priority: high
 depends_on: []
-touches: [scripts/gate.sh, scripts/config/gate.sh, .husky/pre-push, .husky/pre-commit, scripts/gitflow.sh, tests/test_gate.py, tests/test_hooks.py, tests/test_gitflow.py, tests/test_release.py, scripts/README.md, DEV_TOOLING_SPEC.md, changelog.d/T-0033.added.md]
+touches: [scripts/gate.sh, scripts/config/gate.sh, .husky/pre-push, .husky/pre-commit, scripts/gitflow.sh, tests/test_gate.py, tests/test_hooks.py, tests/test_gitflow.py, tests/test_release.py, scripts/README.md, DEV_TOOLING_SPEC.md, changelog.d/T-0033.added.md, changelog.d/template.added.md]
 created: 2026-10-05
 report: reports/T-0033.md
 ---
@@ -34,6 +34,9 @@ re-running the gate on code that already passed; and task-branch pushes run only
   `.husky/pre-push` skip every `.agents/` path except `.agents/tasks/scripts/`.
   `scripts/gitflow.sh:96` runs the full gate in `finish`. `scripts/release.py` pushes `main`,
   `develop` and the tag atomically, possibly with the `develop` back-merge not checked out.
+- `scripts/README.md` is under `scripts/` and is treated as an "Ask first" item (T-0026 precedent).
+  The plan assigns it to this task, and the owner's acceptance ("proceed with the steps") covers
+  the plan's tasks. Cite both in the report.
 
 ## Scope
 
@@ -51,7 +54,10 @@ branches" exactly:
   want of a checkout.
 - `.husky/pre-push`: `develop` and `main` call `--if-needed` with every pushed non-deleted
   `local_sha`; any other branch runs `scripts/gate.sh --fast`. The changelog check is unchanged.
-- `scripts/gitflow.sh finish`: `--if-needed` instead of the full gate.
+- `scripts/gitflow.sh finish`: after each merge it makes (into the base; for a hotfix, also the
+  back-merge into `develop`), it runs `scripts/gate.sh --if-needed HEAD`. On red it runs
+  `git reset --merge ORIG_HEAD` for each merge it made in this run and dies; nothing has been
+  pushed. The pre-merge full gate is removed. A test covers a red post-merge gate.
 - `scripts/README.md` and `DEV_TOOLING_SPEC.md`: the gate and hook sections, matching the code.
 - Tests: `tests/test_gate.py` (new) for keys, filtering, clean checks, tool-version changes,
   `--if-needed` on several commits and on a non-checked-out commit; hook and gitflow tests; a test
@@ -59,6 +65,33 @@ branches" exactly:
 - `changelog.d/T-0033.added.md`. The behavior commit is marked breaking (`feat(gate)!:`) with a
   footer naming the new pre-push behavior.
 - The task's fragment holds only bullet and indented continuation lines and no placeholder words.
+- Key format (shared with T-0035): `RECORD_PATHS` is one space-separated string of git glob
+  pathspecs: `.agents/tasks/T-*.md .agents/tasks/reports/** .agents/tasks/BACKLOG.md
+  .agents/tasks/.counter .agents/LESSONS.md .agents/plans/**`. The hooks and the key's tree listing
+  both exclude these as `:(exclude,glob)<entry>` pathspecs, so all three use one matcher; shell code
+  expands the string with globbing off (`set -f`). `gate.sh` reads config variables as `${VAR-}`
+  so stub configs without them still work.
+- Key: `git hash-object --stdin` over `git ls-tree -r --full-tree <commit> -- . <exclude
+  pathspecs>` followed by one line each from `uv --version`, `uv run python -VV`, `git --version`
+  and `node -v` (`node: absent` when node is missing). It is 40 or 64 lowercase hex characters.
+- The record is the file `$(git rev-parse --git-common-dir)/gate-pass/<key>` with `key=`,
+  `commit=`, `slow=yes|no` and `date=` lines; a `slow=yes` record is never overwritten by
+  `slow=no`. A run that writes a record prints `gate record <key> (slow tests: yes|no)` before
+  `gate clean`; a full run that writes none prints why (dirty tree).
+- Temporary worktree: before using one, `gate.sh` unsets `GIT_DIR`, `GIT_WORK_TREE`,
+  `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`, `GIT_ALTERNATE_OBJECT_DIRECTORIES` and `GIT_PREFIX`;
+  creates it with `git worktree add --detach "$(mktemp -d)/wt" <commit>`; runs that commit's own
+  `scripts/gate.sh` (full) there, which writes the record; removes it with
+  `git worktree remove --force` and `git worktree prune` in a trap on exit. No `npm ci` is needed;
+  `uv run` creates `.venv`. A test pushes `develop` from a linked worktree with the commit not
+  checked out.
+- Pre-push interface: one `gate.sh --if-needed` call with the `local_sha` of every non-deleted
+  `develop` or `main` ref; when the push has any other branch ref, one `gate.sh --fast` call; tags
+  and other non-branch refs trigger no gate. The `RECORD_PATHS` skip rule runs first, as today.
+- `changelog.d/template.added.md`: correct the line about `.agents/`-only pushes to name
+  `RECORD_PATHS`-only pushes.
+- The fragment follows `changelog.d/README.md`, section "Before the first release": category
+  `added`, and no "Breaking:", "no longer", "used to" or "now".
 
 ## Non-goals
 
