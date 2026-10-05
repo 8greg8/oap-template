@@ -532,6 +532,71 @@ def test_push_lands_main_develop_and_tag_on_origin(repo: Path):
     assert git(bare, "cat-file", "-t", "v0.1.0") == "tag"
 
 
+def install_pre_push_hook(repo: Path) -> Path:
+    """Wire the real pre-push hook and the real gate.sh into the scratch repo.
+
+    The gate commands are replaced by `true` and committed on develop, so the tree stays clean
+    and the gate runs for real except for lint, typecheck and tests. The hook is reached through
+    a shim in a hooks directory, which the caller wires in with `core.hooksPath` when it wants
+    the hook to run; the other hooks stay off. Returns that directory.
+    """
+    (repo / "scripts" / "lib").mkdir(parents=True, exist_ok=True)
+    shutil.copy(SCRIPTS / "gate.sh", repo / "scripts" / "gate.sh")
+    shutil.copy(SCRIPTS / "lib" / "common.sh", repo / "scripts" / "lib" / "common.sh")
+    config = repo / "scripts" / "config" / "gate.sh"
+    config.write_text(
+        config.read_text(encoding="utf-8")
+        + "LINT_CMD=true\nFORMAT_CHECK_CMD=true\nTYPECHECK_CMD=true\nTEST_CMD=true\n",
+        encoding="utf-8",
+    )
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "chore: gate with cheap commands")
+    git(repo, "push", "-q", "origin", "develop")
+    hooks = repo.parent / "pre-push-hooks"
+    hooks.mkdir()
+    shim = hooks / "pre-push"
+    shim.write_text(
+        f'#!/bin/sh\nexec sh -e "{REPO_ROOT / ".husky" / "pre-push"}" "$@"\n',
+        encoding="utf-8",
+    )
+    shim.chmod(shim.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    return hooks
+
+
+def test_hotfix_release_push_passes_the_pre_push_hook(repo: Path):
+    """`release.py --yes --push` after a hotfix: main is checked out, develop is not.
+
+    The hook gates main's release commit on the checkout, develop's back-merge in a temporary
+    worktree (which it removes), and runs the fast gate for the tag.
+    """
+    hooks = install_pre_push_hook(repo)  # not wired in yet
+    feat(repo, "a")
+    git(repo, "push", "-q", "origin", "develop")
+    release(repo, "--yes", "--push", expect=0)
+    feat(repo, "b")  # develop-only work, not released yet
+    git(repo, "push", "-q", "origin", "develop")
+    _hotfix_on_main(repo)
+    git(repo, "config", "core.hooksPath", str(hooks))
+
+    result = release(repo, "--yes", "--push", expect=0)
+
+    assert "pushed" in result.stdout
+    bare = origin_of(repo)
+    assert git(bare, "rev-parse", "main") == git(repo, "rev-parse", "main")
+    assert git(bare, "rev-parse", "develop") == git(repo, "rev-parse", "develop")
+    assert git(bare, "rev-parse", "v0.1.1^{commit}") == git(repo, "rev-parse", "main")
+    assert git(repo, "rev-parse", "--abbrev-ref", "HEAD") == "main"
+    # The hook ran the gate for both pushed commits and left no temporary worktree behind.
+    gated = {
+        line.removeprefix("commit=")
+        for record in (repo / ".git" / "gate-pass").iterdir()
+        for line in record.read_text(encoding="utf-8").splitlines()
+        if line.startswith("commit=")
+    }
+    assert gated == {git(repo, "rev-parse", "main"), git(repo, "rev-parse", "develop")}
+    assert git(repo, "worktree", "list", "--porcelain").count("worktree ") == 1
+
+
 def test_push_is_atomic_when_one_ref_is_rejected(repo: Path):
     feat(repo, "a")
     git(repo, "push", "-q", "origin", "develop")

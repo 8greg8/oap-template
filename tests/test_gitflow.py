@@ -336,3 +336,99 @@ def test_hotfix_finish_tells_you_to_push_both_branches_then_release(scratch: Pat
     assert _git(scratch, "rev-parse", "origin/main") != _git(
         scratch, "rev-parse", "main"
     )
+
+
+def _commit_on_develop(scratch: Path, files: dict[str, str], message: str) -> None:
+    """Commit files on develop and push it, so the primary checkout stays clean."""
+    for rel, content in files.items():
+        path = scratch / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    _git(scratch, "add", "-A")
+    _git(scratch, "commit", "-q", "--no-verify", "-m", message)
+    _git(scratch, "push", "-q", "origin", "develop")
+
+
+def test_finish_runs_the_gate_with_if_needed_on_the_branch_tip(scratch: Path):
+    log = scratch.parent / "gate-args"
+    _commit_on_develop(
+        scratch,
+        {"scripts/gate.sh": f'#!/bin/sh\necho "$@ $PWD" >> "{log}"\n'},
+        "chore: logging gate stub",
+    )
+    worktree = _start_commit(scratch, "docs", "T-0007-notes", "docs: notes", None)
+
+    _gitflow(scratch, "docs", "finish", "T-0007-notes")
+
+    (line,) = log.read_text(encoding="utf-8").splitlines()
+    flag, ref, cwd = line.split(" ", 2)
+    assert (flag, ref) == ("--if-needed", "refs/heads/docs/T-0007-notes")
+    assert Path(cwd).resolve() == worktree.resolve()
+    assert not worktree.exists()
+
+
+def _install_real_gate(scratch: Path, log: Path) -> None:
+    """Replace the stub gate with the real gate.sh, over a config that logs each gate command."""
+    config = (scratch / "scripts" / "config" / "gate.sh").read_text(encoding="utf-8")
+    logging = "\n".join(
+        [
+            "",
+            f'log() {{ echo "$1" >> "{log}"; }}',
+            'LINT_CMD="log lint"',
+            'FORMAT_CHECK_CMD="log format"',
+            'TYPECHECK_CMD="log typecheck"',
+            'TEST_CMD="log test"',
+            "export -f log",
+            "",
+        ]
+    )
+    _commit_on_develop(
+        scratch,
+        {
+            ".gitignore": "node_modules\n",
+            "scripts/gate.sh": (SCRIPTS / "gate.sh").read_text(encoding="utf-8"),
+            "scripts/config/gate.sh": config + logging,
+        },
+        "chore: real gate with a logging config",
+    )
+
+
+FULL_GATE = ["lint", "format", "typecheck", "test"]
+
+
+def test_finish_does_not_rerun_a_gate_that_already_passed_on_the_branch_tip(
+    scratch: Path, tmp_path: Path
+):
+    """With the real gate.sh: a full run on the branch writes a record, so finish skips it."""
+    log = tmp_path / "calls.log"
+    _install_real_gate(scratch, log)
+    worktree = _start_commit(scratch, "docs", "T-0007-notes", "docs: notes", None)
+    first = subprocess.run(
+        ["bash", "scripts/gate.sh"],
+        cwd=worktree,
+        capture_output=True,
+        text=True,
+        env=_env(),
+        check=False,
+    )
+    assert first.returncode == 0, first.stdout + first.stderr
+    assert log.read_text(encoding="utf-8").split() == FULL_GATE
+    log.unlink()
+
+    result = _gitflow(scratch, "docs", "finish", "T-0007-notes")
+
+    assert "skipped" in result.stdout
+    assert not log.exists()
+    assert (scratch / "change.py").is_file()
+
+
+def test_finish_runs_the_gate_when_the_branch_tip_has_no_record(
+    scratch: Path, tmp_path: Path
+):
+    log = tmp_path / "calls.log"
+    _install_real_gate(scratch, log)
+    _start_commit(scratch, "docs", "T-0007-notes", "docs: notes", None)
+
+    _gitflow(scratch, "docs", "finish", "T-0007-notes")
+
+    assert log.read_text(encoding="utf-8").split() == FULL_GATE

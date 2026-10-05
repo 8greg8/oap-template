@@ -93,7 +93,10 @@ finish() {
         die "changelog check failed (exit $check_rc) on $branch"
     fi
 
-    ( cd "$worktree_dir" && "$SCRIPTS_DIR/gate.sh" ) || die "gate failed on $branch -- fix before finishing"
+    # --if-needed runs the full gate only when no gate record exists for the branch tip, so
+    # code that already passed (the verifier's run, a push of the branch) is not gated again.
+    ( cd "$worktree_dir" && "$SCRIPTS_DIR/gate.sh" --if-needed "refs/heads/$branch" ) \
+        || die "gate failed on $branch -- fix before finishing"
 
     section "merging $branch into $base"
     git checkout "$base"

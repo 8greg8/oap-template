@@ -56,15 +56,17 @@ package.json                # minimal: husky devDependency + "prepare" script on
 .husky/
   pre-commit                 # staged files only, no tests: autofix.sh --staged, re-stage, gate.sh --staged
   commit-msg                 # scripts/commit_lint.py "$1"
-  pre-push                   # changelog fragment check per pushed branch, then full scripts/gate.sh;
-                             # both skipped when every pushed commit is .agents/ records
+  pre-push                   # changelog fragment check per pushed branch, then the gate: develop and
+                             # main need a gate record (gate.sh --if-needed), any other ref gets
+                             # gate.sh --fast; all skipped when every pushed commit is RECORD_PATHS only
 scripts/
   README.md                  # how to install this bundle into a new/existing repo
   config/
-    gate.sh                  # ONLY project-specific file: lint/format/typecheck/test commands
+    gate.sh                  # ONLY project-specific file: gate commands, branch names, RECORD_PATHS
   lib/
     common.sh                # shared shell helpers: colors, fail(), section headers
-  gate.sh                    # runs the 4 verify gates from config/gate.sh, fails fast, reports clearly
+  gate.sh                    # runs the 4 verify gates from config/gate.sh, reports clearly; writes and
+                             # checks gate records (--if-needed)
   autofix.sh                 # runs the *_FIX_CMD variants from config/gate.sh (safe auto-corrections)
   commit_lint.py              # stdlib-only: validates a commit message against Conventional Commits
   next_version.py             # stdlib-only: computes next SemVer from commits since last vX.Y.Z tag
@@ -79,7 +81,7 @@ changelog.d/
 ```
 
 Everything under `scripts/` besides `config/gate.sh` is committed as-is. `scripts/config/gate.sh`
-is the adaptation point: it defines four shell variables the rest of the tooling sources and never
+is the adaptation point: it defines the shell variables the rest of the tooling sources and never
 hardcodes elsewhere.
 
 ## `scripts/config/gate.sh` contract
@@ -96,7 +98,18 @@ TEST_CMD="uv run pytest"
 # Branch names, only needed by gitflow.sh / release.py.
 MAIN_BRANCH="main"
 DEVELOP_BRANCH="develop"
+
+# Bookkeeping paths: space-separated patterns, left out of a gate record's key and skipped by
+# the hooks.
+RECORD_PATHS=".agents/tasks/T-*.md .agents/tasks/reports/ .agents/tasks/BACKLOG.md .agents/tasks/.counter .agents/LESSONS.md .agents/plans/"
 ```
+
+`RECORD_PATHS` lists the paths that only record bookkeeping: task files, reports, `BACKLOG.md`, the
+task counter, `LESSONS.md` and plans. A pattern ending in `/` is a directory prefix; any other
+pattern is an exact path or a glob in which `*` also matches `/`; no pattern holds a space. Everything
+else counts as code, including `.agents/tasks/scripts/`, `.agents/tasks/templates/` and
+`.agents/README.md`. Both hooks use the list for their skip rule, and `gate.sh` uses it to build the
+key of a gate record, so the hooks and the key always agree.
 
 This repo's default values are the exact commands from `PYTHON_CONVENTIONS.md` § Commands, so the
 gate a fresh clone of this template runs is identical to what that doc already tells a human/agent
@@ -108,7 +121,9 @@ loop, and `gitflow.sh`/`release.py` keep working unmodified.
 
 The file must stay POSIX-sourceable: plain `NAME="value"` assignments, no bash arrays or other
 bash-only syntax. The bash scripts source it, and so does `.husky/pre-push`, which runs under
-POSIX `sh` (`dash` on many systems). A test sources it with `sh`.
+POSIX `sh` (`dash` on many systems). A test sources it with `sh`. A copy of the config
+without `RECORD_PATHS` still works: no path is then a record path, so the hooks gate every change
+and the key covers every tracked file.
 
 ## `scripts/gate.sh`
 
@@ -121,9 +136,9 @@ output directly):
 3. `TYPECHECK_CMD`
 4. `TEST_CMD`
 
-Stops at the first failing gate (fail-fast) and exits non-zero. Exit 0 only when all four pass.
-This is what `pre-push` runs, what the verify/resolve loop's independent verifier runs, and what a
-CI job would run — one script, one source of truth.
+Exits non-zero when any gate fails. Exit 0 only when all four pass. This is what the verify/resolve
+loop's independent verifier runs, what `pre-push` runs (through `--if-needed` for `develop` and
+`main`), and what a CI job would run: one script, one source of truth.
 
 Flags:
 
@@ -133,25 +148,64 @@ Flags:
   It exits 0 when no staged file matches. `LINT_CMD`, `FORMAT_CHECK_CMD`, `TYPECHECK_CMD` and
   the `*_FIX_CMD`s therefore must accept file paths as trailing arguments; with no arguments
   they check the whole repo. `pre-commit` uses this mode.
+- `--if-needed [<commit>...]` checks a gate record for each named commit (default `HEAD`) and
+  exits 0 only when every commit has a record or passes a full gate run. See § Gate records.
+  It cannot be combined with `--fast` or `--staged`, and a commit argument is accepted only with
+  it.
 
 `gate.sh` and `autofix.sh` run under bash 3.2 (macOS default): no `mapfile`, and empty arrays
 are expanded with the `${files[@]+"${files[@]}"}` guard so `set -u` does not abort.
 
+### Gate records
+
+A full `gate.sh` run that passes writes a record, so later steps do not gate the same code again.
+
+- **Key.** The hash of the commit's tree with every `RECORD_PATHS` path filtered out, plus
+  `uv --version`, `uv run python -VV`, `node -v` and `git --version`. A tool that is not installed
+  counts as such, and does not fail the run. The tool versions are those seen from the checkout
+  where `gate.sh` runs. Changing a record path keeps the key. Changing any other tracked file, or a
+  tool version, changes it.
+- **Where.** `$(git rev-parse --git-common-dir)/gate-pass/<key>`, a small text file naming the
+  commit, whether the slow tests ran (`slow_tests=yes` for every full run) and the time. It sits
+  in the git directory shared by every worktree of the repository. It is never committed and never
+  part of the tree.
+- **When it is written.** Only after a full run in which every gate passed on a tree that is
+  clean before and after: `git status --porcelain --untracked-files=all` prints nothing both
+  times. `--fast`, `--staged`, a failed run and a dirty run never write one; a dirty run says so.
+- **`--if-needed [<commit>...]`.** For each commit (default `HEAD`) it computes the key and looks
+  for the record. A commit with a record is skipped. For each commit without one it runs the
+  commit's own full gate: on the working tree when that commit is checked out and the tree is
+  clean, otherwise in a temporary detached worktree of that commit, which it removes afterwards
+  whether the gate passed or not. It never refuses for want of a checkout. The run writes the
+  record itself. It exits 1 at the first commit whose gate fails.
+
+Records are local files, and any clean full run writes one, an executor's included. The
+independent verifier therefore never relies on a record: it runs the full gate itself. Records
+only let the later mechanical steps skip the same code: the `develop` and `main` pushes, `gitflow.sh finish`
+and the post-merge check. Records written inside scratch repositories by tests and by
+`init_project.py` stay in those repositories.
+
 ## Hooks
 
 - `pre-commit`: exits 0 when nothing is staged. Exits 0 with a message when every staged path
-  (listed with `--no-renames`, so a rename into `.agents/` also counts its old path) is under
-  `.agents/` and none is under `.agents/tasks/scripts/` (task filing, status changes, reports,
-  `BACKLOG.md`). Otherwise runs `autofix.sh --staged`, re-stages only the files that were
+  (listed with `--no-renames`, so a rename into a record path also counts its old path) matches
+  `RECORD_PATHS` (task filing, status changes, reports, `BACKLOG.md`, `LESSONS.md`, plans).
+  Otherwise runs `autofix.sh --staged`, re-stages only the files that were
   already staged (NUL-delimited, as literal paths, so any filename works), then
   `gate.sh --staged`. Tests are left to `pre-push`.
 - `pre-push`: reads git's `<local ref> <local sha> <remote ref> <remote sha>` lines and lists
   the files of each pushed commit (`git log --name-only --no-renames
   --diff-merges=first-parent`). It skips everything, the fragment check and the gate, only when
-  every pushed commit touches nothing but `.agents/` and nothing under `.agents/tasks/scripts/`. A
-  deleted ref pushes no commits. A new remote branch, or a range git cannot list, never takes the
-  skip. Otherwise it runs the fragment check (below) for each pushed ref, then the full
-  `gate.sh`.
+  every pushed commit touches nothing but `RECORD_PATHS` paths. A deleted ref pushes no commits. A
+  new remote branch, or a range git cannot list, never takes the skip. Otherwise it runs the
+  fragment check (below) for each pushed ref, then the gate, which depends on the ref:
+  - `develop` and `main` run `gate.sh --if-needed` with every pushed, non-deleted local sha. The
+    full gate runs only for a commit that has no gate record.
+  - any other ref (a task branch, a tag) runs `gate.sh --fast` once. The independent verifier's
+    full run follows before a merge, and `develop` and `main` stay fully protected.
+  A hotfix release push passes: `release.py --yes --push` leaves `main` checked out, so its release
+  commit is gated on the checkout, and the back-merge on `develop` is gated in a temporary
+  worktree.
 - `commit-msg`: `commit_lint.py`, below.
 - Merge commits: a merge commit that git creates itself runs `commit-msg` only. Git runs no
   `pre-commit` for it, and `.husky/` has no `pre-merge-commit` hook, so the `chore(merge)` commits
@@ -159,7 +213,8 @@ are expanded with the `${files[@]+"${files[@]}"}` guard so `set -u` does not abo
   conflict and is finished by hand with `git commit` runs `pre-commit` too. Of the commits
   `release.py` makes, only `chore(release)` runs `pre-commit`.
 
-Code under `.agents/tasks/scripts/` is tooling, not a record, so it never takes the skip.
+Code under `.agents/tasks/scripts/`, the templates and the process docs are not in `RECORD_PATHS`,
+so they never take the skip.
 
 ### Fragment check on push
 
@@ -389,8 +444,9 @@ scripts/gitflow.sh hotfix finish <topic>   # merge into main, back-merge main in
                                             # (pushes and tags nothing; prints the next steps)
 ```
 
-`finish` subcommands refuse to run if the changelog check or `scripts/gate.sh` fails on the branch
-being merged — neither is bypassable through the gitflow helper. The changelog check is
+`finish` subcommands refuse to run if the changelog check or `scripts/gate.sh --if-needed` fails on
+the branch being merged — neither is bypassable through the gitflow helper. `--if-needed` skips
+the full gate when the branch tip already has a gate record and runs it otherwise. The changelog check is
 `changelog.py check <merge base> <branch>`, where the merge base is with `origin/<base>` when that
 ref exists and with the local base branch otherwise. `finish` runs `git fetch origin <base>` first
 so that ref is current; when the fetch fails it prints a warning and uses the local base branch.

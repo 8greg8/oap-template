@@ -1,21 +1,43 @@
 #!/usr/bin/env sh
-# Staged files only, no tests: .husky/pre-push runs the full gate. A commit that stages
-# only .agents/ records (task filing, status changes, reports, BACKLOG.md) skips the hook,
-# so `task.py new` and the orchestrator's state commits stay fast. The tooling code under
-# .agents/tasks/scripts/ is never skipped.
+# Staged files only, no tests: .husky/pre-push runs the gate. A commit that stages only
+# record paths (RECORD_PATHS in scripts/config/gate.sh: task filing, status changes, reports,
+# BACKLOG.md, LESSONS.md, plans) skips the hook, so `task.py new` and the orchestrator's state
+# commits stay fast. The tooling code under .agents/tasks/scripts/ and the process docs are
+# not records and are never skipped.
 #
 # The skip decision lists every staged path with --no-renames and no --diff-filter, as
-# .husky/pre-push does: a file renamed into .agents/ shows as a deletion outside it plus an
-# addition inside, and the deletion keeps the gate on. Path lists are NUL-delimited (-z), so
-# spaces, quotes, newlines and non-ASCII bytes in a name are never quoted or split. The
-# decision list is turned into lines only to match prefixes; a newline inside a name can add
-# lines but never hides a path outside .agents/, so it can only keep the gate on.
+# .husky/pre-push does: a file renamed into a record path shows as a deletion outside it plus
+# an addition inside, and the deletion keeps the gate on. Path lists are NUL-delimited (-z),
+# so spaces, quotes, newlines and non-ASCII bytes in a name are never quoted or split. The
+# decision list is turned into lines only to match patterns; a newline inside a name can add
+# lines but never hides a path outside the record paths, so it can only keep the gate on.
+# shellcheck disable=SC1091
+. scripts/config/gate.sh
+
 staged=$(git diff --cached -z --name-only --no-renames | tr '\0' '\n')
 [ -n "$staged" ] || exit 0
 
-if ! printf '%s\n' "$staged" | grep -q -v '^\.agents/' \
-    && ! printf '%s\n' "$staged" | grep -q '^\.agents/tasks/scripts/'; then
-    echo "pre-commit: only .agents/ records staged; skipping gate."
+# outside_records: print the lines of stdin that are not a record path. A pattern ending in
+# "/" is a directory prefix; any other is an exact path or a glob in which "*" matches "/".
+outside_records() {
+    set -f
+    while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        matched=0
+        for pattern in $RECORD_PATHS; do
+            case "$pattern" in
+                */) case "$path" in "$pattern"*) matched=1 ;; esac ;;
+                *) case "$path" in $pattern) matched=1 ;; esac ;;
+            esac
+            [ "$matched" = 0 ] || break
+        done
+        [ "$matched" = 1 ] || printf '%s\n' "$path"
+    done
+    set +f
+}
+
+if [ -z "$(printf '%s\n' "$staged" | outside_records)" ]; then
+    echo "pre-commit: only record paths staged; skipping gate."
     exit 0
 fi
 
