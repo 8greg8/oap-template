@@ -91,7 +91,13 @@ testing contexts where a real push isn't wanted.
 1. **Select.** `backlog.py ready --parallel 3` → a conflict-free batch of IDs.
    Candidates whose `touches` overlap a task already `in_progress` or `review`
    are left out, and `blocked` tasks are never listed.
-2. **Mark.** `task.py set-status T-00XX in_progress` for each, then
+2. **Mark.** First sync the primary checkout: `git pull --ff-only origin develop`, before any
+   `set-status` and before dispatch, so a task is never started from a stale `develop`. If local
+   `develop` has diverged from `origin/develop` (the orchestrator has unpushed status commits and
+   `origin` has moved), the pull refuses. Rebase the unpushed status commits onto `origin/develop`
+   (`git fetch origin`, then `git rebase origin/develop`) instead of merging, so `develop` gets no
+   `merge origin/develop into develop` commit. Only unpushed commits are rebased, never commits
+   already on `origin`. Then `task.py set-status T-00XX in_progress` for each, then
    `backlog.py reindex`.
 3. **Dispatch.** One subagent per task, each on its own git worktree (see
    `CONTRIBUTING.md` § Worktrees for agents), prompted with: *read
@@ -161,7 +167,8 @@ Step 7 runs as follows, for every task:
      pushing: `git reset --merge ORIG_HEAD` and block the task. Red after
      pushing: `git revert -m 1 <merge>` as a new commit, push, and block the
      task. It never force-pushes.
-   - Before the next dispatch: `git pull --ff-only origin develop`.
+   - Before the next dispatch: `git pull --ff-only origin develop`, and rebase rather than merge
+     if `develop` has diverged (step 2).
 
 Rules for every batch:
 

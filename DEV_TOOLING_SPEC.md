@@ -3,9 +3,10 @@
 This document specifies the copy-pasteable `scripts/` + `.husky/` + `package.json` bundle that
 turns the process described in [`CONTRIBUTING.md`](CONTRIBUTING.md) (branching, commits,
 versioning, verify/resolve) into deterministic, agent-runnable commands instead of prose an agent
-has to interpret freshly each time. It is the implementation of `README.md` step 4 ("Wire up
-Husky-managed git hooks") and of the tagging step `CLAUDE.md` refers to ("outside the tagging step
-defined in `CONTRIBUTING.md`").
+has to interpret freshly each time. It implements the gate, the Husky-managed hooks, the changelog
+and the release flow that `CONTRIBUTING.md` describes, including the tagging step `CLAUDE.md` refers
+to ("outside the tagging step defined in `CONTRIBUTING.md`"). `README.md` step 3 installs the
+bundle in a generated project.
 
 It is written to be **copy-pasted as a unit** into an existing or new repository: the `scripts/`
 folder, `.husky/`, and `package.json` move together, and the one file a target repo edits to adapt
@@ -42,9 +43,9 @@ them is `scripts/config/gate.sh`.
   `scripts/gate.sh` call if/when one is added later, but authoring `.github/workflows/*` is out of
   scope.
 - No auto-merge, auto-tag-push, or auto-release-on-push behavior. Releasing, tagging and pushing
-  tags stay a deliberate, explicit invocation (`scripts/release.py`) — see `CLAUDE.md`'s "Ask
-  first" list (cutting a release tag by hand is a human-in-the-loop action; this spec gives the
-  *tool*, not permission to run it unattended).
+  tags stay a deliberate, explicit invocation (`scripts/release.py`). `CLAUDE.md`'s "Ask first"
+  list covers it: running `release.py --yes` or `--push` needs the owner's request, and only a
+  dry run is free. This spec gives the *tool*, not permission to run it unattended.
 - No changelog text is generated from commit messages. Entries are written by hand as fragments
   (`changelog.d/`), and `scripts/changelog.py` only checks, previews and assembles them.
 - No GitHub Release or publishing workflow. `release.py` creates the tag; what happens on a tag is
@@ -107,6 +108,10 @@ A repo with a different stack (e.g. TypeScript) only edits this one file — e.g
 `LINT_CMD="pnpm eslint ."`, `TEST_CMD="pnpm vitest run"` — and every hook, the verify/resolve
 loop, and `gitflow.sh`/`release.py` keep working unmodified.
 
+The file must stay POSIX-sourceable: plain `NAME="value"` assignments, no bash arrays or other
+bash-only syntax. The bash scripts source it, and so does `.husky/pre-push`, which runs under
+POSIX `sh` (`dash` on many systems). A test sources it with `sh`.
+
 ## `scripts/gate.sh`
 
 Runs, in order, with each gate's name and pass/fail printed as it completes (matching the four
@@ -150,29 +155,40 @@ are expanded with the `${files[@]+"${files[@]}"}` guard so `set -u` does not abo
   skip. Otherwise it runs the fragment check (below) for each pushed ref, then the full
   `gate.sh`.
 - `commit-msg`: `commit_lint.py`, below.
+- Merge commits: a merge commit that git creates itself runs `commit-msg` only. Git runs no
+  `pre-commit` for it, and `.husky/` has no `pre-merge-commit` hook, so the `chore(merge)` commits
+  of `gitflow.sh finish` and `release.py` are linted but not gated. A merge that stopped on a
+  conflict and is finished by hand with `git commit` runs `pre-commit` too. Of the commits
+  `release.py` makes, only `chore(release)` runs `pre-commit`.
 
 Code under `.agents/tasks/scripts/` is tooling, not a record, so it never takes the skip.
 
 ### Fragment check on push
 
 For each pushed ref, `pre-push` runs `python3 scripts/changelog.py check <base> <local sha>`. The
-branch comes from `<remote ref>`, never from `<local ref>`, which can be `HEAD`. The base is:
+branch comes from `<remote ref>`, never from `<local ref>`, which can be `HEAD`. `<remote>` is the
+remote git passes to the hook as `$1` (`origin` when the hook is run by hand), so a push to another
+remote is checked against that remote's tracking refs. The base is:
 
 | Pushed ref | Base |
 |---|---|
 | `MAIN_BRANCH`, `DEVELOP_BRANCH` | the remote sha; a first push (all-zero remote sha) is not checked |
-| `hotfix/*` | merge base of `origin/MAIN_BRANCH` and the tip |
-| any other branch, new or not | merge base of `origin/DEVELOP_BRANCH` and the tip |
+| `hotfix/*` | merge base of `<remote>/MAIN_BRANCH` and the tip |
+| any other branch, new or not | merge base of `<remote>/DEVELOP_BRANCH` and the tip |
 | a deleted ref, a tag, any non-branch ref | not checked |
 
 The branch names come from `scripts/config/gate.sh`. Exit codes decide what happens next:
 
 - 0: the ref passes.
-- 2, or no merge base because the `origin` ref is missing (a range git cannot list): the check is
-  skipped for that ref with a message, and the gate still runs. This fails open, as the hook
-  already does for a range it cannot list.
-- Any other code (1 for a failed check, or a shell failure such as a missing `python3`): the push
-  is rejected before the gate starts. This fails closed.
+- 2, or no merge base because the remote-tracking ref is missing (a range git cannot list; `$1` is
+  a URL, for example, so there is no such ref): the check is skipped for that ref with a message,
+  and the gate still runs. This fails open, as the hook already does for a range it cannot list.
+- 1: a missing or invalid fragment. The push is rejected before the gate starts, with that
+  explanation. This fails closed.
+- Any other code (3 for an internal error of `changelog.py`, 127 for a missing `python3`, a
+  signal): the push is rejected before the gate starts with
+  `pre-push: changelog check failed (exit N) for <remote ref>`. It makes no claim that a fragment
+  is missing. This fails closed.
 
 A release push needs no special case. The `main` range holds the released commits and the commits
 that added their fragments. The `develop` range holds merge commits and the `chore(release)`
@@ -243,32 +259,41 @@ adds one fragment file instead, so parallel task branches never conflict on `CHA
 
 **Fragments.** `changelog.d/<id>.<category>.md`. `<id>` matches `[A-Za-z0-9][A-Za-z0-9_-]*` (a task
 ID or a branch topic, no dots). `<category>` is one of `added`, `changed`, `deprecated`, `removed`,
-`fixed`, `security`. The body holds one or more bullets (`- ` or `* `; indented lines continue
-one). A fragment with no bullet is invalid, and so is a bullet that is empty or holds a
-case-insensitive whole-word `todo` or `to-do`, `TBD`, `FIXME` or `<...>`. Every file in
-`changelog.d/` except `README.md` must be a valid fragment; `README.md` is never checked, folded or
-deleted. `changelog.py` is stdlib-only and loads `next_version.py` to classify commits, so the
-check and the version bump use one definition of `feat`, `fix` and breaking.
+`fixed`, `security`. The body holds only bullet lines (`- ` or `* `), indented continuation lines
+and blank lines, because the whole file is folded into `CHANGELOG.md`. An indented line continues a
+bullet only directly after that bullet or another continuation line; after a blank line, or before
+the first bullet, it is invalid. So is any other line (an intro sentence, a heading, stray prose).
+A fragment with no bullet is invalid, and so is a bullet that is empty or holds a case-insensitive
+whole-word `todo` or `to-do`, `TBD`, `FIXME` or `<...>`. Fragments are decoded strictly as UTF-8 on
+every path; a file that is not UTF-8 is a fragment problem, and one leading BOM is ignored. Every
+file in `changelog.d/` except `README.md` must be a valid fragment; `README.md` is never checked,
+folded or deleted. `changelog.py` is stdlib-only and loads `next_version.py` to classify commits,
+so the check and the version bump use one definition of `feat`, `fix` and breaking.
 
 **Subcommands.**
 
 - `check <base> <tip>`: takes the non-merge commits in `<base>..<tip>`. Fails when one is `feat`,
   `fix` or breaking and no commit in the range adds a fragment (found per commit with
-  `git log --diff-filter=A`, so a fragment added and later folded in by a release inside the range
-  still counts). Also fails on any invalid entry in `changelog.d/` at `<tip>`, read with
+  `git log -M --diff-filter=A`, so a fragment added and later folded in by a release inside the
+  range still counts). A path that exists at `<base>` never counts as added, and rename detection
+  is on, so renaming a fragment, or deleting and re-adding it under the same name, does not count.
+  Also fails on any invalid entry in `changelog.d/` at `<tip>`, read with
   `git ls-tree` and `git show`, never from the working tree.
 - `preview [version]`: prints the section `assemble` would write, headed `## [X.Y.Z] - <today>`
   when a version is given and `## [Unreleased]` otherwise. Reads the working tree and changes
   nothing. With no fragments it prints a note to stderr and exits 0.
-- `assemble <version> [--date YYYY-MM-DD]`: writes `## [X.Y.Z] - date` under `## [Unreleased]`,
+- `assemble <version> [--date YYYY-MM-DD]`: `--date` takes exactly `YYYY-MM-DD` and a real date.
+  Writes `## [X.Y.Z] - date` under `## [Unreleased]`,
   grouped by category in Keep a Changelog order (Added, Changed, Deprecated, Removed, Fixed,
   Security), then deletes the folded fragments. It edits the working tree and stages nothing. It
   refuses when `[Unreleased]` is not empty (so nothing is stranded there), when the version already
   has a section, when a fragment is invalid, and when there are no fragments.
 
-**Exit codes.** 0 success; 1 the check failed or the command refused to run, with the reason on
-stderr; 2 usage error (including a malformed version or date), or git cannot resolve a revision,
-list the range or run at all. `version` accepts `X.Y.Z` or `vX.Y.Z`.
+**Exit codes.** 0 success; 1 the check failed, a fragment is invalid (including one that is not
+UTF-8), or the command refused to run, with the reason on stderr; 2 usage error (including a
+malformed version or date), or git cannot resolve a revision, list the range or run at all; 3
+internal error (a sibling script cannot be loaded, or an unexpected exception), reported as one
+line on stderr. `version` accepts `X.Y.Z` or `vX.Y.Z`.
 
 ## Release: `scripts/release.py`
 
@@ -286,8 +311,8 @@ scripts/release.py --yes --version v1.0.0  # override the computed version
 **Refusals.** Nothing is changed and the exit code is 1 when any of these hold, checked in this
 order. `git fetch origin` runs after the first check, and a failed fetch is itself a refusal:
 
-1. the starting branch is not `MAIN_BRANCH` or `DEVELOP_BRANCH`, or the directory is not a git
-   repository;
+1. the directory is not a git repository, the repository has no commits, or the starting branch
+   is not `MAIN_BRANCH` or `DEVELOP_BRANCH`;
 2. the working tree is dirty;
 3. local `MAIN_BRANCH` or `DEVELOP_BRANCH` does not exist, has no `origin` counterpart, or is
    behind, ahead of or diverged from it;
@@ -297,12 +322,13 @@ order. `git fetch origin` runs after the first check, and a failed fetch is itse
 7. the tag already exists;
 8. `changelog.py preview` fails (an invalid fragment) or finds no fragment.
 
-An `--version` value that is not canonical `vX.Y.Z` (a leading `v`, three numbers, no leading
-zeros) is a usage error, exit 2, before any check.
+A `--version` value that is not canonical `vX.Y.Z` (a leading `v`, three numbers, no leading
+zeros) is a usage error, exit 2, before any check. So is `--push` without `--yes`: exit 2 with a
+usage message, nothing changed. `--push` does not imply `--yes`.
 
 **Dry run.** Without `--yes` it makes the same checks, prints the version, the commits behind it
 and the changelog section, and changes only the remote-tracking refs, through the fetch. It exits
-0. `--push` implies `--yes`.
+0.
 
 **With `--yes`:**
 
@@ -319,19 +345,25 @@ and the changelog section, and changes only the remote-tracking refs, through th
 5. Check out the starting branch again. With `--push`, run
    `git push --atomic origin main develop vX.Y.Z`: all three refs or none. Without it, print that
    command. A rejected push leaves the release complete locally, prints the retry command and
-   exits 1.
+   exits 1. The message names both likely causes: another push won the race, or a local
+   `pre-push` hook failed.
 
 **Failure.** If a step fails after the first change (a merge conflict, a hook rejecting a commit),
-the script stops, prints the current state (branch, `HEAD`, both branch tips against their values
-before the run, whether the tag exists, whether a merge is in progress, `git status --short`), then
-the exact commands to finish by hand and the exact commands to undo the run, in order, and exits 1.
+the script stops, prints the failed command's stdout and stderr, each under its own label, then
+the current state (branch, `HEAD`, both branch tips against their values before the run, whether
+the tag exists, whether a merge is in progress, `git status --short`), then the exact commands to
+finish by hand and the exact commands to undo the run, in order, and exits 1. When the step that
+brings `develop` up to `main` stops on a conflicted changelog fragment, the finish list says to
+resolve it as deleted with `git rm <path>`, because `main` already folded it and keeping it would
+fold it twice at the next release.
 It never runs `git reset`, a force push or a retry. The undo list may contain `git reset --hard`
 and `git branch -f`, which are for a human to run (`CLAUDE.md` § "Ask first").
 
 **Hotfix.** `gitflow.sh hotfix finish` merges into `MAIN_BRANCH` and back into `DEVELOP_BRANCH`
 without pushing. Push both branches, then check out `MAIN_BRANCH` and run `release.py --yes`. The
 local branch must equal `origin`, so an unpushed hotfix is refused. Step 1 is skipped, and step 4
-is a back-merge because `develop` has diverged.
+is a back-merge because `develop` has diverged. The release is an "Ask first" item, so the
+owner runs it or asks for it.
 
 **Branch protection.** A repository with protection on `main` or `develop` must allow the release
 push, or the owner releases through pull requests. `init_project.py`'s checklist says so.
@@ -362,9 +394,13 @@ scripts/gitflow.sh hotfix finish <topic>   # merge into main, back-merge main in
 `finish` subcommands refuse to run if the changelog check or `scripts/gate.sh` fails on the branch
 being merged — neither is bypassable through the gitflow helper. The changelog check is
 `changelog.py check <merge base> <branch>`, where the merge base is with `origin/<base>` when that
-ref exists and with the local base branch otherwise. It runs first, and it stops on every failure,
-including a range it cannot list. `finish` for a hotfix ends by printing: push `main` and
-`develop`, then check out `main` and run `scripts/release.py --yes`.
+ref exists and with the local base branch otherwise. `finish` runs `git fetch origin <base>` first
+so that ref is current; when the fetch fails it prints a warning and uses the local base branch.
+The check runs first, and it stops on every failure, including a range it cannot list. Only exit
+status 1 prints the advice to add a fragment; any other status stops with
+`changelog check failed (exit N) on <branch>`. `finish` for a hotfix ends by printing: push `main`
+and `develop`, then check out `main` and run `scripts/release.py --yes`, which is the owner's
+step.
 
 `finish` writes the merge commit with `merge_message` (in `scripts/lib/common.sh`):
 `chore(merge): merge task NNNN into <base>` for a `<type>/T-NNNN-<slug>` branch, otherwise

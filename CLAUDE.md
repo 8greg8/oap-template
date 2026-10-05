@@ -110,6 +110,11 @@ are being followed exactly.
   branch (`main`, `develop`), or deleting remote branches/tags.
 - Cutting a release tag by hand (outside the tagging step defined in `CONTRIBUTING.md`) or editing
   an existing tag.
+- Running `scripts/release.py --yes` or `scripts/release.py --yes --push`. It merges `develop` into
+  `main`, writes `CHANGELOG.md`, creates the tag and, with `--push`, pushes both branches and the
+  tag. The tagging step named in the previous item is this script, so it is not exempt. An agent
+  runs it only when the owner asks for that release; a dry run (`scripts/release.py` with no
+  flags) stays free. The script refuses `--push` without `--yes`.
 - Adding a new **runtime** dependency not clearly required by the task, or upgrading a dependency
   across a major version.
 - Any change to `pyproject.toml` `[tool]` sections governing lint/type/test behavior (what
