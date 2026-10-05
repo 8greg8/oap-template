@@ -157,6 +157,71 @@ def test_done_report_with_passed_verify_is_accepted():
     assert report_module.validate_report(report, task) == []
 
 
+_GATE_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
+
+def _verify_line(status: str) -> str:
+    return f"Independent verify agent (fresh context) :: {status}"
+
+
+def test_done_report_with_gate_record_verify_line_is_accepted():
+    task = _done_task("T-0001", ["src"])
+    line = _verify_line(f"passed (commit abc1234; gate {_GATE_KEY}; 10 passed)")
+    report = _report_for("T-0001", line, _TOUCHES_UNTICKED)
+    assert report_module.validate_report(report, task) == []
+
+
+def test_done_report_accepts_short_gate_key():
+    task = _done_task("T-0001", ["src"])
+    line = _verify_line("passed (commit abc1234; gate 0123abc; 551 passed)")
+    report = _report_for("T-0001", line, _TOUCHES_UNTICKED)
+    assert report_module.validate_report(report, task) == []
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        "passed (commit abc1234; gate pending; 10 passed)",
+        "passed (commit abc1234; gate ; 10 passed)",
+        "passed (commit abc1234; gate xyz; 10 passed)",
+        "passed (commit abc1234; gate 0123; 10 passed)",
+        f"passed (commit abc1234; gate {_GATE_KEY}0; 10 passed)",
+    ],
+)
+def test_done_report_rejects_malformed_gate_record(status):
+    task = _done_task("T-0001", ["src"])
+    report = _report_for("T-0001", _verify_line(status), _TOUCHES_UNTICKED)
+    assert any("gate" in p for p in report_module.validate_report(report, task))
+
+
+def test_done_report_with_gate_record_still_needs_a_commit():
+    task = _done_task("T-0001", ["src"])
+    line = _verify_line(f"passed (gate {_GATE_KEY}; 10 passed)")
+    report = _report_for("T-0001", line, _TOUCHES_UNTICKED)
+    assert any("commit" in p for p in report_module.validate_report(report, task))
+
+
+def test_done_report_with_gate_record_but_failed_verify_fails():
+    task = _done_task("T-0001", ["src"])
+    line = _verify_line(f"failed (commit abc1234; gate {_GATE_KEY}; 3 failed)")
+    report = _report_for("T-0001", line, _TOUCHES_UNTICKED)
+    assert any("verify" in p for p in report_module.validate_report(report, task))
+
+
+def test_done_report_without_gate_part_in_free_text_is_accepted():
+    task = _done_task("T-0001", ["src"])
+    line = _verify_line("passed (commit abc1234; gate.sh passed, 551 tests passed)")
+    report = _report_for("T-0001", line, _TOUCHES_UNTICKED)
+    assert report_module.validate_report(report, task) == []
+
+
+def test_report_template_documents_the_gate_record_form():
+    template = (REPO_ROOT / ".agents/tasks/templates/report.md").read_text(
+        encoding="utf-8"
+    )
+    assert "passed (commit <hash>; gate <record-key>;" in template
+
+
 def test_done_report_without_verify_line_fails():
     task = _done_task("T-0001", ["src"])
     report = _report_for("T-0001", "uv run ruff check :: passed", _TOUCHES_UNTICKED)
@@ -341,6 +406,8 @@ def hk_repo(tmp_path, monkeypatch):
     repo = _seeded_repo(tmp_path / "repo")
     monkeypatch.setattr(housekeep_module, "REPO_ROOT", repo)
     monkeypatch.setattr(_schema, "REPORTS_DIR", repo / ".agents/tasks/reports")
+    # No task files in the scratch repo; tests that need tasks patch ``load_tasks``.
+    monkeypatch.setattr(housekeep_module, "load_tasks", list)
     return repo
 
 
@@ -410,3 +477,116 @@ def test_housekeep_worktrees_flags_develop_in_secondary_worktree(hk_repo):
     _git(hk_repo, "worktree", "add", "-q", str(wt), "develop")
     findings = housekeep_module.check_worktrees()
     assert any(str(wt) in f and "'develop'" in f for f in findings)
+
+
+def _set_tasks(monkeypatch, *tasks: Task) -> None:
+    monkeypatch.setattr(housekeep_module, "load_tasks", lambda: list(tasks))
+
+
+@pytest.mark.parametrize("status", ["done", "abandoned"])
+def test_housekeep_worktrees_flags_unmerged_worktree_of_finished_task(
+    hk_repo, monkeypatch, status
+):
+    _set_tasks(monkeypatch, _hk_task("T-0001", ["src"], status=status))
+    wt = hk_repo.parent / "wt-unmerged"
+    _git(hk_repo, "worktree", "add", "-q", "-b", "feat/T-0001-demo", str(wt))
+    _commit_files(wt, ["src/a.py"], "feat: work")
+    findings = housekeep_module.check_worktrees()
+    assert len(findings) == 1
+    assert str(wt) in findings[0]
+    assert "T-0001" in findings[0] and status in findings[0]
+    assert "not merged" in findings[0]
+
+
+def test_housekeep_worktrees_flags_worktree_of_finished_task_at_develop_tip(
+    hk_repo, monkeypatch
+):
+    _set_tasks(monkeypatch, _hk_task("T-0001", ["src"], status="abandoned"))
+    wt = hk_repo.parent / "wt-empty"
+    _git(hk_repo, "worktree", "add", "-q", "-b", "feat/T-0001-demo", str(wt))
+    findings = housekeep_module.check_worktrees()
+    assert len(findings) == 1
+    assert str(wt) in findings[0] and "abandoned" in findings[0]
+
+
+def test_housekeep_worktrees_merged_worktree_of_done_task_is_one_finding(
+    hk_repo, monkeypatch
+):
+    _set_tasks(monkeypatch, _hk_task("T-0001", ["src"], status="done"))
+    wt = hk_repo.parent / "wt-merged"
+    _git(hk_repo, "worktree", "add", "-q", "-b", "feat/T-0001-demo", str(wt))
+    _commit_files(wt, ["src/a.py"], "feat: work")
+    _git(hk_repo, "merge", "-q", "--no-ff", "feat/T-0001-demo", "-m", "merge")
+    findings = housekeep_module.check_worktrees()
+    # One for the worktree; the branch is already covered by it.
+    assert len(findings) == 1
+    assert str(wt) in findings[0] and "never removed" in findings[0]
+    assert "T-0001" in findings[0]
+
+
+@pytest.mark.parametrize("status", ["in_progress", "review", "open", "blocked"])
+def test_housekeep_worktrees_ignores_worktree_of_unfinished_task(
+    hk_repo, monkeypatch, status
+):
+    _set_tasks(monkeypatch, _hk_task("T-0001", ["src"], status=status))
+    wt = hk_repo.parent / "wt-open"
+    _git(hk_repo, "worktree", "add", "-q", "-b", "feat/T-0001-demo", str(wt))
+    _commit_files(wt, ["src/a.py"], "feat: work")
+    assert housekeep_module.check_worktrees() == []
+
+
+@pytest.mark.parametrize("status", ["done", "abandoned"])
+def test_housekeep_worktrees_flags_unmerged_branch_without_worktree(
+    hk_repo, monkeypatch, status
+):
+    _set_tasks(monkeypatch, _hk_task("T-0001", ["src"], status=status))
+    _git(hk_repo, "checkout", "-q", "-b", "feat/T-0001-demo")
+    _commit_files(hk_repo, ["src/a.py"], "feat: work")
+    _git(hk_repo, "checkout", "-q", "develop")
+    findings = housekeep_module.check_worktrees()
+    assert len(findings) == 1
+    assert "feat/T-0001-demo" in findings[0]
+    assert "T-0001" in findings[0] and status in findings[0]
+    assert "not merged" in findings[0] and "no secondary worktree" in findings[0]
+
+
+def test_housekeep_worktrees_flags_merged_branch_without_worktree(hk_repo, monkeypatch):
+    _set_tasks(monkeypatch, _hk_task("T-0001", ["src"], status="done"))
+    _git(hk_repo, "checkout", "-q", "-b", "feat/T-0001-demo")
+    _commit_files(hk_repo, ["src/a.py"], "feat: work")
+    _git(hk_repo, "checkout", "-q", "develop")
+    _git(hk_repo, "merge", "-q", "--no-ff", "feat/T-0001-demo", "-m", "merge")
+    findings = housekeep_module.check_worktrees()
+    assert len(findings) == 1
+    assert "feat/T-0001-demo" in findings[0] and "merged into develop" in findings[0]
+    assert "not merged" not in findings[0]
+
+
+def test_housekeep_worktrees_ignores_branch_of_unfinished_or_unknown_task(
+    hk_repo, monkeypatch
+):
+    _set_tasks(monkeypatch, _hk_task("T-0001", ["src"], status="in_progress"))
+    for branch in ("feat/T-0001-demo", "feat/T-0002-other", "scratch"):
+        _git(hk_repo, "branch", branch)
+    assert housekeep_module.check_worktrees() == []
+
+
+def test_housekeep_worktrees_branch_leftover_makes_cli_exit_nonzero(
+    hk_repo, monkeypatch, capsys
+):
+    _set_tasks(monkeypatch, _hk_task("T-0001", ["src"], status="done"))
+    _git(hk_repo, "branch", "feat/T-0001-demo")
+    assert housekeep_module.main(["worktrees"]) == 1
+    assert "feat/T-0001-demo" in capsys.readouterr().out
+    assert housekeep_module.main(["all"]) == 1
+
+
+def test_housekeep_worktrees_reports_only_and_removes_nothing(hk_repo, monkeypatch):
+    _set_tasks(monkeypatch, _hk_task("T-0001", ["src"], status="done"))
+    wt = hk_repo.parent / "wt-keep"
+    _git(hk_repo, "worktree", "add", "-q", "-b", "feat/T-0001-demo", str(wt))
+    _git(hk_repo, "branch", "feat/T-0001-other")
+    housekeep_module.check_worktrees()
+    assert wt.is_dir()
+    branches = _git(hk_repo, "branch", "--format=%(refname:short)").stdout.split()
+    assert "feat/T-0001-demo" in branches and "feat/T-0001-other" in branches
