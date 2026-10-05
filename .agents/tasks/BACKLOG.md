@@ -6,7 +6,7 @@
 
 32 task(s). Generated 2026-10-05.
 
-| open: 1 | in_progress: 0 | blocked: 0 | review: 1 | done: 30 | abandoned: 0 |
+| open: 1 | in_progress: 0 | blocked: 0 | review: 0 | done: 31 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -40,7 +40,7 @@
 | T-0025 | [Start generated projects with an empty changelog](T-0025-start-generated-projects-with-an-empty-changelog.md) | done | medium | feat | T-0022 | [report](reports/T-0025.md) |
 | T-0026 | [Document the changelog and release workflow](T-0026-document-the-changelog-and-release-workflow.md) | done | medium | docs | T-0024, T-0025 | [report](reports/T-0026.md) |
 | T-0030 | [Correct the release docs and add the release to Ask first](T-0030-correct-the-release-docs-and-add-the-release-to.md) | done | medium | docs | T-0028, T-0029 | [report](reports/T-0030.md) |
-| T-0031 | [Fold the post-batch fragments and document the pre-release wording rule](T-0031-fold-the-post-batch-fragments-and-document-the.md) | review | medium | docs | — | — |
+| T-0031 | [Fold the post-batch fragments and document the pre-release wording rule](T-0031-fold-the-post-batch-fragments-and-document-the.md) | done | medium | docs | — | [report](reports/T-0031.md) |
 | T-0032 | [Clarify the tag items in Ask first and drop the stale README reference](T-0032-clarify-the-tag-items-in-ask-first-and-drop-the.md) | open | medium | docs | T-0031 | — |
 | T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | done | low | chore | — | [report](reports/T-0009.md) |
 | T-0010 | [Fix agent-doc wording and stale AGENTS.md references](T-0010-fix-agent-doc-wording-and-stale-agents-md.md) | done | low | docs | — | [report](reports/T-0010.md) |
@@ -48,8 +48,8 @@
 
 ## Ready to dispatch
 
-*Nothing ready — every open task is blocked or already in flight.*
+Dependencies satisfied, not yet started:
 
-## Waiting on dependencies
+- **T-0032** Clarify the tag items in Ask first and drop the stale README reference — `CLAUDE.md`, `CONTRIBUTING.md`, `DEV_TOOLING_SPEC.md`, `changelog.d/T-0032.added.md`
 
-- **T-0032** Clarify the tag items in Ask first and drop the stale README reference — needs T-0031
+Suggested conflict-free parallel batch: T-0032
