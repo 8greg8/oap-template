@@ -39,7 +39,7 @@ below are what they found wrong.
      template still has fragments. After a release removes them, the pre-push gate fails and the
      release push is rejected (reproduced). They write their own fragment into the scratch copy.
    - Decision B.
-2. **T-0028: Harden the changelog check and the push hook** (fix). Parallel with T-0029.
+2. **T-0028: Harden the changelog check and the push hook** (fix, breaking). Parallel with T-0029.
    - `changelog.py`: reject non-bullet, non-continuation, non-blank lines in a fragment (they are
      folded into `CHANGELOG.md` unchecked today); decode fragments strictly as UTF-8 in every path
      and report a non-UTF-8 fragment as a fragment problem; strip a leading BOM; accept `--date`
@@ -51,8 +51,10 @@ below are what they found wrong.
    - `scripts/config/gate.sh`: state that it must stay POSIX-sourceable; a test sources it with `sh`.
    - Tests: make `test_tag_ref_is_not_checked` and `test_hotfix_branch_is_ranged_from_origin_main`
      prove their claims (both pass today with the behavior removed).
-3. **T-0029: Fix `release.py` edge cases** (fix). Parallel with T-0028.
-   - `--push` without `--yes` refuses instead of releasing.
+3. **T-0029: Fix `release.py` edge cases** (fix, breaking). Parallel with T-0028.
+   - `--push` without `--yes` refuses instead of releasing. This reverses the documented
+     "`--push` implies `--yes`" so that, as the 2026-10-04 plan says, nothing changes without
+     `--yes`.
    - After a failed step, print both stdout and stderr.
    - A modify/delete conflict on a `changelog.d/` fragment during the `develop` update: say to
      resolve it as deleted (`git rm`), so it is not folded twice.
@@ -76,8 +78,14 @@ below are what they found wrong.
 
 - **Ask first:** T-0028 changes `scripts/` (including `scripts/config/gate.sh`); T-0029
   changes `scripts/release.py`; T-0030 changes `CLAUDE.md`'s "Ask first" list.
-- **Breaking:** T-0030 adds an item to "Ask first" (a rule change). T-0028 and T-0029 bring the
-  code in line with the accepted plan and are fixes, not breaking changes.
+- **Breaking:**
+  - T-0029: `--push` without `--yes` now refuses. Today it implies `--yes`, which is documented
+    in `release.py --help`, `CONTRIBUTING.md` and `DEV_TOOLING_SPEC.md`, so this changes the CLI
+    of a tool under `scripts/`.
+  - T-0028: `changelog.py check` gains a distinct exit status for load and unexpected errors,
+    which changes its documented exit codes.
+  - T-0030: adds an item to "Ask first" (a rule change).
+  Each marks its behavior commit breaking; T-0028 and T-0029 are typed `fix!`.
 - The owner decisions above are the written approval the orchestrator cites when merging.
 
 ## Process corrections made with this plan
