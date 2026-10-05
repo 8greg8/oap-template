@@ -6,7 +6,7 @@
 
 30 task(s). Generated 2026-10-05.
 
-| open: 1 | in_progress: 1 | blocked: 0 | review: 0 | done: 28 | abandoned: 0 |
+| open: 1 | in_progress: 0 | blocked: 0 | review: 1 | done: 28 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -26,7 +26,7 @@
 | T-0023 | [Require a changelog fragment on push and at finish](T-0023-require-a-changelog-fragment-on-push-and-at.md) | done | high | feat | T-0022 | [report](reports/T-0023.md) |
 | T-0024 | [Release from develop into main with the changelog](T-0024-release-from-develop-into-main-with-the.md) | done | high | feat | T-0023 | [report](reports/T-0024.md) |
 | T-0027 | [Make init tests independent of template fragments and fold the first release entries](T-0027-make-init-tests-independent-of-template.md) | done | high | chore | — | [report](reports/T-0027.md) |
-| T-0028 | [Harden the changelog check and the push hook](T-0028-harden-the-changelog-check-and-the-push-hook.md) | in_progress | high | fix | T-0027 | — |
+| T-0028 | [Harden the changelog check and the push hook](T-0028-harden-the-changelog-check-and-the-push-hook.md) | review | high | fix | T-0027 | — |
 | T-0029 | [Fix release.py edge cases](T-0029-fix-release-py-edge-cases.md) | done | high | fix | T-0027 | [report](reports/T-0029.md) |
 | T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
 | T-0008 | [Fix pre-commit re-staging for unusual filenames](T-0008-fix-pre-commit-re-staging-for-unusual-filenames.md) | done | medium | fix | — | [report](reports/T-0008.md) |

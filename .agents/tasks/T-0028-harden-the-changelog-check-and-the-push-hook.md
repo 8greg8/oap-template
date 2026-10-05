@@ -1,7 +1,7 @@
 ---
 id: T-0028
 title: Harden the changelog check and the push hook
-status: in_progress
+status: review
 type: fix
 priority: high
 depends_on: [T-0027]
