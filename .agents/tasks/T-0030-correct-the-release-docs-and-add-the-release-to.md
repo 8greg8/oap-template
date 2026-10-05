@@ -18,51 +18,83 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+Running `scripts/release.py --yes` or `--push` is an "Ask first" item, and the process documents
+match the code after T-0028 and T-0029.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-05-post-batch-review-fixes.md`, accepted by the owner on 2026-10-05 (all tasks, decisions A and B). Its § Approvals
+  is the owner's written approval for this task's "Ask first" and breaking items; cite it in the
+  report. Where this file and the plan differ, stop and report.
+- Re-check against `develop` before starting (`git pull --ff-only origin develop`) and report any
+  discrepancy.
+- Depends on T-0028 and T-0029; document the merged code, and report any difference from the plan.
+- `CLAUDE.md:111` lists only "Cutting a release tag by hand" under "Ask first"; `CONTRIBUTING.md`
+  (`:208`) and the new `CLAUDE.md` fragment bullet already claim releases are a human step "as
+  Ask first requires".
+- `CONTRIBUTING.md:305-307` (verify/resolve step 6, hotfix) tells the agent to run
+  `scripts/release.py --yes` on `main`; `:253` states the "not higher than the highest tag"
+  refusal without "with `--version`"; the hooks bullet says `chore(merge)` commits pass through
+  `pre-commit` (merges run `commit-msg` only; `.husky/` has no `pre-merge-commit`).
+- `DEV_TOOLING_SPEC.md:6-7` cites `README.md` step 4 ("Wire up Husky-managed git hooks"), which no
+  longer exists. `README.md:18` describes `DEV_TOOLING_SPEC.md` without the changelog.
+- T-0022 was started from a stale local `develop`, which needed a fix round and left
+  `3412c0d chore(merge): merge origin/develop into develop`.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- `CLAUDE.md` "Ask first": add running `scripts/release.py --yes` or `--push` (a dry run stays
+  free). Keep `## Working unit: the task` as the first `##` heading.
+- `CONTRIBUTING.md`: step 6 hotfix bullet hands the release to a human; merges run `commit-msg`
+  only; `--version` qualifier on the refusal; `--push` requires `--yes` (T-0029); changelog exit
+  status 3 and the fragment content rule (T-0028).
+- `DEV_TOOLING_SPEC.md`: drop or fix the stale README step reference; T-0028 and T-0029 behavior.
+- `scripts/README.md`: `--push` requires `--yes`; exit status 3.
+- `README.md`: the `DEV_TOOLING_SPEC.md` table row mentions the changelog.
+- `.agents/README.md`: before `set-status` or dispatch the orchestrator runs
+  `git pull --ff-only origin develop`; if local `develop` has diverged, it rebases its unpushed
+  status commits onto `origin/develop` instead of merging.
+- `changelog.d/T-0030.changed.md`: this task's entry. The `CLAUDE.md` commit is
+  `docs(claude)!:` with a `BREAKING CHANGE:` footer naming the new "Ask first" item.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change any script, hook, test or `init_project.py`.
+- Do not change § Merge authority or any other "Ask first" item.
+- Do not change the task or report schema.
+- No new or edited tracked file contains `proj_template`, `proj-template`, `oap-template`, `8greg8` or the owner's email. Do not name the source project of the practice.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-05-post-batch-review-fixes.md`
+- Every file in `touches`; the merged `scripts/changelog.py`, `scripts/release.py`, `.husky/pre-push`
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+An agent following only the documents never runs `release.py --yes` or `--push` without the
+owner asking, and every documented behavior matches the merged code.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- `scripts/gate.sh` passes (the init test checks the `CLAUDE.md` anchor).
+- `python .agents/tasks/scripts/task.py validate` passes.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason. A `feat`, `fix` or breaking change also adds a changelog fragment,
-`changelog.d/<id>.<category>.md`, listed in `touches` (see `CONTRIBUTING.md`
-§ Versioning).
+The files in `touches`, as in Scope.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] `CLAUDE.md` "Ask first" names running `scripts/release.py --yes` or `--push`.
+- [ ] `CONTRIBUTING.md` step 6 no longer tells an agent to run the release.
+- [ ] `CONTRIBUTING.md` says merge commits run `commit-msg` only and qualifies the `--version` refusal.
+- [ ] `--push` requiring `--yes` and changelog exit status 3 are documented wherever the old behavior was.
+- [ ] `DEV_TOOLING_SPEC.md` has no stale README step reference; `README.md` mentions the changelog.
+- [ ] `.agents/README.md` has the pull/rebase rule.
+- [ ] `CLAUDE.md`'s first `##` heading is unchanged.
+- [ ] `changelog.d/T-0030.changed.md` exists and `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 
 ## Workflow
 

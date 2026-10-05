@@ -18,51 +18,77 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+The test suite passes whether or not the template has changelog fragments, so the first release
+can be pushed, and the first release's changelog describes the template without "Breaking:"
+entries against a version that was never released.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-05-post-batch-review-fixes.md`, accepted by the owner on 2026-10-05 (all tasks, decisions A and B). Its § Approvals
+  is the owner's written approval for this task's "Ask first" and breaking items; cite it in the
+  report. Where this file and the plan differ, stop and report.
+- Re-check against `develop` before starting (`git pull --ff-only origin develop`) and report any
+  discrepancy.
+- `tests/test_init_project.py:965` (`test_dry_run_lists_the_changelog_reset_and_changes_nothing`)
+  and `:1002` (`test_generated_project_has_no_fragments_and_keeps_the_fragment_readme`) assert the
+  scratch template copy has fragments. A release deletes every fragment, so after
+  `release.py --yes --push` the pre-push gate fails these two tests and rejects the push
+  (reproduced in the post-merge review).
+- `changelog.d/T-0023.changed.md` and `changelog.d/T-0024.changed.md` start their bullets with
+  "Breaking:". `changelog.d/template.added.md` holds the template summary (decision B).
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- In those two tests (or the fixture they share), write a test-owned fragment into the scratch
+  copy and commit it there before running init, and assert on that fragment, never on the
+  repository's own `changelog.d/` contents.
+- Decision B: rewrite the content of `changelog.d/T-0023.changed.md` and
+  `changelog.d/T-0024.changed.md` as plain feature bullets in `changelog.d/template.added.md`
+  (fragment check on push and at finish; release from `develop` into `main` with the changelog;
+  the 0.x rule; the hotfix release step), then delete those two fragments. Keep
+  `T-0022.added.md` and `T-0025.added.md`.
+- Commit types: `test(init): ...` for the tests and `docs(changelog): ...` for the fragments; no
+  fragment for this task (neither type needs one).
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change `init_project.py`, any file under `scripts/` or `.husky/`, or any other test.
+- Do not change `CHANGELOG.md` or run a release.
+- Do not reword `T-0022.added.md` or `T-0025.added.md`.
+- No new or edited tracked file contains `proj_template`, `proj-template`, `oap-template`, `8greg8` or the owner's email.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-05-post-batch-review-fixes.md`
+- `tests/test_init_project.py` (the two tests and their fixture), `changelog.d/*`
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+With every fragment except `changelog.d/README.md` removed from a copy of the repository, the full
+test suite passes. `python3 scripts/changelog.py preview v0.1.0` shows one `### Added` section and
+no "Breaking:" text.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- In a scratch copy: delete all fragments except `README.md`, commit, run
+  `uv run pytest tests/test_init_project.py -q`; it passes. Record the command and result.
+- `uv run pytest tests/test_init_project.py -v` and `scripts/gate.sh` on the branch.
+- `python3 scripts/changelog.py preview v0.1.0` and `python3 scripts/next_version.py` (still
+  `v0.1.0`).
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason. A `feat`, `fix` or breaking change also adds a changelog fragment,
-`changelog.d/<id>.<category>.md`, listed in `touches` (see `CONTRIBUTING.md`
-§ Versioning).
+None.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] The two tests no longer depend on the repository's own fragments.
+- [ ] With all fragments removed in a scratch copy, `uv run pytest tests/test_init_project.py -q` passes.
+- [ ] `changelog.d/T-0023.changed.md` and `changelog.d/T-0024.changed.md` are deleted and their content is in `changelog.d/template.added.md` without "Breaking:".
+- [ ] `python3 scripts/changelog.py preview v0.1.0` shows no "Breaking:" text, and `python3 scripts/next_version.py` prints `v0.1.0`.
+- [ ] `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 
 ## Workflow
 

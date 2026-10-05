@@ -18,51 +18,83 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+`release.py` never releases without `--yes`, shows the full output of a failed step, gives
+correct recovery advice for fragment conflicts and rejected pushes, and refuses cleanly in a
+repository with no commits.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- Plan: `.agents/plans/2026-10-05-post-batch-review-fixes.md`, accepted by the owner on 2026-10-05 (all tasks, decisions A and B). Its § Approvals
+  is the owner's written approval for this task's "Ask first" and breaking items; cite it in the
+  report. Where this file and the plan differ, stop and report.
+- Re-check against `develop` before starting (`git pull --ff-only origin develop`) and report any
+  discrepancy.
+- `scripts/release.py:689-701`: `--push` sets `args.yes = True`, documented in its help text,
+  `CONTRIBUTING.md:220` and `DEV_TOOLING_SPEC.md:305`.
+- `:495` prints `result.stderr or result.stdout` after a failed step, so a hook's stdout (for
+  example ruff diagnostics) is lost.
+- `:449`, `:466`: a modify/delete conflict on a `changelog.d/` fragment while updating `develop`
+  after a hotfix release is resolved by the generic advice, which can keep the fragment and fold
+  it twice at the next release.
+- `:593-596`: a rejected push only suggests `git fetch origin`, not a local pre-push hook failure.
+- `:111`: `current_branch()` raises in a repository with no commits.
+- `:469`: when the run starts on `develop`, the finish list prints `git checkout develop` twice.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- `--push` without `--yes` exits 2 with a usage message and changes nothing.
+- After a failed step, print stdout and stderr (both, labelled).
+- When the `develop` update conflicts on a path under `changelog.d/` (other than `README.md`),
+  the printed advice says to resolve it as deleted (`git rm <path>`) because `main` already
+  folded it.
+- A rejected push's message names both causes: another push won the race (fetch and retry) or a
+  local pre-push hook failed (fix and rerun the printed push command).
+- A repository with no commits: refuse with a clear message (exit 1).
+- Do not print the same `git checkout <start>` twice in the finish list.
+- Tests in `tests/test_release.py`; at least one test runs the real `.husky` hooks on the commits
+  `release.py` makes (the fixture sets `core.hooksPath=/dev/null` today).
+- `changelog.d/T-0029.fixed.md`: this task's entry. The behavior commit is `fix(release)!:` with a
+  `BREAKING CHANGE:` footer: `--push` no longer implies `--yes`.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not change the release sequence, refusals, version rules or `--version` behavior beyond the
+  items above.
+- Do not change `scripts/changelog.py`, `scripts/next_version.py`, `scripts/gitflow.sh` or hooks.
+- Do not change documentation files (T-0030).
+- No new or edited tracked file contains `proj_template`, `proj-template`, `oap-template`, `8greg8` or the owner's email.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `.agents/plans/2026-10-05-post-batch-review-fixes.md`
+- `scripts/release.py`, `tests/test_release.py`, `.agents/tasks/T-0024-*.md` (the original contract)
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+Each item in Scope behaves as stated; every other behavior in the T-0024 task file is unchanged.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- One test per Scope item, plus the real-hooks test.
+- `uv run pytest tests/test_release.py -v` and `scripts/gate.sh`.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason. A `feat`, `fix` or breaking change also adds a changelog fragment,
-`changelog.d/<id>.<category>.md`, listed in `touches` (see `CONTRIBUTING.md`
-§ Versioning).
+`release.py --help` text for `--push`. Other docs are T-0030.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] `release.py --push` without `--yes` exits 2 and changes nothing.
+- [ ] A failed step prints both stdout and stderr.
+- [ ] A fragment conflict during the `develop` update prints `git rm` advice for that path.
+- [ ] A rejected push names the local hook failure as a possible cause.
+- [ ] A repository with no commits is refused with exit 1 and no traceback.
+- [ ] The finish list never repeats the same checkout.
+- [ ] A test runs the real `.husky` hooks on `release.py`'s commits.
+- [ ] `changelog.d/T-0029.fixed.md` exists and `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch.
+- [ ] `uv run pytest tests/test_release.py -v` passes.
+- [ ] `scripts/gate.sh` passes.
+- [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 
 ## Workflow
 
