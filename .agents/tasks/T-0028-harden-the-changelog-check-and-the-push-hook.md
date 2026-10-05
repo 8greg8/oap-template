@@ -49,7 +49,7 @@ and `gitflow.sh finish` check against the right, fresh base.
   continuation lines and blank lines; anything else fails `check` and makes `assemble` refuse. An
   indented line is a continuation only directly after a bullet or another continuation line; an
   indented line after a blank line, or before the first bullet, is rejected. Move the
-  intro-line case at `tests/test_changelog.py:390` from the valid to the rejected cases. Update the
+  intro-line case at `tests/test_changelog.py:391` from the valid to the rejected cases. Update the
   module docstring (`:32-40`) and `main`'s docstring (`:684`) for the content rule, strict UTF-8
   and exit 3.
 - Decode fragments strictly as UTF-8 in every path; a non-UTF-8 fragment is a fragment problem
