@@ -10,6 +10,7 @@ Usage:
     scripts/release.py                         # dry run: print the version, commits, changelog
     scripts/release.py --yes                   # release locally; nothing is pushed
     scripts/release.py --yes --push            # release and push main, develop and the tag
+                                               # (--push alone is a usage error: exit 2)
     scripts/release.py --yes --version v1.0.0  # override the computed version (must be higher
                                                # than the highest vX.Y.Z tag)
 
@@ -31,10 +32,14 @@ bumps minor). `git fetch origin` runs first. Nothing is changed, and the script 
   - `main` or `develop` is checked out in another worktree;
   - there is nothing to release (no feat/fix/breaking commit, or no changelog fragment), the
     fragments are invalid, or the version is not higher than the highest tag (--version) or
-    already exists as a tag.
+    already exists as a tag;
+  - the repository has no commits.
+`--push` never implies `--yes`: without `--yes` it exits 2 with a usage message and changes
+nothing.
 If a step fails after the first change (merge conflict, a hook rejecting the release commit, a
-rejected push) the script stops, prints the current state and the exact commands to finish or
-undo by hand, and exits 1. It never resets, forces or retries anything.
+rejected push) the script stops, prints the failed command's stdout and stderr, the current state
+and the exact commands to finish or undo by hand, and exits 1. It never resets, forces or retries
+anything.
 
 This script uses the network only through `git fetch origin` and `git push`.
 """
@@ -44,6 +49,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -431,6 +437,62 @@ def changelog_assembled() -> bool:
     )
 
 
+def last_checkout(commands: list[str]) -> str | None:
+    """Find the branch the last `git checkout` in a command list leaves checked out.
+
+    Args:
+        commands: Command lines, some of which may be prose hints in parentheses.
+
+    Returns:
+        The branch name, or None when the list has no `git checkout`.
+    """
+    branch: str | None = None
+    for command in commands:
+        if command.startswith("git checkout "):
+            branch = command[len("git checkout ") :]
+    return branch
+
+
+def unmerged_fragments() -> list[str]:
+    """List the changelog fragments that are in conflict in the working tree.
+
+    Returns:
+        Paths under `changelog.d/` (other than its README) with an unresolved conflict.
+    """
+    listed = run("diff", "--name-only", "--diff-filter=U", "-z", check=False).stdout
+    return [
+        path
+        for path in listed.split("\0")
+        if path.startswith("changelog.d/") and path != "changelog.d/README.md"
+    ]
+
+
+def fragment_conflict_advice(plan: Release) -> list[str]:
+    """Advise on a conflicted fragment while `develop` is brought up to `main`.
+
+    `main` already folded every fragment it had into `CHANGELOG.md` and deleted it, so a
+    conflict on one (a modify/delete conflict) is resolved as deleted. Keeping it would fold
+    it a second time at the next release.
+
+    Args:
+        plan: The release in progress.
+
+    Returns:
+        For each conflicted fragment, a hint line and the `git rm` command; empty when no
+        fragment is in conflict.
+    """
+    advice: list[str] = []
+    for path in unmerged_fragments():
+        advice += [
+            (
+                f"({path} is already folded into CHANGELOG.md on {plan.main}; "
+                "resolve it as deleted, not kept, or the next release folds it twice)"
+            ),
+            f"git rm {shlex.quote(path)}",
+        ]
+    return advice
+
+
 def finish_commands(plan: Release, step: str, push: bool) -> list[str]:
     """List the commands that complete the release by hand after a failed step.
 
@@ -446,7 +508,11 @@ def finish_commands(plan: Release, step: str, push: bool) -> list[str]:
     Returns:
         Command lines for a human to run, in order. The script never runs them.
     """
-    resolve = ["(resolve the conflicts and git add them)", "git commit --no-edit"]
+    resolve = [
+        "(resolve the conflicts and git add them)",
+        *(fragment_conflict_advice(plan) if step == "develop" else []),
+        "git commit --no-edit",
+    ]
     # Once the merge of develop into main is complete, develop is an ancestor of main.
     develop_ff = step == "merge-main" or git_ok(
         "merge-base", "--is-ancestor", plan.develop, plan.main
@@ -466,10 +532,31 @@ def finish_commands(plan: Release, step: str, push: bool) -> list[str]:
         commands += resolve
     elif step != "back":
         commands += plan.update_develop(develop_ff)
-    commands += plan.return_to_start
+    if last_checkout(commands) != plan.start:
+        commands += plan.return_to_start
     if push:
         commands.append(plan.push_command)
     return commands
+
+
+def labelled_output(result: subprocess.CompletedProcess[str]) -> list[str]:
+    """Format a failed command's two output streams, both labelled.
+
+    Args:
+        result: The failed command's result.
+
+    Returns:
+        Lines for `stdout:` and `stderr:`, each followed by its text indented, or `(empty)`.
+    """
+    lines: list[str] = []
+    for label, text in (("stdout", result.stdout), ("stderr", result.stderr)):
+        lines.append(f"{label}:")
+        body = text.rstrip()
+        if body:
+            lines.extend(f"  {line}" for line in body.splitlines())
+        else:
+            lines.append("  (empty)")
+    return lines
 
 
 def stop_after_failure(
@@ -492,7 +579,7 @@ def stop_after_failure(
     out = [
         f"release FAILED at step '{step}'. Nothing has been reset or forced.",
         "",
-        (result.stderr or result.stdout).rstrip(),
+        *labelled_output(result),
         "",
         "Current state:",
         describe_state(plan),
@@ -591,9 +678,12 @@ def execute(plan: Release, push: bool) -> int:
     if pushed.returncode != 0:
         print(
             f"\npush rejected: none of {plan.main}, {plan.develop} and {plan.version} "
-            f"reached {REMOTE}. The release is complete locally. Fix the cause (for example "
-            f"`git fetch {REMOTE}` and look at what changed), then retry:\n"
-            f"  {plan.push_command}",
+            f"reached {REMOTE}. The release is complete locally. Two causes are likely:\n"
+            f"  - another push won the race: run `git fetch {REMOTE}`, look at what "
+            f"changed, then retry;\n"
+            "  - a local pre-push hook failed (its output is above): fix what it reports, "
+            "then retry.\n"
+            f"The retry command is:\n  {plan.push_command}",
             file=sys.stderr,
         )
         return 1
@@ -614,6 +704,9 @@ def prepare(requested_version: str | None) -> tuple[Release, str, str]:
         Refusal: If any precondition fails. Nothing has been changed except remote-tracking
             refs updated by `git fetch`.
     """
+    if sha("HEAD") is None:
+        raise Refusal("the repository has no commits; there is nothing to release")
+
     main_branch = read_config_value("MAIN_BRANCH", "main")
     develop_branch = read_config_value("DEVELOP_BRANCH", "develop")
 
@@ -689,7 +782,7 @@ def main(argv: list[str]) -> int:
     parser.add_argument(
         "--push",
         action="store_true",
-        help="push main, develop and the tag atomically (implies --yes)",
+        help="push main, develop and the tag atomically; requires --yes (does not imply it)",
     )
     parser.add_argument(
         "--version",
@@ -697,8 +790,8 @@ def main(argv: list[str]) -> int:
         help="override the computed version; must be higher than the highest tag",
     )
     args = parser.parse_args(argv)
-    if args.push:
-        args.yes = True
+    if args.push and not args.yes:
+        parser.error("--push requires --yes; it does not imply it")
     if args.version is not None and parse_version(args.version) is None:
         parser.error(f"--version {args.version!r} is not in vX.Y.Z form")
 
