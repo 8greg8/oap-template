@@ -199,6 +199,8 @@ def test_finish_refuses_feat_branch_without_fragment(scratch: Path):
 
     assert result.returncode != 0
     assert "changelog" in result.stderr
+    assert "add changelog.d/<id>.<category>.md" in result.stderr
+    assert "(exit" not in result.stderr
     assert worktree.is_dir()
     assert _git(scratch, "branch", "--list", "feat/nofrag") != ""
     assert _git(scratch, "log", "-1", "--format=%s", "develop") == "init"
@@ -233,16 +235,80 @@ def test_finish_checks_against_origin_base_when_it_exists(scratch: Path):
     assert "changelog" in result.stderr
 
 
-def test_finish_falls_back_to_local_base_without_origin_ref(scratch: Path):
+def test_finish_falls_back_to_local_base_without_origin_ref(
+    scratch: Path, tmp_path: Path
+):
+    _unpushed_feat_without_fragment(scratch)
+    _start_commit(scratch, "docs", "T-0007-notes", "docs: notes", None)
+    # `start` created origin/develop; now the remote goes away, so the fetch in `finish` fails
+    # and the stale tracking ref must not be used.
+    _git(scratch, "remote", "set-url", "origin", str(tmp_path / "no-such-remote.git"))
+    assert _git(scratch, "rev-parse", "--verify", "refs/remotes/origin/develop")
+
+    result = _gitflow(scratch, "docs", "finish", "T-0007-notes")
+
+    # Against local develop the range holds only the docs commit.
+    assert "could not fetch origin develop" in result.stderr
+    assert "local develop" in result.stderr
+    assert (scratch / "change.py").is_file()
+
+
+def test_finish_falls_back_to_local_base_without_origin_remote(scratch: Path):
     _unpushed_feat_without_fragment(scratch)
     _start_commit(
         scratch, "docs", "T-0007-notes", "docs: notes", None, drop_origin_ref=True
     )
+    _git(scratch, "remote", "remove", "origin")
 
-    # Against local develop the range holds only the docs commit.
-    _gitflow(scratch, "docs", "finish", "T-0007-notes")
+    result = _gitflow(scratch, "docs", "finish", "T-0007-notes")
 
+    assert "could not fetch origin develop" in result.stderr
     assert (scratch / "change.py").is_file()
+
+
+def test_finish_fetches_the_base_so_origin_ref_is_current(
+    scratch: Path, tmp_path: Path
+):
+    # A second clone pushes to origin after `start` fetched; the local origin/develop is stale.
+    _start_commit(scratch, "docs", "T-0007-notes", "docs: notes", None)
+    stale = _git(scratch, "rev-parse", "refs/remotes/origin/develop")
+    other = tmp_path / "other"
+    subprocess.run(
+        ["git", "clone", "-q", str(tmp_path / "origin.git"), str(other)],
+        check=True,
+        env=_env(),
+    )
+    (other / "teammate.txt").write_text("hi\n", encoding="utf-8")
+    _git(other, "add", "teammate.txt")
+    _git(other, "commit", "-q", "--no-verify", "-m", "docs: teammate")
+    _git(other, "push", "-q", "origin", "develop")
+    fresh = _git(other, "rev-parse", "HEAD")
+    assert fresh != stale
+
+    result = _gitflow(scratch, "docs", "finish", "T-0007-notes")
+
+    assert "could not fetch" not in result.stderr
+    assert _git(scratch, "rev-parse", "refs/remotes/origin/develop") == fresh
+
+
+def test_finish_reports_an_internal_changelog_error_not_a_missing_fragment(
+    scratch: Path,
+):
+    worktree = _start_commit(
+        scratch, "feature", "boom", "feat: has a fragment", "boom.added.md"
+    )
+    # A broken sibling makes changelog.py exit 3 (internal error) once it classifies a commit.
+    (scratch / "scripts" / "next_version.py").write_text(
+        "raise RuntimeError('boom')\n", encoding="utf-8"
+    )
+
+    result = _gitflow(scratch, "feature", "finish", "boom", check=False)
+
+    assert result.returncode != 0
+    assert "changelog check failed (exit 3) on feat/boom" in result.stderr
+    assert "add changelog.d/" not in result.stderr
+    assert worktree.is_dir()
+    assert _git(scratch, "branch", "--list", "feat/boom") != ""
 
 
 def test_hotfix_finish_tells_you_to_push_both_branches_then_release(scratch: Path):
