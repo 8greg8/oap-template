@@ -45,6 +45,30 @@ case.
 The file must be valid UTF-8. A file that is not is reported as an invalid fragment. One leading
 byte order mark (BOM) is ignored.
 
+## Before the first release
+
+While no `vX.Y.Z` tag exists, nothing has been released, so there is no earlier behavior to change.
+A fragment describes the project as it will first ship: plain "added" bullets that state what the
+project does. Do not start a bullet with "Breaking:", and do not use "no longer", "used to" or
+"now", because each of them describes a change to something that was never released.
+
+Wrong, before the first release:
+
+```markdown
+- Breaking: `--push` no longer implies `--yes`. It used to release without asking.
+```
+
+Right, before the first release:
+
+```markdown
+- `--push` requires `--yes` and does not imply it. Without `--yes` it exits 2 and changes nothing.
+```
+
+After the first release a fragment describes a change to released behavior, and a breaking change
+starts with "Breaking:". Before any release, the owner reads the release dry run's changelog
+section and merges, rewords or deletes fragments that read wrong; a fix to something the same
+release introduced belongs in one bullet or none.
+
 ## Check and release
 
 - `python scripts/changelog.py check <base> <tip>` fails when a `feat`, `fix` or breaking commit in
