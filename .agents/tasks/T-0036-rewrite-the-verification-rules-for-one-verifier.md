@@ -5,7 +5,7 @@ status: open
 type: docs
 priority: medium
 depends_on: [T-0033, T-0034, T-0035]
-touches: [CLAUDE.md, CONTRIBUTING.md, .agents/README.md, .agents/tasks/templates/task.md, PYTHON_CONVENTIONS.md, README.md, DEV_TOOLING_SPEC.md, scripts/README.md, changelog.d/T-0036.changed.md]
+touches: [CLAUDE.md, CONTRIBUTING.md, .agents/README.md, .agents/tasks/templates/task.md, PYTHON_CONVENTIONS.md, README.md, DEV_TOOLING_SPEC.md, scripts/README.md, changelog.d/T-0036.added.md]
 created: 2026-10-05
 report: reports/T-0036.md
 ---
@@ -35,6 +35,9 @@ gate run is canonical, and match the code from T-0033 to T-0035.
   `.agents/README.md` has the branch-level verifier and the post-merge gate rerun.
   `PYTHON_CONVENTIONS.md` and `README.md` also describe the per-commit verifier or the full
   pre-push gate.
+- `scripts/README.md` is under `scripts/` and is treated as an "Ask first" item (T-0026 precedent).
+  The plan assigns it to this task, and the owner's acceptance ("proceed with the steps") covers
+  the plan's tasks. Cite both in the report.
 
 ## Scope
 
@@ -49,14 +52,21 @@ gate run is canonical, and match the code from T-0033 to T-0035.
   the post-merge check uses `--if-needed`.
 - `.agents/tasks/templates/task.md`, `PYTHON_CONVENTIONS.md`, `README.md`, `DEV_TOOLING_SPEC.md`,
   `scripts/README.md`: remove the per-commit verifier and describe the new flow.
-- `changelog.d/T-0036.changed.md`. The `CLAUDE.md` commit is `docs(claude)!:` with a footer naming
+- `changelog.d/T-0036.added.md`. The `CLAUDE.md` commit is `docs(claude)!:` with a footer naming
   the new verification rule.
 - The task's fragment holds only bullet and indented continuation lines and no placeholder words.
+- `.agents/README.md`, Housekeeping, the `worktrees` bullet: the findings T-0035 added and their
+  exit status.
+- `CONTRIBUTING.md`: gate records are written only by `scripts/gate.sh`; never create, copy or edit
+  them by hand.
+- The fragment follows `changelog.d/README.md`, section "Before the first release": category
+  `added`, and no "Breaking:", "no longer", "used to" or "now".
 
 ## Non-goals
 
 - Do not change any script, hook, test or `init_project.py`.
-- Do not change the "Ask first" list or any other `CLAUDE.md` section than the two named.
+- Do not change the "Ask first" list. Change other `CLAUDE.md` sections only to fix references to
+  the verify loop (the Autonomy bullets that describe it and the Chatter section's step reference).
 - Do not change the task or report schema.
 - No new or edited tracked file contains `proj_template`, `proj-template`, `oap-template`, `8greg8`
   or the owner's email.
@@ -88,7 +98,7 @@ The files in `touches`, as in Scope.
 - [ ] Fix rounds, foreground verifiers and bookkeeping commits are described as the plan states.
 - [ ] Every documented gate and hook behavior matches the merged code.
 - [ ] `CLAUDE.md`'s first `##` heading is unchanged.
-- [ ] `changelog.d/T-0036.changed.md` exists and `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch.
+- [ ] `changelog.d/T-0036.added.md` exists and `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch.
 - [ ] `scripts/gate.sh` passes.
 - [ ] Diff stays within `touches`, the report and `BACKLOG.md`.
 

@@ -5,7 +5,7 @@ status: open
 type: feat
 priority: high
 depends_on: [T-0033]
-touches: [pyproject.toml, tests/test_init_project.py, scripts/gate.sh, scripts/config/gate.sh, .husky/pre-push, tests/test_gate.py, tests/test_hooks.py, scripts/README.md, DEV_TOOLING_SPEC.md, changelog.d/T-0034.added.md]
+touches: [pyproject.toml, tests/test_init_project.py, scripts/gate.sh, scripts/config/gate.sh, .husky/pre-push, tests/test_gate.py, tests/test_hooks.py, scripts/README.md, DEV_TOOLING_SPEC.md, tests/test_release.py, changelog.d/T-0034.added.md]
 created: 2026-10-05
 report: reports/T-0034.md
 ---
@@ -32,6 +32,9 @@ safe-list-only changes, always runs them for `main` and `--all`, and records whi
 - The two slow cases are the end-to-end tests in `tests/test_init_project.py` (about 250 to 300 s
   together); the file's other tests take about 40 s. `pyproject.toml` has no `[tool.pytest]`
   section. `TEST_CMD` is `uv run pytest`.
+- `scripts/README.md` is under `scripts/` and is treated as an "Ask first" item (T-0026 precedent).
+  The plan assigns it to this task, and the owner's acceptance ("proceed with the steps") covers
+  the plan's tasks. Cite both in the report.
 
 ## Scope
 
@@ -51,6 +54,20 @@ Implement the plan's § "Slow tests run unless the change is provably safe" exac
 - `changelog.d/T-0034.added.md`. The behavior commit is marked breaking (`feat(gate)!:`) with a
   footer saying the default gate may skip the slow tests.
 - The task's fragment holds only bullet and indented continuation lines and no placeholder words.
+- `scripts/config/gate.sh` gets `TEST_SKIP_SLOW_ARGS='-m "not slow"'`; `gate.sh` appends it to
+  `TEST_CMD` only when skipping. `SLOW_SAFE_PATHS` uses the `RECORD_PATHS` pathspec syntax;
+  fragments are `changelog.d/*.*.md` (which leaves out `README.md`). Variables are read as `${VAR-}`.
+- Changed paths: for a working-tree run, `git diff --name-only --no-renames <base>` plus
+  `git ls-files --others --exclude-standard`; for a named commit,
+  `git diff --name-only --no-renames <base> <commit>`. An empty set runs the slow tests.
+- The `hotfix/*` base applies only when `git symbolic-ref -q --short HEAD` names a `hotfix/`
+  branch; a detached HEAD uses the `develop` base.
+- `--if-needed --all <sha>...` treats a `slow=no` record as insufficient and gates with `--all`.
+  Pre-push calls it separately for `main`'s SHA, so `release.py --push` makes two calls; update the
+  hotfix release test in `tests/test_release.py` accordingly.
+- `tests/test_hooks.py:950-954` asserts an exact test call; adapt it.
+- The fragment follows `changelog.d/README.md`, section "Before the first release": category
+  `added`, and no "Breaking:", "no longer", "used to" or "now".
 
 ## Non-goals
 

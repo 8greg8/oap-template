@@ -45,8 +45,15 @@ verify line can name the gate record the verifier wrote.
   The template documents it.
 - Tests in `tests/test_report_scripts.py` (and `tests/test_task_scripts.py` if the task scripts'
   shared helpers change).
-- `changelog.d/T-0035.added.md`. The verify-line change is marked breaking (`feat(tasks)!:`) only
-  if old reports stop validating; the plan expects they do not.
+- `changelog.d/T-0035.added.md`. The behavior commit is marked breaking (`feat(tasks)!:`), as the
+  plan's § Approvals lists the verify-line format as breaking. Its footer names the new verify-line
+  form and the new `housekeep.py worktrees` findings, which make `worktrees` and `all` exit 1 where
+  they exited 0. Old reports keep validating.
+- Key format (from T-0033): 40 or 64 lowercase hex characters. The verify line cites it as
+  `gate <key>` with at least 12 characters. `report.py validate` rejects a `gate` token that does
+  not match `\bgate [0-9a-f]{12,64}\b`, and does not require one.
+- The fragment follows `changelog.d/README.md`, section "Before the first release": category
+  `added`, and no "Breaking:", "no longer", "used to" or "now".
 - The task's fragment holds only bullet and indented continuation lines and no placeholder words.
 
 ## Non-goals
@@ -64,13 +71,15 @@ verify line can name the gate record the verifier wrote.
 
 ## Required behavior
 
-`housekeep.py worktrees` lists every leftover the Scope names; every existing report still
-validates; a report with the new verify line validates.
+`housekeep.py worktrees` lists every leftover the Scope names; every report that passes
+`report.py validate` at the branch's merge base still passes (T-0002, T-0004, T-0006 and T-0007
+already fail and are out of scope); a report with the new verify line validates.
 
 ## Tests required
 
 - `uv run pytest tests/test_report_scripts.py tests/test_task_scripts.py -v`.
-- `python .agents/tasks/scripts/report.py validate` over every existing report.
+- `python .agents/tasks/scripts/report.py validate` lists the same findings at the merge base and
+  at the branch head.
 - `scripts/gate.sh`.
 
 ## Documentation required
@@ -80,7 +89,7 @@ validates; a report with the new verify line validates.
 ## Acceptance criteria
 
 - [ ] `housekeep.py worktrees` reports worktrees and branches of `done` or `abandoned` tasks, merged or not, with or without a worktree.
-- [ ] The new verify-line form validates and every existing report still validates.
+- [ ] The new verify-line form validates, and `report.py validate` lists the same findings at the merge base and at the branch head.
 - [ ] The report template documents the new form.
 - [ ] Any exit-status change of `housekeep.py` is stated in the report.
 - [ ] `changelog.d/T-0035.added.md` exists and `python3 scripts/changelog.py check $(git merge-base origin/develop HEAD) HEAD` exits 0 on the pushed branch.
