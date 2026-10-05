@@ -148,7 +148,10 @@ Step 7 runs as follows, for every task:
      breaking change it also checks that the branch adds a changelog fragment
      (`changelog.d/<id>.<category>.md`, listed in `touches`) that describes the
      change, and that each commit's type matches what the change does, since a
-     wrongly typed commit needs no fragment and drives no release. It reports
+     wrongly typed commit needs no fragment and drives no release. It reads
+     each new fragment against the wording rule in `changelog.d/README.md`
+     § "Before the first release" and, until the first `vX.Y.Z` tag exists,
+     reports "Breaking:", "no longer", "used to" or "now". It reports
      every failure and fixes nothing. It must also check and report whether
      the change is a breaking change (as `CLAUDE.md` defines it) or crosses any "Ask first"
      item, including edits to `scripts/` or `pyproject.toml` `[tool]`
