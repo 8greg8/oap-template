@@ -1,7 +1,8 @@
 """Tests for the gate records of `scripts/gate.sh` and its `--if-needed` mode.
 
 Each case builds a scratch repository holding a copy of the real `scripts/`, whose config logs
-every gate command with its working directory instead of running lint, typecheck and tests. The
+every gate command with its working directory instead of running lint, typecheck and tests,
+through a `log` stub on `PATH` (the config stays POSIX-sourceable, as `.husky/pre-push` needs). The
 log lives outside the repository so it never dirties the tree. `uv` and `node` are stubs on
 `PATH` that print versions read from files, so a case can change a tool version. A record is
 observed through behavior: whether a later `--if-needed` runs the gate again.
@@ -10,6 +11,7 @@ observed through behavior: whether a later `--if-needed` runs the gate again.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -20,9 +22,11 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = REPO_ROOT / "scripts"
 RECORD_PATHS_OF_PLAN = (
-    ".agents/tasks/T-*.md .agents/tasks/reports/ .agents/tasks/BACKLOG.md "
-    ".agents/tasks/.counter .agents/LESSONS.md .agents/plans/"
+    ".agents/tasks/T-*.md .agents/tasks/reports/** .agents/tasks/BACKLOG.md "
+    ".agents/tasks/.counter .agents/LESSONS.md .agents/plans/**"
 )
+PRE_PUSH = REPO_ROOT / ".husky" / "pre-push"
+KEY = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 
 
 class Scratch:
@@ -117,6 +121,7 @@ def scratch(tmp_path: Path) -> Scratch:
         'if [ "$1" = "--version" ]; then cat "$TOOLS/uv"; else cat "$TOOLS/python"; fi',
     )
     _stub(s.bin / "node", 'cat "$TOOLS/node"')
+    _stub(s.bin / "log", f'echo "$1 $PWD" >> "{s.log}"')
     s.tools.mkdir()
     s.set_tool("uv", "uv 1.0.0")
     s.set_tool("python", "Python 3.12.0")
@@ -131,18 +136,8 @@ def scratch(tmp_path: Path) -> Scratch:
     config = s.repo / "scripts" / "config" / "gate.sh"
     config.write_text(
         config.read_text(encoding="utf-8")
-        + "\n".join(
-            [
-                "",
-                f'log() {{ echo "$1 $PWD" >> "{s.log}"; }}',
-                'LINT_CMD="log lint"',
-                'FORMAT_CHECK_CMD="log format"',
-                'TYPECHECK_CMD="log typecheck"',
-                'TEST_CMD="log test"',
-                "export -f log",
-                "",
-            ]
-        ),
+        + '\nLINT_CMD="log lint"\nFORMAT_CHECK_CMD="log format"\n'
+        + 'TYPECHECK_CMD="log typecheck"\nTEST_CMD="log test"\n',
         encoding="utf-8",
     )
     s.commit({"src/app.py": "x = 1\n"}, "init")
@@ -172,8 +167,35 @@ def test_full_clean_run_writes_a_record_in_the_git_common_dir(scratch: Scratch) 
     (record,) = scratch.records()
     body = record.read_text(encoding="utf-8")
     assert f"commit={scratch.git('rev-parse', 'HEAD')}" in body
-    assert "slow_tests=yes" in body
+    assert "slow=yes" in body.splitlines()
     assert record.parent == scratch.repo / ".git" / "gate-pass"
+
+
+def test_record_file_layout_and_output(scratch: Scratch) -> None:
+    result = scratch.gate()
+    assert result.returncode == 0, result.stderr + result.stdout
+    (record,) = scratch.records()
+    key = record.name
+    assert KEY.fullmatch(key)
+    lines = record.read_text(encoding="utf-8").splitlines()
+    assert [line.split("=", 1)[0] for line in lines] == [
+        "key",
+        "commit",
+        "slow",
+        "date",
+    ]
+    assert lines[0] == f"key={key}"
+    assert lines[1] == f"commit={scratch.git('rev-parse', 'HEAD')}"
+    assert lines[2] == "slow=yes"
+    out = result.stdout
+    assert out.index(f"gate record {key} (slow tests: yes)") < out.index("gate clean")
+
+
+def test_dirty_run_says_why_it_wrote_no_record(scratch: Scratch) -> None:
+    scratch.write({"untracked.txt": "u\n"})
+    result = scratch.gate()
+    assert "dirty tree" in result.stderr
+    assert "gate record" not in result.stdout
 
 
 def test_record_is_not_part_of_the_working_tree(scratch: Scratch) -> None:
@@ -197,7 +219,7 @@ def test_run_on_a_dirty_tree_writes_no_record(scratch: Scratch) -> None:
     scratch.write({"untracked.txt": "u\n"})
     result = scratch.gate()
     assert result.returncode == 0
-    assert "not clean" in result.stderr
+    assert "dirty tree" in result.stderr
     assert scratch.records() == []
 
 
@@ -217,7 +239,7 @@ def test_run_that_dirties_the_tree_writes_no_record(scratch: Scratch) -> None:
     )
     result = scratch.gate()
     assert result.returncode == 0
-    assert "changed the working tree" in result.stderr
+    assert "dirty tree after the run" in result.stderr
     assert scratch.records() == []
 
 
@@ -246,10 +268,12 @@ def test_unknown_arguments_are_refused(scratch: Scratch) -> None:
 RECORD_FILES = {
     ".agents/tasks/T-0002-a-task.md": "task\n",
     ".agents/tasks/reports/T-0002.md": "report\n",
+    ".agents/tasks/reports/deep/er/T-0002.md": "report\n",
     ".agents/tasks/BACKLOG.md": "backlog\n",
     ".agents/tasks/.counter": "2\n",
     ".agents/LESSONS.md": "lessons\n",
     ".agents/plans/2026-10-05-p.md": "plan\n",
+    ".agents/plans/sub/dir/p.md": "plan\n",
 }
 
 CODE_FILES = {
@@ -258,6 +282,9 @@ CODE_FILES = {
     ".agents/tasks/scripts/task.py": "x = 1\n",
     ".agents/tasks/templates/task.md": "template\n",
     ".agents/other/T-0003.md": "elsewhere\n",
+    ".agents/tasks/sub/T-0004.md": "nested task\n",
+    ".agents/tasks/T-0005/inner.md": "inside a task directory\n",
+    ".agents/LESSONS.md.bak": "backup\n",
     "README.md": "r\n",
 }
 
@@ -489,5 +516,76 @@ def test_if_needed_never_refuses_for_want_of_a_checkout(scratch: Scratch) -> Non
     """A commit on no branch at all, with a different commit checked out, is still gated."""
     orphan = scratch.git("commit-tree", "HEAD^{tree}", "-m", "unreachable")
     result = scratch.gate("--if-needed", orphan)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert _ran(scratch) == FULL
+
+
+# --- pre-push from a linked worktree --------------------------------------------
+
+
+def test_develop_push_from_a_linked_worktree_gates_a_commit_that_is_not_checked_out(
+    scratch: Scratch,
+) -> None:
+    """The real hook, run from a linked worktree whose HEAD is not the pushed commit."""
+    old = scratch.git("rev-parse", "HEAD")
+    scratch.git("checkout", "-q", "-b", "candidate")
+    pushed = scratch.commit({"src/app.py": "x = 7\n"}, "candidate work")
+    scratch.git("checkout", "-q", "develop")
+    linked = scratch.root / "linked"
+    scratch.git("worktree", "add", "-q", "--detach", str(linked), old)
+    assert scratch.git("rev-parse", "HEAD", cwd=linked) == old
+    line = f"refs/heads/develop {pushed} refs/heads/develop {old}\n"
+
+    result = subprocess.run(
+        ["sh", "-e", str(PRE_PUSH), "origin", "https://example.invalid/repo.git"],
+        input=line,
+        cwd=linked,
+        capture_output=True,
+        text=True,
+        env=scratch.env(),
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert _ran(scratch) == FULL
+    (cwd,) = {line.split(maxsplit=1)[1] for line in scratch.calls()}
+    assert cwd not in {str(scratch.repo.resolve()), str(linked.resolve())}
+    assert not Path(cwd).exists()
+    assert scratch.git("worktree", "list", "--porcelain").count("worktree ") == 2
+    assert list((scratch.root / "tmp").iterdir()) == []
+    (record,) = scratch.records()
+    assert f"commit={pushed}" in record.read_text(encoding="utf-8")
+    # The same push again finds the record and runs nothing.
+    scratch.clear_calls()
+    again = subprocess.run(
+        ["sh", "-e", str(PRE_PUSH), "origin", "https://example.invalid/repo.git"],
+        input=line,
+        cwd=linked,
+        capture_output=True,
+        text=True,
+        env=scratch.env(),
+        check=False,
+    )
+    assert again.returncode == 0, again.stderr + again.stdout
+    assert scratch.calls() == []
+
+
+def test_if_needed_survives_git_environment_variables_from_a_hook(
+    scratch: Scratch,
+) -> None:
+    scratch.git("checkout", "-q", "-b", "side")
+    side = scratch.commit({"src/app.py": "x = 5\n"}, "side work")
+    scratch.git("checkout", "-q", "develop")
+    env = scratch.env()
+    env["GIT_INDEX_FILE"] = str(scratch.repo / ".git" / "no-such-index")
+    env["GIT_PREFIX"] = ""
+    result = subprocess.run(
+        ["bash", "scripts/gate.sh", "--if-needed", side],
+        cwd=scratch.repo,
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
     assert result.returncode == 0, result.stderr + result.stdout
     assert _ran(scratch) == FULL

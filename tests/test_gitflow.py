@@ -349,22 +349,125 @@ def _commit_on_develop(scratch: Path, files: dict[str, str], message: str) -> No
     _git(scratch, "push", "-q", "origin", "develop")
 
 
-def test_finish_runs_the_gate_with_if_needed_on_the_branch_tip(scratch: Path):
+def test_finish_runs_the_gate_with_if_needed_on_the_merge_commit(scratch: Path):
     log = scratch.parent / "gate-args"
     _commit_on_develop(
         scratch,
-        {"scripts/gate.sh": f'#!/bin/sh\necho "$@ $PWD" >> "{log}"\n'},
+        {
+            "scripts/gate.sh": f'#!/bin/sh\necho "$@ $(git rev-parse HEAD) $PWD" >> "{log}"\n'
+        },
         "chore: logging gate stub",
     )
     worktree = _start_commit(scratch, "docs", "T-0007-notes", "docs: notes", None)
+    branch_tip = _git(worktree, "rev-parse", "HEAD")
 
     _gitflow(scratch, "docs", "finish", "T-0007-notes")
 
     (line,) = log.read_text(encoding="utf-8").splitlines()
-    flag, ref, cwd = line.split(" ", 2)
-    assert (flag, ref) == ("--if-needed", "refs/heads/docs/T-0007-notes")
-    assert Path(cwd).resolve() == worktree.resolve()
+    flag, ref, head, cwd = line.split(" ", 3)
+    assert (flag, ref) == ("--if-needed", "HEAD")
+    # The gate ran once, after the merge, on the merge commit in the primary checkout.
+    assert head == _git(scratch, "rev-parse", "develop")
+    assert head != branch_tip
+    assert Path(cwd).resolve() == scratch.resolve()
     assert not worktree.exists()
+
+
+def _failing_gate(scratch: Path, condition: str = "true") -> Path:
+    """Commit a gate stub that exits 1 when `condition` holds (a shell test) and log each call."""
+    log = scratch.parent / "gate-calls"
+    _commit_on_develop(
+        scratch,
+        {
+            "scripts/gate.sh": (
+                f'#!/bin/sh\necho "$@ $(git rev-parse --abbrev-ref HEAD)" >> "{log}"\n'
+                f"if {condition}; then exit 1; fi\n"
+            )
+        },
+        "chore: failing gate stub",
+    )
+    return log
+
+
+def test_finish_with_a_red_gate_after_the_merge_undoes_the_merge(scratch: Path):
+    log = _failing_gate(scratch)
+    worktree = _start_commit(scratch, "docs", "T-0007-notes", "docs: notes", None)
+    before = _git(scratch, "rev-parse", "develop")
+    origin_before = _git(scratch, "rev-parse", "origin/develop")
+
+    result = _gitflow(scratch, "docs", "finish", "T-0007-notes", check=False)
+
+    assert result.returncode != 0
+    assert "gate failed on develop" in result.stderr
+    assert "undone" in result.stderr
+    assert log.read_text(encoding="utf-8").splitlines() == ["--if-needed HEAD develop"]
+    assert _git(scratch, "rev-parse", "develop") == before
+    assert _git(scratch, "status", "--porcelain", "--untracked-files=no") == ""
+    assert not (scratch / "change.py").exists()
+    assert _git(scratch, "rev-parse", "origin/develop") == origin_before
+    # The branch and its worktree are kept for another try.
+    assert worktree.is_dir()
+    assert _git(scratch, "branch", "--list", "docs/T-0007-notes") != ""
+
+
+def test_finish_gates_after_the_merge_not_before(scratch: Path):
+    """A gate that fails only on the base branch is never asked about the branch itself."""
+    log = _failing_gate(scratch, '[ "$(git rev-parse --abbrev-ref HEAD)" = develop ]')
+    _start_commit(scratch, "docs", "T-0007-notes", "docs: notes", None)
+
+    result = _gitflow(scratch, "docs", "finish", "T-0007-notes", check=False)
+
+    assert result.returncode != 0
+    assert log.read_text(encoding="utf-8").splitlines() == ["--if-needed HEAD develop"]
+
+
+def test_hotfix_finish_with_a_red_gate_on_main_undoes_the_merge(scratch: Path):
+    log = _failing_gate(scratch, '[ "$(git rev-parse --abbrev-ref HEAD)" = main ]')
+    _git(scratch, "branch", "-f", "main", "develop")
+    _git(scratch, "push", "-q", "-f", "origin", "main")
+    worktree = _start_commit(
+        scratch, "hotfix", "urgent", "fix: urgent repair", "urgent.fixed.md"
+    )
+    main_before = _git(scratch, "rev-parse", "main")
+    develop_before = _git(scratch, "rev-parse", "develop")
+
+    result = _gitflow(scratch, "hotfix", "finish", "urgent", check=False)
+
+    assert result.returncode != 0
+    assert "gate failed on main" in result.stderr
+    assert _git(scratch, "rev-parse", "main") == main_before
+    assert _git(scratch, "rev-parse", "develop") == develop_before
+    assert log.read_text(encoding="utf-8").splitlines() == ["--if-needed HEAD main"]
+    assert worktree.is_dir()
+
+
+def test_hotfix_finish_with_a_red_gate_on_develop_undoes_both_merges(scratch: Path):
+    log = _failing_gate(scratch, '[ "$(git rev-parse --abbrev-ref HEAD)" = develop ]')
+    _git(scratch, "push", "-q", "origin", "develop")
+    _git(scratch, "branch", "-f", "main", "develop")
+    _git(scratch, "push", "-q", "-f", "origin", "main")
+    worktree = _start_commit(
+        scratch, "hotfix", "urgent", "fix: urgent repair", "urgent.fixed.md"
+    )
+    # develop moves on, so the back-merge is a real merge.
+    (scratch / "develop-only.txt").write_text("d\n", encoding="utf-8")
+    _git(scratch, "add", "develop-only.txt")
+    _git(scratch, "commit", "-q", "--no-verify", "-m", "docs: develop only")
+    main_before = _git(scratch, "rev-parse", "main")
+    develop_before = _git(scratch, "rev-parse", "develop")
+
+    result = _gitflow(scratch, "hotfix", "finish", "urgent", check=False)
+
+    assert result.returncode != 0
+    assert "gate failed on develop after the back-merge" in result.stderr
+    assert _git(scratch, "rev-parse", "main") == main_before
+    assert _git(scratch, "rev-parse", "develop") == develop_before
+    assert _git(scratch, "status", "--porcelain", "--untracked-files=no") == ""
+    assert log.read_text(encoding="utf-8").splitlines() == [
+        "--if-needed HEAD main",
+        "--if-needed HEAD develop",
+    ]
+    assert worktree.is_dir()
 
 
 def _install_real_gate(scratch: Path, log: Path) -> None:

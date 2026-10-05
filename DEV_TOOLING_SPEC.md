@@ -99,31 +99,24 @@ TEST_CMD="uv run pytest"
 MAIN_BRANCH="main"
 DEVELOP_BRANCH="develop"
 
-# Bookkeeping paths: space-separated patterns, left out of a gate record's key and skipped by
-# the hooks.
-RECORD_PATHS=".agents/tasks/T-*.md .agents/tasks/reports/ .agents/tasks/BACKLOG.md .agents/tasks/.counter .agents/LESSONS.md .agents/plans/"
+# Bookkeeping paths: one space-separated string of git glob pathspecs, left out of a gate
+# record's key and skipped by the hooks.
+RECORD_PATHS=".agents/tasks/T-*.md .agents/tasks/reports/** .agents/tasks/BACKLOG.md .agents/tasks/.counter .agents/LESSONS.md .agents/plans/**"
 ```
 
 `RECORD_PATHS` lists the paths that only record bookkeeping: task files, reports, `BACKLOG.md`, the
-task counter, `LESSONS.md` and plans. A pattern ending in `/` is a directory prefix; any other
-pattern is an exact path or a glob in which `*` also matches `/`; no pattern holds a space. Everything
-else counts as code, including `.agents/tasks/scripts/`, `.agents/tasks/templates/` and
-`.agents/README.md`. Both hooks use the list for their skip rule, and `gate.sh` uses it to build the
-key of a gate record, so the hooks and the key always agree.
-
-This repo's default values are the exact commands from `PYTHON_CONVENTIONS.md` § Commands, so the
-gate a fresh clone of this template runs is identical to what that doc already tells a human/agent
-to run by hand — the script is just the same commands with no chance of transcription drift.
-
-A repo with a different stack (e.g. TypeScript) only edits this one file — e.g.
-`LINT_CMD="pnpm eslint ."`, `TEST_CMD="pnpm vitest run"` — and every hook, the verify/resolve
-loop, and `gitflow.sh`/`release.py` keep working unmodified.
+task counter, `LESSONS.md` and plans. It is one space-separated string of git glob pathspecs, so no
+entry holds a space: `*` does not cross `/` and `**` does. `gate.sh` and both hooks exclude each entry
+as a `:(exclude,glob)<entry>` pathspec, so git is the one matcher, and shell code expands the string
+with globbing off (`set -f`). Everything else counts as code, including `.agents/tasks/scripts/`,
+`.agents/tasks/templates/` and `.agents/README.md`. Both hooks use the list for their skip rule, and
+`gate.sh` uses it to build the key of a gate record, so the hooks and the key always agree.
 
 The file must stay POSIX-sourceable: plain `NAME="value"` assignments, no bash arrays or other
 bash-only syntax. The bash scripts source it, and so does `.husky/pre-push`, which runs under
-POSIX `sh` (`dash` on many systems). A test sources it with `sh`. A copy of the config
-without `RECORD_PATHS` still works: no path is then a record path, so the hooks gate every change
-and the key covers every tracked file.
+POSIX `sh` (`dash` on many systems). A test sources it with `sh`. `gate.sh` reads `RECORD_PATHS` as `${RECORD_PATHS-}`, so a copy of the config without it still
+works: no path is then a record path, so the hooks gate every change and the key covers every
+tracked file.
 
 ## `scripts/gate.sh`
 
@@ -160,24 +153,34 @@ are expanded with the `${files[@]+"${files[@]}"}` guard so `set -u` does not abo
 
 A full `gate.sh` run that passes writes a record, so later steps do not gate the same code again.
 
-- **Key.** The hash of the commit's tree with every `RECORD_PATHS` path filtered out, plus
-  `uv --version`, `uv run python -VV`, `node -v` and `git --version`. A tool that is not installed
-  counts as such, and does not fail the run. The tool versions are those seen from the checkout
-  where `gate.sh` runs. Changing a record path keeps the key. Changing any other tracked file, or a
-  tool version, changes it.
-- **Where.** `$(git rev-parse --git-common-dir)/gate-pass/<key>`, a small text file naming the
-  commit, whether the slow tests ran (`slow_tests=yes` for every full run) and the time. It sits
-  in the git directory shared by every worktree of the repository. It is never committed and never
-  part of the tree.
+- **Key.** A hash (`git hash-object --stdin`, 40 or 64 lowercase hex characters) over the listing
+  of the commit's tree without the `RECORD_PATHS` entries, followed by one line each from
+  `uv --version`, `uv run python -VV`, `git --version` and `node -v` (`node: absent` when node is
+  missing). The listing is `git ls-files -s` over a temporary index of the commit, because
+  `git ls-tree` accepts no pathspec magic. The tool versions are those seen from the checkout where
+  `gate.sh` runs. Changing a record path keeps the key. Changing any other tracked file, or a tool
+  version, changes it.
+- **Where.** The file `$(git rev-parse --git-common-dir)/gate-pass/<key>`, in the git directory
+  shared by every worktree of the repository, never committed and never part of the tree. It holds
+  four lines: `key=`, `commit=`, `slow=yes|no` (whether the slow tests ran; every full run says
+  `yes` until a later task adds test selection) and `date=`. A `slow=yes` record is never
+  overwritten by a `slow=no` one.
 - **When it is written.** Only after a full run in which every gate passed on a tree that is
   clean before and after: `git status --porcelain --untracked-files=all` prints nothing both
-  times. `--fast`, `--staged`, a failed run and a dirty run never write one; a dirty run says so.
+  times. The run prints `gate record <key> (slow tests: yes|no)` before `gate clean`.
+  `--fast`, `--staged`, a failed run and a dirty run never write one; a dirty run prints why
+  (`dirty tree before the run` or `dirty tree after the run`).
 - **`--if-needed [<commit>...]`.** For each commit (default `HEAD`) it computes the key and looks
   for the record. A commit with a record is skipped. For each commit without one it runs the
   commit's own full gate: on the working tree when that commit is checked out and the tree is
-  clean, otherwise in a temporary detached worktree of that commit, which it removes afterwards
-  whether the gate passed or not. It never refuses for want of a checkout. The run writes the
-  record itself. It exits 1 at the first commit whose gate fails.
+  clean, otherwise in a temporary detached worktree, which is the commit's `scripts/gate.sh` run
+  from `git worktree add --detach "$(mktemp -d)/wt" <commit>`. Before it uses the worktree it
+  unsets `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`,
+  `GIT_ALTERNATE_OBJECT_DIRECTORIES` and `GIT_PREFIX`, which a hook may have set. A trap on exit
+  removes the worktree (`git worktree remove --force`, then `git worktree prune`) whether the
+  gate passed or not. No `npm ci` is needed; `uv run` creates the `.venv`. The inner run writes the
+  record. It never refuses for want of a checkout, and it exits 1 at the first commit whose gate
+  fails.
 
 Records are local files, and any clean full run writes one, an executor's included. The
 independent verifier therefore never relies on a record: it runs the full gate itself. Records
@@ -189,7 +192,7 @@ and the post-merge check. Records written inside scratch repositories by tests a
 
 - `pre-commit`: exits 0 when nothing is staged. Exits 0 with a message when every staged path
   (listed with `--no-renames`, so a rename into a record path also counts its old path) matches
-  `RECORD_PATHS` (task filing, status changes, reports, `BACKLOG.md`, `LESSONS.md`, plans).
+  a `RECORD_PATHS` entry (task filing, status changes, reports, `BACKLOG.md`, `LESSONS.md`, plans).
   Otherwise runs `autofix.sh --staged`, re-stages only the files that were
   already staged (NUL-delimited, as literal paths, so any filename works), then
   `gate.sh --staged`. Tests are left to `pre-push`.
@@ -199,10 +202,11 @@ and the post-merge check. Records written inside scratch repositories by tests a
   every pushed commit touches nothing but `RECORD_PATHS` paths. A deleted ref pushes no commits. A
   new remote branch, or a range git cannot list, never takes the skip. Otherwise it runs the
   fragment check (below) for each pushed ref, then the gate, which depends on the ref:
-  - `develop` and `main` run `gate.sh --if-needed` with every pushed, non-deleted local sha. The
-    full gate runs only for a commit that has no gate record.
-  - any other ref (a task branch, a tag) runs `gate.sh --fast` once. The independent verifier's
-    full run follows before a merge, and `develop` and `main` stay fully protected.
+  - `develop` and `main`: one `gate.sh --if-needed` call with the local sha of every non-deleted
+    `develop` or `main` ref. The full gate runs only for a commit that has no gate record.
+  - any other branch: one `gate.sh --fast` call when the push has such a ref. The independent
+    verifier's full run follows before a merge, and `develop` and `main` stay fully protected.
+  - tags and other non-branch refs trigger no gate.
   A hotfix release push passes: `release.py --yes --push` leaves `main` checked out, so its release
   commit is gated on the checkout, and the back-merge on `develop` is gated in a temporary
   worktree.
@@ -444,9 +448,15 @@ scripts/gitflow.sh hotfix finish <topic>   # merge into main, back-merge main in
                                             # (pushes and tags nothing; prints the next steps)
 ```
 
-`finish` subcommands refuse to run if the changelog check or `scripts/gate.sh --if-needed` fails on
-the branch being merged — neither is bypassable through the gitflow helper. `--if-needed` skips
-the full gate when the branch tip already has a gate record and runs it otherwise. The changelog check is
+`finish` subcommands refuse to finish if the changelog check fails on the branch or the gate fails
+after a merge. The gate is `scripts/gate.sh --if-needed HEAD` and runs after each merge `finish`
+makes: the merge into the base branch and, for a hotfix, the back-merge into `develop`. It skips the
+full gate when that code already has a gate record (the verifier's run, when the merge changed no
+code) and runs it otherwise. On red, `finish` runs `git reset --merge ORIG_HEAD` for each merge it
+made in this run (a hotfix back-merge first, then the merge into `main` from the commit saved before
+it, since the back-merge replaced `ORIG_HEAD`) and stops. Nothing has been pushed, and the branch
+and its worktree are kept. There is no gate before the merge. Neither check is bypassable through
+the gitflow helper. The changelog check is
 `changelog.py check <merge base> <branch>`, where the merge base is with `origin/<base>` when that
 ref exists and with the local base branch otherwise. `finish` runs `git fetch origin <base>` first
 so that ref is current; when the fetch fails it prints a warning and uses the local base branch.

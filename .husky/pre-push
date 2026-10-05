@@ -32,34 +32,24 @@
 #
 # The gate depends on the ref. A push of develop or main runs `scripts/gate.sh --if-needed`
 # with every pushed, non-deleted local sha: the full gate runs only for a commit whose code
-# has no gate record. Any other ref (a task branch, a tag) runs `scripts/gate.sh --fast`
-# once; the independent verifier's full run follows before a merge.
+# has no gate record, in one call. When the push has any other branch ref (a task branch), one
+# `scripts/gate.sh --fast` call runs as well; the independent verifier's full run follows before
+# a merge. Tags and other non-branch refs trigger no gate.
 # shellcheck disable=SC1091
 . scripts/config/gate.sh
 
 remote=${1:-origin}
 refs=$(cat)
 
-# outside_records: print the lines of stdin that are not a record path. A pattern of
-# RECORD_PATHS ending in "/" is a directory prefix; any other is an exact path or a glob in
-# which "*" matches "/". Names arrive one per line, so a newline inside a name adds lines; a
-# line that does not match keeps the gate on.
-outside_records() {
-  set -f
-  while IFS= read -r path; do
-    [ -n "$path" ] || continue
-    matched=0
-    for pattern in $RECORD_PATHS; do
-      case "$pattern" in
-        */) case "$path" in "$pattern"*) matched=1 ;; esac ;;
-        *) case "$path" in $pattern) matched=1 ;; esac ;;
-      esac
-      [ "$matched" = 0 ] || break
-    done
-    [ "$matched" = 1 ] || printf '%s\n' "$path"
-  done
-  set +f
-}
+# Every RECORD_PATHS entry becomes a `:(exclude,glob)<entry>` pathspec in "$@", the same
+# matcher gate.sh uses for the key of a gate record. Globbing is off while the string is split.
+# $1 is saved above, so "$@" is free for the list.
+set --
+set -f
+for entry in $RECORD_PATHS; do
+  set -- "$@" ":(exclude,glob)$entry"
+done
+set +f
 
 tasks_only=1
 while read -r local_ref local_sha remote_ref remote_sha; do
@@ -67,11 +57,13 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   case "$local_sha" in *[!0]*) ;; *) continue ;; esac
   # A new remote branch (all-zero remote sha) has no base to diff against.
   case "$remote_sha" in *[!0]*) ;; *) tasks_only=0; break ;; esac
-  if ! changed=$(git log --format= --name-only --no-renames --diff-merges=first-parent "$remote_sha..$local_sha" 2>/dev/null); then
+  # --full-history keeps history simplification from hiding a commit of a merged side branch.
+  # What git prints is every path outside RECORD_PATHS that a commit of the range changes.
+  if ! changed=$(git log --format= --name-only --no-renames --diff-merges=first-parent --full-history "$remote_sha..$local_sha" -- . "$@" 2>/dev/null); then
     tasks_only=0
     break
   fi
-  if [ -n "$(printf '%s\n' "$changed" | outside_records)" ]; then
+  if [ -n "$changed" ]; then
     tasks_only=0
     break
   fi
@@ -130,7 +122,7 @@ if [ "$fragment_failed" = 1 ] || [ "$check_failed" = 1 ]; then
   exit 1
 fi
 
-# develop and main need a gate record for every pushed commit; any other ref runs --fast.
+# develop and main need a gate record for every pushed commit; any other branch runs --fast.
 # The shas go in as the "--if-needed" argument list; no sha contains a space.
 needed=""
 fast=0
@@ -138,7 +130,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   case "$local_sha" in *[!0]*) ;; *) continue ;; esac
   case "$remote_ref" in
     "refs/heads/$MAIN_BRANCH" | "refs/heads/$DEVELOP_BRANCH") needed="$needed $local_sha" ;;
-    *) fast=1 ;;
+    refs/heads/*) fast=1 ;;
+    *) ;;
   esac
 done <<EOF
 $refs

@@ -28,10 +28,11 @@ DEVELOP_BRANCH="develop"
 # as trailing arguments; with no arguments they check the whole repo.
 STAGED_GLOB="*.py"
 
-# Paths that only record bookkeeping, as a space-separated list of path patterns. A pattern
-# ending in "/" is a directory prefix; any other pattern is an exact path or a glob in which
-# "*" also matches "/". No pattern may contain a space. scripts/gate.sh leaves these paths out
-# of the key of a gate record, and .husky/pre-commit and .husky/pre-push skip a change that
-# touches only these paths. Everything else, including the task tooling under
-# .agents/tasks/scripts/ and the process docs, is code for both.
-RECORD_PATHS=".agents/tasks/T-*.md .agents/tasks/reports/ .agents/tasks/BACKLOG.md .agents/tasks/.counter .agents/LESSONS.md .agents/plans/"
+# Paths that only record bookkeeping: one space-separated string of git glob pathspecs, so no
+# entry holds a space. scripts/gate.sh leaves them out of the key of a gate record, and
+# .husky/pre-commit and .husky/pre-push skip a change that touches only these paths. All three
+# exclude each entry as a `:(exclude,glob)<entry>` pathspec, so git is the only matcher: `*`
+# does not cross `/` and `**` does. Everything else, including the task tooling under
+# .agents/tasks/scripts/ and the process docs, is code for both. Shell code expands the string
+# with globbing off (`set -f`).
+RECORD_PATHS=".agents/tasks/T-*.md .agents/tasks/reports/** .agents/tasks/BACKLOG.md .agents/tasks/.counter .agents/LESSONS.md .agents/plans/**"

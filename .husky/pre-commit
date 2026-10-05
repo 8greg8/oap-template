@@ -9,34 +9,24 @@
 # .husky/pre-push does: a file renamed into a record path shows as a deletion outside it plus
 # an addition inside, and the deletion keeps the gate on. Path lists are NUL-delimited (-z),
 # so spaces, quotes, newlines and non-ASCII bytes in a name are never quoted or split. The
-# decision list is turned into lines only to match patterns; a newline inside a name can add
-# lines but never hides a path outside the record paths, so it can only keep the gate on.
+# decision list is turned into lines only to test it for emptiness.
 # shellcheck disable=SC1091
 . scripts/config/gate.sh
 
 staged=$(git diff --cached -z --name-only --no-renames | tr '\0' '\n')
 [ -n "$staged" ] || exit 0
 
-# outside_records: print the lines of stdin that are not a record path. A pattern ending in
-# "/" is a directory prefix; any other is an exact path or a glob in which "*" matches "/".
-outside_records() {
-    set -f
-    while IFS= read -r path; do
-        [ -n "$path" ] || continue
-        matched=0
-        for pattern in $RECORD_PATHS; do
-            case "$pattern" in
-                */) case "$path" in "$pattern"*) matched=1 ;; esac ;;
-                *) case "$path" in $pattern) matched=1 ;; esac ;;
-            esac
-            [ "$matched" = 0 ] || break
-        done
-        [ "$matched" = 1 ] || printf '%s\n' "$path"
-    done
-    set +f
-}
+# Every RECORD_PATHS entry becomes a `:(exclude,glob)<entry>` pathspec in "$@", the same
+# matcher gate.sh uses for the key of a gate record. Globbing is off while the string is split.
+set --
+set -f
+for entry in $RECORD_PATHS; do
+    set -- "$@" ":(exclude,glob)$entry"
+done
+set +f
 
-if [ -z "$(printf '%s\n' "$staged" | outside_records)" ]; then
+# What git prints is every staged path outside RECORD_PATHS.
+if [ -z "$(git diff --cached -z --name-only --no-renames -- . "$@" | tr '\0' '\n')" ]; then
     echo "pre-commit: only record paths staged; skipping gate."
     exit 0
 fi
