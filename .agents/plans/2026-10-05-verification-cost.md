@@ -56,12 +56,14 @@ about 3.3 min. `pyproject.toml` has no `[tool.pytest]` section; `TEST_CMD` is `u
 
 - The executor iterates with `scripts/gate.sh --fast` and targeted tests, and may run the full
   gate whenever it wants. Its own runs certify nothing.
-- Exactly one independent verifier checks the finished, pushed branch. It runs the full gate
-  itself (writing the record below) and does the judgment work: acceptance criteria, `touches`,
+- Exactly one independent verifier checks the finished, pushed branch. It always runs the full
+  gate itself (never `--if-needed`), which also writes the record below, and does the judgment work: acceptance criteria, `touches`,
   spec-first discipline, fragment and commit types, breaking and "Ask first". This keeps
   `CLAUDE.md`'s rule that the verify step is run by an independent agent.
-- The verifier works in a worktree of the orchestrator's checkout (`git worktree add`), so its
-  record is in the shared git directory where the orchestrator's later steps find it.
+- The verifier works in a detached worktree of the orchestrator's checkout
+  (`git worktree add --detach <path> origin/<branch>`; a plain checkout of the branch is refused
+  while the executor's worktree holds it), so its record is in the shared git directory where the
+  orchestrator's later steps find it.
 - `CONTRIBUTING.md` § "Agent verify/resolve workflow" takes the same shape for standalone changes:
   implement, iterate, commit freely; one independent verify of the finished branch; resolve; merge.
   No verifier per commit.
@@ -70,16 +72,26 @@ about 3.3 min. `pyproject.toml` has no `[tool.pytest]` section; `TEST_CMD` is `u
 
 - After a full, clean run, `scripts/gate.sh` writes a record under
   `$(git rev-parse --git-common-dir)/gate-pass/`. The key hashes:
-  - the tree with `.agents/` records filtered out (task files, reports, `BACKLOG.md`,
-    `LESSONS.md`, `plans/`), keeping `.agents/tasks/scripts/` and `.agents/tasks/templates/`,
-    the same split the hooks already use for their skip rule;
+  - the tree with the bookkeeping records filtered out: the paths in a new `RECORD_PATHS` list in
+    `scripts/config/gate.sh` (`.agents/tasks/T-*.md`, `.agents/tasks/reports/`,
+    `.agents/tasks/BACKLOG.md`, `.agents/tasks/.counter`, `.agents/LESSONS.md`, `.agents/plans/`).
+    Everything else, including `.agents/tasks/scripts/`, `.agents/tasks/templates/` and
+    `.agents/README.md`, is code for the key. `.husky/pre-commit` and `.husky/pre-push` switch their
+    skip rule to the same `RECORD_PATHS` list, so the hooks and the key agree (today the hooks skip
+    every `.agents/` path except `.agents/tasks/scripts/`);
   - `uv --version`, `uv run python -VV`, `node -v` and `git --version`.
-  The record also says whether the slow tests ran.
+  The record also says whether the slow tests ran. A record without slow tests does not satisfy a
+  check that needs them: always for `main`, and for any other commit when the change since the base
+  is not safe-list-only (below).
 - "Clean" means `git status --porcelain --untracked-files=all` is empty before and after the run.
   `--staged`, `--fast` and a dirty run never write a record.
 - `scripts/gate.sh --if-needed [<commit>...]` checks a record for each named commit (default
-  `HEAD`) and exits 0 only if all have one; otherwise it runs the full gate on the checked-out tree
-  if that is one of them and clean, and refuses for any other commit, naming it.
+  `HEAD`) and exits 0 only if all have a sufficient one. For each commit without one it runs the
+  full gate: on the working tree when that commit is checked out and the tree is clean, otherwise
+  in a temporary detached worktree of that commit, which it removes afterwards. It never refuses a
+  push for want of a checkout. (This is what lets `release.py --push` after a hotfix pass: the
+  release commit on `main` is checked out and the back-merge on `develop` is gated in a temporary
+  worktree.)
 - Users: `.husky/pre-push` for `develop` and `main` passes each pushed non-deleted `local_sha`;
   `gitflow.sh finish` and the orchestrator's post-merge check use `--if-needed` on the merge. A
   merge whose filtered tree equals the verified branch tree is not gated again.
@@ -97,10 +109,13 @@ typecheck) instead of the full gate; the verifier's full run follows before any 
 - The two end-to-end cases get a `slow` marker, registered in `pyproject.toml`
   `[tool.pytest.ini_options]`.
 - `scripts/gate.sh` skips them (`-m "not slow"`) only when every path changed since the base is on
-  a safe list in `scripts/config/gate.sh` (`SLOW_SAFE_PATHS`): `.agents/` records and plans,
-  `changelog.d/` fragments (not its `README.md`), and prose docs that `init_project.py` neither
-  edits nor tests: `CONTRIBUTING.md`, `DEV_TOOLING_SPEC.md`, `PYTHON_CONVENTIONS.md`, `NOTICE.md`.
-  Any other change runs them, and so does `--all`.
+  a safe list in `scripts/config/gate.sh` (`SLOW_SAFE_PATHS`): `RECORD_PATHS`, `changelog.d/`
+  fragments (not its `README.md`), and the prose docs `CONTRIBUTING.md`, `DEV_TOOLING_SPEC.md`,
+  `PYTHON_CONVENTIONS.md` and `NOTICE.md`. Any other change runs them, and so does `--all`.
+- The end-to-end test fails if any generated file contains a template name, and `init_project.py`
+  copies those four docs unchanged. A new fast test (not `slow`) greps exactly the safe-listed docs
+  for the template-name strings, so the one way they can break the end-to-end test is caught
+  without it.
 - The base is the merge base with `origin/$DEVELOP_BRANCH` (`origin/$MAIN_BRANCH` for `hotfix/*`),
   falling back to the local branch when the remote ref is missing; pre-push and the post-merge
   check use the same definition.
@@ -122,8 +137,8 @@ whole branch, since a fix can break a criterion that already passed.
 
 ### Bookkeeping commits (V9)
 
-Commits that change only `.agents/` records need no independent verification and no gate; the
-hooks already skip them. Plans and task files written for the owner keep one independent review
+Commits that change only `RECORD_PATHS` need no independent verification and no gate; the hooks
+skip them. Plans and task files written for the owner keep one independent review
 before they are merged.
 
 ### The verify line
@@ -172,11 +187,13 @@ The report's verify line becomes
 ## Tasks (filed after acceptance)
 
 1. **Gate records and `--if-needed`** (feat, breaking). `scripts/gate.sh`,
-   `scripts/config/gate.sh`, `.husky/pre-push`, `scripts/gitflow.sh`, `tests/test_gate.py` (new),
+   `scripts/config/gate.sh`, `.husky/pre-push`, `.husky/pre-commit`, `scripts/gitflow.sh`,
+   `tests/test_release.py` (a hotfix `release.py --push` passes the new hook),
+   `tests/test_gate.py` (new),
    `tests/test_hooks.py`, `tests/test_gitflow.py`, `scripts/README.md`, `DEV_TOOLING_SPEC.md`, a
    fragment.
 2. **Slow marker and safe-list skipping** (feat, breaking). Depends on 1. `pyproject.toml`,
-   `tests/test_init_project.py`, `scripts/gate.sh`, `scripts/config/gate.sh`, `.husky/pre-push`
+   `tests/test_init_project.py` (the marker and the fast template-name test for safe-listed docs), `scripts/gate.sh`, `scripts/config/gate.sh`, `.husky/pre-push`
    (`main` always runs everything), `tests/test_gate.py`, `tests/test_hooks.py`,
    `scripts/README.md`, `DEV_TOOLING_SPEC.md`, a fragment.
 3. **Process tooling: leftovers report and verify line** (feat, breaking). Parallel with 1.
@@ -191,10 +208,13 @@ The report's verify line becomes
 
 - **A stale record lets a broken tree through.** The key covers the code tree and the tool
   versions; any code, lock-file or tool change misses it.
-- **A forged record.** A record is a local file. It is written by the verifier's run, not the
-  executor's, and the report's verify line names it; the rules forbid writing records outside
-  `scripts/gate.sh`.
-- **A safe list that is too wide.** It holds only files the init end-to-end test cannot be broken
-  by; adding to it is a change to `scripts/config/gate.sh` and needs a human.
+- **A forged or self-written record.** A record is a local file, and any clean full run writes
+  one, the executor's included. That is why the verifier never relies on a record: it always runs
+  the full gate itself. Records only let the later mechanical steps (post-merge check, `develop`
+  and `main` pushes, `gitflow.sh finish`) skip re-running the same code. The rules forbid writing
+  records outside `scripts/gate.sh`.
+- **A safe list that is too wide.** Its docs can break the end-to-end test only through a template
+  name, which the fast grep test catches. Adding to the list is a change to
+  `scripts/config/gate.sh` and needs a human.
 - **Task-branch pushes are no longer fully gated.** A broken branch is caught by the verifier's
   full run before any merge, and `develop` and `main` stay fully protected.
