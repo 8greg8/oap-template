@@ -1,11 +1,11 @@
 ---
 id: T-0032
 title: Clarify the tag items in Ask first and drop the stale README reference
-status: open
+status: in_progress
 type: docs
 priority: medium
 depends_on: [T-0031]
-touches: [CLAUDE.md, CONTRIBUTING.md, DEV_TOOLING_SPEC.md, changelog.d/T-0032.added.md]
+touches: [CLAUDE.md, CONTRIBUTING.md, DEV_TOOLING_SPEC.md, changelog.d/T-0032.added.md, changelog.d/T-0025.added.md]
 created: 2026-10-05
 report: reports/T-0032.md
 ---
