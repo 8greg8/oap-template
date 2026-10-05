@@ -1,7 +1,7 @@
 ---
 id: T-0032
 title: Clarify the tag items in Ask first and drop the stale README reference
-status: review
+status: done
 type: docs
 priority: medium
 depends_on: [T-0031]

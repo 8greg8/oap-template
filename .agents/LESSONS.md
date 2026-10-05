@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-31 lesson(s) across 15 section(s). Generated 2026-10-05.
+32 lesson(s) across 15 section(s). Generated 2026-10-05.
 
 ## Tag index
 
@@ -16,12 +16,12 @@ to all lessons that carry it.
 
 - `agent-rules` — [T-0005](#t-0005-success)
 - `agent-workflow` — [T-0010](#t-0010-success)
-- `ask-first` — [T-0030](#t-0030-success)
+- `ask-first` — [T-0030](#t-0030-success), [T-0032](#t-0032-success)
 - `backlog` — [T-0002](#t-0002-success)
 - `bash` — [T-0012](#t-0012-success)
 - `bash-3.2` — [T-0011](#t-0011-success)
 - `breaking` — [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0028](#t-0028-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success)
-- `changelog` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0025](#t-0025-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success), [T-0028](#t-0028-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success)
+- `changelog` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0025](#t-0025-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success), [T-0028](#t-0028-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success), [T-0032](#t-0032-success)
 - `changelog-fragments` — [T-0022](#t-0022-success), [T-0025](#t-0025-success)
 - `chore` — [T-0020](#t-0020-success)
 - `code-of-conduct` — [T-0021](#t-0021-success)
@@ -29,7 +29,7 @@ to all lessons that carry it.
 - `commit-lint` — [T-0004](#t-0004-success)
 - `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
 - `docker` — [T-0006](#t-0006-success)
-- `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success), [T-0013](#t-0013-success), [T-0014](#t-0014-success), [T-0019](#t-0019-success), [T-0021](#t-0021-success), [T-0026](#t-0026-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success)
+- `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success), [T-0013](#t-0013-success), [T-0014](#t-0014-success), [T-0019](#t-0019-success), [T-0021](#t-0021-success), [T-0026](#t-0026-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success), [T-0032](#t-0032-success)
 - `end-to-end` — [T-0018](#t-0018-success)
 - `execution-loop` — [T-0001](#t-0001-success)
 - `feat` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0025](#t-0025-success)
@@ -59,7 +59,7 @@ to all lessons that carry it.
 - `pre-push` — [T-0023](#t-0023-success)
 - `process` — [T-0005](#t-0005-success)
 - `public-release` — [T-0019](#t-0019-success), [T-0020](#t-0020-success)
-- `release` — [T-0024](#t-0024-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success)
+- `release` — [T-0024](#t-0024-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success), [T-0032](#t-0032-success)
 - `rename` — [T-0015](#t-0015-success)
 - `report-gate` — [T-0001](#t-0001-success)
 - `report-validation` — [T-0003](#t-0003-success)
@@ -107,6 +107,16 @@ Source: [`reports/T-0028.md`](tasks/reports/T-0028.md)
 Tags: `changelog`, `docs`, `release`
 
 Source: [`reports/T-0031.md`](tasks/reports/T-0031.md)
+
+### T-0032 (success)
+
+- A commit body line over 100 characters fails the commit-msg hook. Check line length before
+  committing a long `BREAKING CHANGE:` footer.
+- Reflow a markdown paragraph after replacing a sentence in it, or a line exceeds the wrap width.
+
+Tags: `changelog`, `docs`, `release`, `ask-first`
+
+Source: [`reports/T-0032.md`](tasks/reports/T-0032.md)
 
 ## devcontainer
 
