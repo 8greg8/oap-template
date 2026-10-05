@@ -6,7 +6,7 @@
 
 30 task(s). Generated 2026-10-05.
 
-| open: 3 | in_progress: 0 | blocked: 0 | review: 0 | done: 27 | abandoned: 0 |
+| open: 1 | in_progress: 2 | blocked: 0 | review: 0 | done: 27 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -26,8 +26,8 @@
 | T-0023 | [Require a changelog fragment on push and at finish](T-0023-require-a-changelog-fragment-on-push-and-at.md) | done | high | feat | T-0022 | [report](reports/T-0023.md) |
 | T-0024 | [Release from develop into main with the changelog](T-0024-release-from-develop-into-main-with-the.md) | done | high | feat | T-0023 | [report](reports/T-0024.md) |
 | T-0027 | [Make init tests independent of template fragments and fold the first release entries](T-0027-make-init-tests-independent-of-template.md) | done | high | chore | — | [report](reports/T-0027.md) |
-| T-0028 | [Harden the changelog check and the push hook](T-0028-harden-the-changelog-check-and-the-push-hook.md) | open | high | fix | T-0027 | — |
-| T-0029 | [Fix release.py edge cases](T-0029-fix-release-py-edge-cases.md) | open | high | fix | T-0027 | — |
+| T-0028 | [Harden the changelog check and the push hook](T-0028-harden-the-changelog-check-and-the-push-hook.md) | in_progress | high | fix | T-0027 | — |
+| T-0029 | [Fix release.py edge cases](T-0029-fix-release-py-edge-cases.md) | in_progress | high | fix | T-0027 | — |
 | T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
 | T-0008 | [Fix pre-commit re-staging for unusual filenames](T-0008-fix-pre-commit-re-staging-for-unusual-filenames.md) | done | medium | fix | — | [report](reports/T-0008.md) |
 | T-0012 | [Make staged-file handling NUL-safe in gate and autofix scripts](T-0012-make-staged-file-handling-nul-safe-in-gate-and.md) | done | medium | fix | — | [report](reports/T-0012.md) |
@@ -46,12 +46,7 @@
 
 ## Ready to dispatch
 
-Dependencies satisfied, not yet started:
-
-- **T-0028** Harden the changelog check and the push hook — `scripts/changelog.py`, `.husky/pre-push`, `scripts/gitflow.sh`, `scripts/config/gate.sh`, `tests/test_changelog.py`, `tests/test_hooks.py`, `tests/test_gitflow.py`, `changelog.d/T-0028.fixed.md`
-- **T-0029** Fix release.py edge cases — `scripts/release.py`, `tests/test_release.py`, `changelog.d/T-0029.fixed.md`
-
-Suggested conflict-free parallel batch: T-0028, T-0029
+*Nothing ready — every open task is blocked or already in flight.*
 
 ## Waiting on dependencies
 
