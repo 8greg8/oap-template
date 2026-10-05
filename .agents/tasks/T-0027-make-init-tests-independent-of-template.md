@@ -1,7 +1,7 @@
 ---
 id: T-0027
 title: Make init tests independent of template fragments and fold the first release entries
-status: in_progress
+status: review
 type: chore
 priority: high
 depends_on: []

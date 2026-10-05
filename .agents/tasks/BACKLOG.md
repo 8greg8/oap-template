@@ -6,7 +6,7 @@
 
 30 task(s). Generated 2026-10-05.
 
-| open: 3 | in_progress: 1 | blocked: 0 | review: 0 | done: 26 | abandoned: 0 |
+| open: 3 | in_progress: 0 | blocked: 0 | review: 1 | done: 26 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -25,7 +25,7 @@
 | T-0022 | [Add the changelog tool, CHANGELOG.md and changelog fragments](T-0022-add-the-changelog-tool-changelog-md-and.md) | done | high | feat | — | [report](reports/T-0022.md) |
 | T-0023 | [Require a changelog fragment on push and at finish](T-0023-require-a-changelog-fragment-on-push-and-at.md) | done | high | feat | T-0022 | [report](reports/T-0023.md) |
 | T-0024 | [Release from develop into main with the changelog](T-0024-release-from-develop-into-main-with-the.md) | done | high | feat | T-0023 | [report](reports/T-0024.md) |
-| T-0027 | [Make init tests independent of template fragments and fold the first release entries](T-0027-make-init-tests-independent-of-template.md) | in_progress | high | chore | — | — |
+| T-0027 | [Make init tests independent of template fragments and fold the first release entries](T-0027-make-init-tests-independent-of-template.md) | review | high | chore | — | — |
 | T-0028 | [Harden the changelog check and the push hook](T-0028-harden-the-changelog-check-and-the-push-hook.md) | open | high | fix | T-0027 | — |
 | T-0029 | [Fix release.py edge cases](T-0029-fix-release-py-edge-cases.md) | open | high | fix | T-0027 | — |
 | T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
