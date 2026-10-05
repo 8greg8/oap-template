@@ -1,7 +1,7 @@
 ---
 id: T-0029
 title: Fix release.py edge cases
-status: in_progress
+status: review
 type: fix
 priority: high
 depends_on: [T-0027]
