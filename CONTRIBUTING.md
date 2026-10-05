@@ -240,6 +240,17 @@ scripts/release.py --yes --version v1.0.0  # override the computed version
 changes nothing. A dry run makes the same checks as a release and prints the section it would
 write; the only thing it changes is the remote-tracking refs, through `git fetch origin`.
 
+Before `release.py --yes`, curate the fragments:
+
+1. Run the dry run and read its changelog section.
+2. Merge, reword or delete each fragment that reads wrong. A fix to something this release
+   introduced belongs in one bullet or none. Before the first tag, every bullet follows the
+   wording rule in [`changelog.d/README.md`](changelog.d/README.md#before-the-first-release): plain
+   "added" statements, with no "Breaking:", "no longer", "used to" or "now".
+3. Commit those edits as a `docs(changelog)` change through the usual branch flow. It is not a
+   `feat`, `fix` or breaking change, so it needs no fragment.
+4. Run the dry run again, then `release.py --yes`.
+
 With `--yes`, from `develop`:
 
 1. Check out `main` and merge `develop` with `--no-ff` (`chore(merge): merge develop into main`).
