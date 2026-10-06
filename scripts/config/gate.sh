@@ -10,8 +10,9 @@
 # other bash-only syntax. The bash scripts source it, and so does .husky/pre-push, which runs
 # under POSIX sh (dash on many systems) and would fail on bash-only syntax.
 
-# The four verify/resolve gates, in the order CONTRIBUTING.md's verify/resolve workflow runs
-# them. Defaults below match PYTHON_CONVENTIONS.md exactly for this template.
+# The four gates (lint, format check, typecheck, tests), in the order scripts/gate.sh runs them
+# (see CONTRIBUTING.md's "Agent verify/resolve workflow"). Defaults below match
+# PYTHON_CONVENTIONS.md exactly for this template.
 LINT_CMD="uv run ruff check"
 LINT_FIX_CMD="uv run ruff check --fix"
 FORMAT_CHECK_CMD="uv run ruff format --check"

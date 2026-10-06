@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# The "resolve" half of the verify/resolve loop's mechanical part: applies the safe,
-# deterministic auto-corrections (lint autofix, formatting) so trivial issues never reach a
-# human or a verifier as noise. Does NOT touch typecheck/test failures -- those have no
-# generic auto-fix and need a real code change.
+# Applies the safe, deterministic auto-corrections (lint autofix, formatting) so trivial issues
+# never reach a human or a verifier as noise. Run by .husky/pre-commit (--staged) and by hand.
+# Does NOT touch typecheck/test failures -- those have no generic auto-fix and need a real code
+# change.
 #
 # Usage: scripts/autofix.sh [--staged]
 #   --staged  fix only the staged files matching STAGED_GLOB (used by .husky/pre-commit).
