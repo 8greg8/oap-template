@@ -32,9 +32,12 @@
 #
 # The gate depends on the ref. A push of develop or main runs `scripts/gate.sh --if-needed`
 # with every pushed, non-deleted local sha: the full gate runs only for a commit whose code
-# has no gate record, in one call. When the push has any other branch ref (a task branch), one
-# `scripts/gate.sh --fast` call runs as well; the independent verifier's full run follows before
-# a merge. Tags and other non-branch refs trigger no gate.
+# has no gate record that suffices. The slow tests are skipped only for a change that is
+# safe-list-only (SLOW_SAFE_PATHS in scripts/config/gate.sh), and a push to main always needs
+# them: main's shas go in a separate `--if-needed --all` call, made first, and develop's shas
+# in another. When the push has any other branch ref (a task branch), one `scripts/gate.sh
+# --fast` call runs as well; the independent verifier's full run follows before a merge. Tags
+# and other non-branch refs trigger no gate.
 # shellcheck disable=SC1091
 . scripts/config/gate.sh
 
@@ -123,13 +126,16 @@ if [ "$fragment_failed" = 1 ] || [ "$check_failed" = 1 ]; then
 fi
 
 # develop and main need a gate record for every pushed commit; any other branch runs --fast.
-# The shas go in as the "--if-needed" argument list; no sha contains a space.
+# The shas go in as the "--if-needed" argument lists; no sha contains a space. A record of a run
+# without the slow tests never satisfies main, so main's call passes --all.
+main_needed=""
 needed=""
 fast=0
 while read -r local_ref local_sha remote_ref remote_sha; do
   case "$local_sha" in *[!0]*) ;; *) continue ;; esac
   case "$remote_ref" in
-    "refs/heads/$MAIN_BRANCH" | "refs/heads/$DEVELOP_BRANCH") needed="$needed $local_sha" ;;
+    "refs/heads/$MAIN_BRANCH") main_needed="$main_needed $local_sha" ;;
+    "refs/heads/$DEVELOP_BRANCH") needed="$needed $local_sha" ;;
     refs/heads/*) fast=1 ;;
     *) ;;
   esac
@@ -139,6 +145,10 @@ EOF
 
 if [ "$fast" = 1 ]; then
   scripts/gate.sh --fast || exit 1
+fi
+if [ -n "$main_needed" ]; then
+  # shellcheck disable=SC2086
+  scripts/gate.sh --if-needed --all $main_needed || exit 1
 fi
 if [ -n "$needed" ]; then
   # shellcheck disable=SC2086

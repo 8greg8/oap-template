@@ -566,9 +566,9 @@ def install_pre_push_hook(repo: Path) -> Path:
 def test_hotfix_release_push_passes_the_pre_push_hook(repo: Path):
     """`release.py --yes --push` after a hotfix: main is checked out, develop is not.
 
-    The hook gates main's release commit on the checkout, develop's back-merge in a temporary
-    worktree (which it removes). The tag push runs no gate: the hook skips tags and other
-    non-branch refs.
+    The hook makes two calls. `gate.sh --if-needed --all` gates main's release commit on the
+    checkout, and `gate.sh --if-needed` gates develop's back-merge in a temporary worktree (which
+    it removes). The tag push runs no gate: the hook skips tags and other non-branch refs.
     """
     hooks = install_pre_push_hook(repo)  # not wired in yet
     feat(repo, "a")
@@ -595,6 +595,17 @@ def test_hotfix_release_push_passes_the_pre_push_hook(repo: Path):
         if line.startswith("commit=")
     }
     assert gated == {git(repo, "rev-parse", "main"), git(repo, "rev-parse", "develop")}
+    # The hook made two calls: main's carries --all, so main's record is of a run with the slow
+    # tests whatever the change was.
+    fields = [
+        dict(
+            line.split("=", 1)
+            for line in record.read_text(encoding="utf-8").splitlines()
+        )
+        for record in (repo / ".git" / "gate-pass").iterdir()
+    ]
+    slow = {field["commit"]: field["slow"] for field in fields}
+    assert slow[git(repo, "rev-parse", "main")] == "yes"
     assert git(repo, "worktree", "list", "--porcelain").count("worktree ") == 1
 
 

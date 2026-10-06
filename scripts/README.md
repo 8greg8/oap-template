@@ -36,11 +36,15 @@ ls -l .husky                          # hook files should be executable
 ## Commands
 
 ```bash
-scripts/gate.sh              # run all 4 verify gates (lint, format check, typecheck, test)
+scripts/gate.sh              # run all 4 verify gates (lint, format check, typecheck, test); the slow
+                             # tests are skipped when every changed path is on SLOW_SAFE_PATHS
+scripts/gate.sh --all        # run every test, the slow ones included
 scripts/gate.sh --fast       # skip tests, for a quick iteration loop (not a substitute for the full gate)
 scripts/gate.sh --staged     # lint/format/typecheck only staged files matching STAGED_GLOB; no tests
 scripts/gate.sh --if-needed [<commit>...]   # skip the full gate for a commit that already has a gate
                              # record, run it otherwise (default HEAD); exit 0 only if all pass
+scripts/gate.sh --if-needed --all [<commit>...]   # the same, but a record of a run without the
+                             # slow tests does not count, and the gate that runs includes them
 scripts/autofix.sh           # apply lint autofix + formatting, then re-run scripts/gate.sh
 scripts/autofix.sh --staged  # same, but only on staged files matching STAGED_GLOB
 
@@ -76,7 +80,7 @@ scripts/gitflow.sh docs|chore|fix start|finish <T-NNNN-slug>   # task branches, 
 |---|---|
 | `pre-commit` | `autofix.sh --staged`, re-stages the files that were staged, then `gate.sh --staged` (no tests). Skipped when only `RECORD_PATHS` paths are staged |
 | `commit-msg` | `commit_lint.py` against the message being committed (lines <= 100 chars) |
-| `pre-push` | `changelog.py check` for each pushed branch, then the gate: one `gate.sh --if-needed <sha>...` call for `develop` and `main`, one `gate.sh --fast` call when the push has any other branch ref, no gate for tags. All are skipped when every pushed commit changes only `RECORD_PATHS` paths |
+| `pre-push` | `changelog.py check` for each pushed branch, then the gate: one `gate.sh --if-needed --all <sha>...` call for `main` (always every test), one `gate.sh --if-needed <sha>...` call for `develop`, one `gate.sh --fast` call when the push has any other branch ref, no gate for tags. All are skipped when every pushed commit changes only `RECORD_PATHS` paths |
 
 `RECORD_PATHS` in `config/gate.sh` lists the bookkeeping paths (task files, reports, `BACKLOG.md`, the
 task counter, `LESSONS.md` and plans) as one space-separated string of git glob pathspecs. Both hooks
@@ -84,6 +88,31 @@ skip a change that touches only those, and `gate.sh` leaves them out of the key.
 each entry as a `:(exclude,glob)<entry>` pathspec. Task tooling under `.agents/tasks/scripts/`, the
 templates and the process docs are code, never skipped. A new remote branch, or a range git cannot
 list, never takes the skip.
+
+### Slow tests
+
+Tests marked `slow` (registered in `pyproject.toml` under `[tool.pytest.ini_options]`) are the
+end-to-end cases of `tests/test_init_project.py`, about 250 to 300 s of a gate. `gate.sh` appends
+`TEST_SKIP_SLOW_ARGS` (`-m "not slow"`) to `TEST_CMD` only when every path changed since the base
+is on `SLOW_SAFE_PATHS` in `config/gate.sh`. Any other change, an empty change set, `--all` and a
+push to `main` run them.
+
+- `SLOW_SAFE_PATHS` uses the `RECORD_PATHS` pathspec syntax. It holds `RECORD_PATHS`, the changelog
+  fragments `changelog.d/*.*.md` (the README is not one), and the prose docs `CONTRIBUTING.md`,
+  `DEV_TOOLING_SPEC.md`, `PYTHON_CONVENTIONS.md` and `NOTICE.md`. A fast test greps those four docs
+  for the template names, the one way they can break an end-to-end test. Adding a path to the list
+  needs a human.
+- The changed paths are `git diff --name-only --no-renames <base>` plus the untracked files for a
+  run on the working tree, and `git diff --name-only --no-renames <base> <commit>` for a named
+  commit. A rename counts both paths. No base found, or no change, runs the slow tests.
+- The base is the merge base with `origin/develop`, or with `origin/main` when
+  `git symbolic-ref -q --short HEAD` names a `hotfix/` branch (a detached HEAD uses `develop`). When
+  the remote ref is missing the local branch is used. The names come from `DEVELOP_BRANCH` and
+  `MAIN_BRANCH`.
+- A skipped run prints `slow tests: skipped` and writes `slow=no` in its record.
+  `--if-needed` accepts a `slow=no` record only for a commit whose change since the base is
+  safe-list-only and only without `--all`; for any other commit it runs the gate with `--all`. A
+  `slow=yes` record satisfies every check.
 
 ### Gate records
 
@@ -98,14 +127,14 @@ failed run and a dirty run never write a record, and a dirty run says why. Recor
 never committed, and every worktree of the repository shares them.
 
 `gate.sh --if-needed [<commit>...]` looks for a record per commit (default `HEAD`) and skips the full
-gate for each commit that has one. For a commit without a record it runs the commit's own full gate
+gate for each commit that has a sufficient one (see Slow tests). For a commit without one it runs the commit's own full gate
 on the working tree when that commit is checked out and the tree is clean, and otherwise in a
 temporary detached worktree of that commit, removed afterwards. It never refuses for want of a
 checkout; it unsets the git environment variables a hook may have set and removes the worktree on
 exit. An independent verifier does not rely on a record: it runs the plain `gate.sh` and so
 writes the record that the later steps reuse. `release.py --yes --push` after a hotfix passes the
-hook: the release commit on the checked-out `main` is gated on the checkout, and the back-merge on
-`develop` in a temporary worktree. `gitflow.sh finish` runs `gate.sh --if-needed HEAD` after each
+hook, which makes two calls: the release commit on the checked-out `main` is gated on the checkout
+with `--all`, and the back-merge on `develop` in a temporary worktree. `gitflow.sh finish` runs `gate.sh --if-needed HEAD` after each
 merge it makes and undoes the merge with `git reset --merge ORIG_HEAD` when the gate is red.
 
 The fragment check in `pre-push` takes its range from the remote ref being updated: for `main` and
