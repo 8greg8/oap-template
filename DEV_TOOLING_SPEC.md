@@ -65,7 +65,7 @@ scripts/
     gate.sh                  # ONLY project-specific file: gate commands, branch names, RECORD_PATHS
   lib/
     common.sh                # shared shell helpers: colors, fail(), section headers
-  gate.sh                    # runs the 4 verify gates from config/gate.sh, reports clearly; writes and
+  gate.sh                    # runs the 4 verify gates from config/gate.sh, fails fast, reports clearly; writes and
                              # checks gate records (--if-needed)
   autofix.sh                 # runs the *_FIX_CMD variants from config/gate.sh (safe auto-corrections)
   commit_lint.py              # stdlib-only: validates a commit message against Conventional Commits
@@ -104,6 +104,14 @@ DEVELOP_BRANCH="develop"
 RECORD_PATHS=".agents/tasks/T-*.md .agents/tasks/reports/** .agents/tasks/BACKLOG.md .agents/tasks/.counter .agents/LESSONS.md .agents/plans/**"
 ```
 
+This repo's default values are the exact commands from `PYTHON_CONVENTIONS.md` § Commands, so the
+gate a fresh clone of this template runs is identical to what that doc already tells a human/agent
+to run by hand — the script is just the same commands with no chance of transcription drift.
+
+A repo with a different stack (e.g. TypeScript) only edits this one file — e.g.
+`LINT_CMD="pnpm eslint ."`, `TEST_CMD="pnpm vitest run"` — and every hook, the verify/resolve
+loop, and `gitflow.sh`/`release.py` keep working unmodified.
+
 `RECORD_PATHS` lists the paths that only record bookkeeping: task files, reports, `BACKLOG.md`, the
 task counter, `LESSONS.md` and plans. It is one space-separated string of git glob pathspecs, so no
 entry holds a space: `*` does not cross `/` and `**` does. `gate.sh` and both hooks exclude each entry
@@ -129,9 +137,10 @@ output directly):
 3. `TYPECHECK_CMD`
 4. `TEST_CMD`
 
-Exits non-zero when any gate fails. Exit 0 only when all four pass. This is what the verify/resolve
-loop's independent verifier runs, what `pre-push` runs (through `--if-needed` for `develop` and
-`main`), and what a CI job would run: one script, one source of truth.
+Stops at the first failing gate (fail-fast) and exits non-zero. Exit 0 only when all four pass.
+This is what the verify/resolve loop's independent verifier runs, what `pre-push` runs (through
+`--if-needed` for `develop` and `main`), and what a CI job would run — one script, one source of
+truth.
 
 Flags:
 
