@@ -56,13 +56,15 @@ package.json                # minimal: husky devDependency + "prepare" script on
 .husky/
   pre-commit                 # staged files only, no tests: autofix.sh --staged, re-stage, gate.sh --staged
   commit-msg                 # scripts/commit_lint.py "$1"
-  pre-push                   # changelog fragment check per pushed branch, then the gate: develop and
-                             # main need a gate record (gate.sh --if-needed), any other ref gets
-                             # gate.sh --fast; all skipped when every pushed commit is RECORD_PATHS only
+  pre-push                   # changelog fragment check per pushed branch, then the gate: develop needs a
+                             # gate record (gate.sh --if-needed), main one with the slow tests
+                             # (--if-needed --all), any other ref gets gate.sh --fast; all skipped when
+                             # every pushed commit is RECORD_PATHS only
 scripts/
   README.md                  # how to install this bundle into a new/existing repo
   config/
-    gate.sh                  # ONLY project-specific file: gate commands, branch names, RECORD_PATHS
+    gate.sh                  # ONLY project-specific file: gate commands, branch names, RECORD_PATHS,
+                             # SLOW_SAFE_PATHS
   lib/
     common.sh                # shared shell helpers: colors, fail(), section headers
   gate.sh                    # runs the 4 verify gates from config/gate.sh, fails fast, reports clearly; writes and
@@ -94,6 +96,8 @@ FORMAT_CHECK_CMD="uv run ruff format --check"
 FORMAT_FIX_CMD="uv run ruff format"
 TYPECHECK_CMD="uv run ty check"
 TEST_CMD="uv run pytest"
+# Appended to TEST_CMD when the slow tests are skipped (see SLOW_SAFE_PATHS).
+TEST_SKIP_SLOW_ARGS='-m "not slow"'
 
 # Branch names, only needed by gitflow.sh / release.py.
 MAIN_BRANCH="main"
@@ -102,6 +106,9 @@ DEVELOP_BRANCH="develop"
 # Bookkeeping paths: one space-separated string of git glob pathspecs, left out of a gate
 # record's key and skipped by the hooks.
 RECORD_PATHS=".agents/tasks/T-*.md .agents/tasks/reports/** .agents/tasks/BACKLOG.md .agents/tasks/.counter .agents/LESSONS.md .agents/plans/**"
+
+# Paths whose change cannot break a slow test: same syntax as RECORD_PATHS.
+SLOW_SAFE_PATHS="${RECORD_PATHS-} changelog.d/*.*.md CONTRIBUTING.md DEV_TOOLING_SPEC.md PYTHON_CONVENTIONS.md NOTICE.md"
 ```
 
 This repo's default values are the exact commands from `PYTHON_CONVENTIONS.md` § Commands, so the
@@ -125,6 +132,14 @@ bash-only syntax. The bash scripts source it, and so does `.husky/pre-push`, whi
 POSIX `sh` (`dash` on many systems). A test sources it with `sh`. `gate.sh` reads `RECORD_PATHS` as `${RECORD_PATHS-}`, so a copy of the config without it still
 works: no path is then a record path, so the hooks gate every change and the key covers every
 tracked file.
+
+`SLOW_SAFE_PATHS` lists the paths whose change cannot break a slow test: `RECORD_PATHS`, the
+changelog fragments `changelog.d/*.*.md` (`*.*.md` leaves out `changelog.d/README.md`), and the
+prose docs `CONTRIBUTING.md`, `DEV_TOOLING_SPEC.md`, `PYTHON_CONVENTIONS.md` and `NOTICE.md`, which
+`init_project.py` copies unchanged. It uses the same pathspec syntax as `RECORD_PATHS`.
+`TEST_SKIP_SLOW_ARGS` is shell-quoted text appended to `TEST_CMD` when the slow tests are skipped.
+`gate.sh` reads both as `${VAR-}`; with either empty or unset the slow tests always run. Adding a
+path to the list changes what the gate checks and needs a human.
 
 ## `scripts/gate.sh`
 
@@ -151,12 +166,39 @@ Flags:
   the `*_FIX_CMD`s therefore must accept file paths as trailing arguments; with no arguments
   they check the whole repo. `pre-commit` uses this mode.
 - `--if-needed [<commit>...]` checks a gate record for each named commit (default `HEAD`) and
-  exits 0 only when every commit has a record or passes a full gate run. See § Gate records.
-  It cannot be combined with `--fast` or `--staged`, and a commit argument is accepted only with
-  it.
+  exits 0 only when every commit has a sufficient record or passes a full gate run. See § Gate
+  records. It cannot be combined with `--fast` or `--staged`, and a commit argument is accepted
+  only with it.
+- `--all` runs every test, the slow ones included. Without it the slow tests are skipped when the
+  change since the base is safe-list-only (§ Slow tests). It cannot be combined with `--fast` or
+  `--staged`. With `--if-needed`, a record of a run without the slow tests does not count.
 
 `gate.sh` and `autofix.sh` run under bash 3.2 (macOS default): no `mapfile`, and empty arrays
 are expanded with the `${files[@]+"${files[@]}"}` guard so `set -u` does not abort.
+
+### Slow tests
+
+The end-to-end cases of `tests/test_init_project.py` carry `@pytest.mark.slow`, registered in
+`pyproject.toml` under `[tool.pytest.ini_options]`; they take about 250 to 300 s of a full gate.
+`gate.sh` runs `TEST_CMD` followed by `TEST_SKIP_SLOW_ARGS` only when all of these hold: `--all` is
+absent, the two settings are non-empty, a base is found, the change since the base is not empty,
+and every changed path matches `SLOW_SAFE_PATHS`. In every other case it runs `TEST_CMD` alone.
+
+- **Changed paths.** For a run on the working tree: `git diff --name-only --no-renames <base>` plus
+  `git ls-files --others --exclude-standard`. For a named commit under `--if-needed`:
+  `git diff --name-only --no-renames <base> <commit>`. `--no-renames` makes a rename count both
+  paths. Both are filtered with the `:(exclude,glob)` pathspecs of `SLOW_SAFE_PATHS`; any path left
+  over forbids the skip.
+- **Base.** The merge base of the commit with `origin/$DEVELOP_BRANCH`, or with
+  `origin/$MAIN_BRANCH` when `git symbolic-ref -q --short HEAD` names a `hotfix/` branch. A detached
+  HEAD uses the develop base. When that remote ref does not exist the local branch of the same name
+  is used. When neither exists, or git finds no merge base, the slow tests run.
+- **Always run.** `--all`; a push to `main` (the hook passes `--all` in its own call for `main`'s
+  shas); a change set that is empty.
+- **Safety net.** `init_project.py` copies the four prose docs of the list unchanged, and the
+  end-to-end test fails when a generated file holds a template name. A fast test in
+  `tests/test_init_project.py` greps exactly those four docs for the template names, so the one
+  way they can break the end-to-end test is caught without running it.
 
 ### Gate records
 
@@ -171,23 +213,26 @@ A full `gate.sh` run that passes writes a record, so later steps do not gate the
   version, changes it.
 - **Where.** The file `$(git rev-parse --git-common-dir)/gate-pass/<key>`, in the git directory
   shared by every worktree of the repository, never committed and never part of the tree. It holds
-  four lines: `key=`, `commit=`, `slow=yes|no` (whether the slow tests ran; every full run says
-  `yes` until a later task adds test selection) and `date=`. A `slow=yes` record is never
-  overwritten by a `slow=no` one.
+  four lines: `key=`, `commit=`, `slow=yes|no` (whether the slow tests ran) and `date=`. A
+  `slow=yes` record is never overwritten by a `slow=no` one.
 - **When it is written.** Only after a full run in which every gate passed on a tree that is
   clean before and after: `git status --porcelain --untracked-files=all` prints nothing both
   times. The run prints `gate record <key> (slow tests: yes|no)` before `gate clean`.
   `--fast`, `--staged`, a failed run and a dirty run never write one; a dirty run prints why
   (`dirty tree before the run` or `dirty tree after the run`).
 - **`--if-needed [<commit>...]`.** For each commit (default `HEAD`) it computes the key and looks
-  for the record. A commit with a record is skipped. For each commit without one it runs the
+  for the record. A record is sufficient when it says `slow=yes`, or when it says `slow=no` and
+  the commit's change since the base is safe-list-only and `--all` is absent. A commit with a
+  sufficient record is skipped. For each other commit it runs the
   commit's own full gate: on the working tree when that commit is checked out and the tree is
   clean, otherwise in a temporary detached worktree, which is the commit's `scripts/gate.sh` run
   from `git worktree add --detach "$(mktemp -d)/wt" <commit>`. Before it uses the worktree it
   unsets `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, `GIT_OBJECT_DIRECTORY`,
   `GIT_ALTERNATE_OBJECT_DIRECTORIES` and `GIT_PREFIX`, which a hook may have set. A trap on exit
   removes the worktree (`git worktree remove --force`, then `git worktree prune`) whether the
-  gate passed or not. No `npm ci` is needed; `uv run` creates the `.venv`. The inner run writes the
+  gate passed or not. No `npm ci` is needed; `uv run` creates the `.venv`. When the commit needs
+  the slow tests (its change is not safe-list-only, or `--all` was given) the inner `gate.sh`
+  gets `--all`, so it cannot decide otherwise from a different base. The inner run writes the
   record. It never refuses for want of a checkout, and it exits 1 at the first commit whose gate
   fails.
 
@@ -211,14 +256,18 @@ and the post-merge check. Records written inside scratch repositories by tests a
   every pushed commit touches nothing but `RECORD_PATHS` paths. A deleted ref pushes no commits. A
   new remote branch, or a range git cannot list, never takes the skip. Otherwise it runs the
   fragment check (below) for each pushed ref, then the gate, which depends on the ref:
-  - `develop` and `main`: one `gate.sh --if-needed` call with the local sha of every non-deleted
-    `develop` or `main` ref. The full gate runs only for a commit that has no gate record.
+  - `main`: one `gate.sh --if-needed --all` call with the local sha of every non-deleted `main`
+    ref, made first. The slow tests always run for `main`: a record of a run without them does not
+    satisfy it.
+  - `develop`: one `gate.sh --if-needed` call with the local sha of every non-deleted `develop`
+    ref. The full gate runs only for a commit that has no sufficient gate record, and skips the
+    slow tests for a change that is safe-list-only (§ Slow tests).
   - any other branch: one `gate.sh --fast` call when the push has such a ref. The independent
     verifier's full run follows before a merge, and `develop` and `main` stay fully protected.
   - tags and other non-branch refs trigger no gate.
-  A hotfix release push passes: `release.py --yes --push` leaves `main` checked out, so its release
-  commit is gated on the checkout, and the back-merge on `develop` is gated in a temporary
-  worktree.
+  A hotfix release push passes: `release.py --yes --push` leaves `main` checked out, so the hook
+  makes two calls. The release commit is gated on the checkout with `--all`, and the back-merge on
+  `develop` in a temporary worktree.
 - `commit-msg`: `commit_lint.py`, below.
 - Merge commits: a merge commit that git creates itself runs `commit-msg` only. Git runs no
   `pre-commit` for it, and `.husky/` has no `pre-merge-commit` hook, so the `chore(merge)` commits

@@ -394,7 +394,27 @@ def test_main_push_asks_for_a_record_of_the_pushed_sha(repo: Path) -> None:
     line = _ref_line(head, first, "refs/heads/main", "refs/heads/main")
     result, _ = _run_pre_push(repo, line)
     assert result.returncode == 0, result.stderr
-    assert _gate_calls(repo) == [f"--if-needed {head}"]
+    assert _gate_calls(repo) == [f"--if-needed --all {head}"]
+
+
+def test_main_push_of_a_safe_listed_change_still_asks_for_every_test(
+    repo: Path,
+) -> None:
+    """A release commit may change only prose docs; main's call still carries --all."""
+    first = _git(repo, "rev-parse", "HEAD")
+    head = _commit(repo, {"NOTICE.md": "n\n"})
+    line = _ref_line(head, first, "refs/heads/main", "refs/heads/main")
+    result, _ = _run_pre_push(repo, line)
+    assert result.returncode == 0, result.stderr
+    assert _gate_calls(repo) == [f"--if-needed --all {head}"]
+
+
+def test_develop_push_never_passes_all(repo: Path) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    head = _commit(repo, {"NOTICE.md": "n\n"})
+    result, _ = _run_pre_push(repo, _line(head, base))
+    assert result.returncode == 0, result.stderr
+    assert all("--all" not in call for call in _gate_calls(repo))
 
 
 def test_first_push_of_develop_asks_for_a_record(repo: Path) -> None:
@@ -417,7 +437,22 @@ def test_main_and_develop_pushed_together_pass_every_sha_and_skip_deleted_refs(
     )
     result, _ = _run_pre_push(repo, stdin)
     assert result.returncode == 0, result.stderr
-    assert _gate_calls(repo) == [f"--if-needed {main_head} {develop_head}"]
+    assert _gate_calls(repo) == [
+        f"--if-needed --all {main_head}",
+        f"--if-needed {develop_head}",
+    ]
+
+
+def test_main_pushed_twice_in_one_push_is_one_all_call(repo: Path) -> None:
+    first = _git(repo, "rev-parse", "HEAD")
+    a = _commit(repo, {"src/app.py": "x = 2\n"})
+    b = _commit(repo, {"src/app.py": "x = 3\n"})
+    stdin = _ref_line(a, first, "refs/heads/main", "refs/heads/main") + _ref_line(
+        b, first, "refs/heads/main", "refs/heads/main"
+    )
+    result, _ = _run_pre_push(repo, stdin)
+    assert result.returncode == 0, result.stderr
+    assert _gate_calls(repo) == [f"--if-needed --all {a} {b}"]
 
 
 @pytest.mark.parametrize("remote_sha_is_new", [True, False])
@@ -449,6 +484,27 @@ def test_task_branch_and_develop_pushed_together_run_both_modes(repo: Path) -> N
     result, _ = _run_pre_push(repo, stdin)
     assert result.returncode == 0, result.stderr
     assert _gate_calls(repo) == ["--fast", f"--if-needed {develop_head}"]
+
+
+def test_fast_main_and_develop_calls_run_in_that_order(repo: Path) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    _set_origin(repo, "develop", base)
+    _checkout_new(repo, "docs/T-0001-x")
+    branch_head = _commit(repo, {"src/app.py": "x = 2\n"}, "docs: change it")
+    stdin = (
+        _line(branch_head, base)
+        + _ref_line(branch_head, base, "refs/heads/main", "refs/heads/main")
+        + _ref_line(
+            branch_head, base, "refs/heads/docs/T-0001-x", "refs/heads/docs/T-0001-x"
+        )
+    )
+    result, _ = _run_pre_push(repo, stdin)
+    assert result.returncode == 0, result.stderr
+    assert _gate_calls(repo) == [
+        "--fast",
+        f"--if-needed --all {branch_head}",
+        f"--if-needed {branch_head}",
+    ]
 
 
 def test_tag_only_push_runs_no_gate(repo: Path) -> None:
@@ -493,6 +549,15 @@ def test_failing_fast_gate_blocks_a_task_branch_push(repo: Path) -> None:
     _checkout_new(repo, "docs/T-0001-x")
     head = _commit(repo, {"src/app.py": "x = 2\n"}, "docs: change it")
     line = _ref_line(head, ZERO, "refs/heads/docs/T-0001-x", "refs/heads/docs/T-0001-x")
+    result, ran = _run_pre_push(repo, line, gate_exit=1)
+    assert ran
+    assert result.returncode != 0
+
+
+def test_failing_all_gate_blocks_a_main_push(repo: Path) -> None:
+    first = _git(repo, "rev-parse", "HEAD")
+    head = _commit(repo, {"src/app.py": "x = 2\n"})
+    line = _ref_line(head, first, "refs/heads/main", "refs/heads/main")
     result, ran = _run_pre_push(repo, line, gate_exit=1)
     assert ran
     assert result.returncode != 0
@@ -1316,6 +1381,8 @@ def test_gate_config_is_sourceable_by_posix_sh() -> None:
         "DEVELOP_BRANCH",
         "STAGED_GLOB",
         "RECORD_PATHS",
+        "TEST_SKIP_SLOW_ARGS",
+        "SLOW_SAFE_PATHS",
     ]
     script = ". " + shlex.quote(str(SCRIPTS / "config" / "gate.sh")) + "\n"
     script += "".join(f'printf "%s=%s\\n" {name} "${name}"\n' for name in names)

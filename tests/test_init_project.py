@@ -1506,6 +1506,34 @@ def test_template_readme_getting_started_describes_the_script_and_checklist():
         assert heading in text
 
 
+# --- the safe-listed docs ---------------------------------------------------------------------
+
+# The prose docs of SLOW_SAFE_PATHS in scripts/config/gate.sh. `init_project.py` copies them
+# unchanged, so the end-to-end test fails if one names the template, and the gate skips that test
+# for a change that touches only these files. This case catches the break without it.
+SAFE_LISTED_DOCS = (
+    "CONTRIBUTING.md",
+    "DEV_TOOLING_SPEC.md",
+    "PYTHON_CONVENTIONS.md",
+    "NOTICE.md",
+)
+
+
+@pytest.mark.parametrize("name", SAFE_LISTED_DOCS)
+def test_safe_listed_docs_name_no_template_string(name: str):
+    text = _text(REPO_ROOT, name)
+    assert [t for t in TEMPLATE_STRINGS if t in text] == []
+
+
+def test_safe_listed_docs_are_the_prose_docs_of_slow_safe_paths():
+    config = _text(REPO_ROOT, "scripts/config/gate.sh")
+    line = next(ln for ln in config.splitlines() if ln.startswith("SLOW_SAFE_PATHS="))
+    entries = line.split('"')[1].split()
+    assert [e for e in entries if e.endswith(".md") and "/" not in e] == list(
+        SAFE_LISTED_DOCS
+    )
+
+
 # --- end to end: a template copy becomes a working project ------------------------------------
 
 
@@ -1542,6 +1570,7 @@ def _require_lock_tools(repo: Path) -> None:
     assert _status(repo) == ""
 
 
+@pytest.mark.slow
 def test_end_to_end_template_copy_becomes_a_working_project(scratch: Scratch):
     repo = scratch.repo
     _require_lock_tools(repo)
@@ -1604,6 +1633,7 @@ def test_end_to_end_template_copy_becomes_a_working_project(scratch: Scratch):
     assert created[0].startswith("T-0001-")
 
 
+@pytest.mark.slow
 def test_end_to_end_failing_gate_leaves_no_commit_or_branch(scratch: Scratch):
     repo = scratch.repo
     planted = repo / "tests" / "test_planted_failure.py"

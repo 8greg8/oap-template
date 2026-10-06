@@ -18,6 +18,10 @@ FORMAT_CHECK_CMD="uv run ruff format --check"
 FORMAT_FIX_CMD="uv run ruff format"
 TYPECHECK_CMD="uv run ty check"
 TEST_CMD="uv run pytest"
+# Appended to TEST_CMD when scripts/gate.sh skips the slow tests (see SLOW_SAFE_PATHS). The
+# string is passed to `bash -c` together with TEST_CMD, so its quoting is shell quoting. Empty
+# or unset: the slow tests are never skipped.
+TEST_SKIP_SLOW_ARGS='-m "not slow"'
 
 # Branch names used by gitflow.sh and release.py, per CONTRIBUTING.md § Branching.
 MAIN_BRANCH="main"
@@ -36,3 +40,12 @@ STAGED_GLOB="*.py"
 # .agents/tasks/scripts/ and the process docs, is code for both. Shell code expands the string
 # with globbing off (`set -f`).
 RECORD_PATHS=".agents/tasks/T-*.md .agents/tasks/reports/** .agents/tasks/BACKLOG.md .agents/tasks/.counter .agents/LESSONS.md .agents/plans/**"
+
+# Paths whose change cannot break a slow test: same syntax as RECORD_PATHS. scripts/gate.sh
+# appends TEST_SKIP_SLOW_ARGS to TEST_CMD only when every path changed since the base is on this
+# list. Any other change, an empty change set, `--all` and a push to MAIN_BRANCH run the slow
+# tests. The list is RECORD_PATHS, the changelog fragments (`*.*.md` leaves out the README), and
+# the prose docs that init_project.py copies unchanged; a fast test greps those docs for the
+# template names. Empty or unset: the slow tests always run. Adding a path is a change that
+# needs a human.
+SLOW_SAFE_PATHS="${RECORD_PATHS-} changelog.d/*.*.md CONTRIBUTING.md DEV_TOOLING_SPEC.md PYTHON_CONVENTIONS.md NOTICE.md"

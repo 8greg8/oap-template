@@ -22,3 +22,8 @@ source = "vcs"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/proj_template"]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: end-to-end tests that scripts/gate.sh skips when every changed path is on SLOW_SAFE_PATHS",
+]
