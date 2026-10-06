@@ -109,7 +109,8 @@ testing contexts where a real push isn't wanted.
 4. **Execute.** The subagent creates a worktree and branches from `develop` as
    `<type>/T-00XX-<slug>` (Conventional Commits type as the prefix, per
    `CONTRIBUTING.md`), does the work, writes and commits its report, and
-   pushes. It does not merge.
+   pushes. It iterates with `scripts/gate.sh --fast` and targeted tests,
+   commits freely, and spawns no verifier of its own. It does not merge.
 5. **Collect.** The orchestrator reads the report without leaving the main tree:
    ```bash
    git show <branch>:.agents/tasks/reports/T-00XX.md
@@ -121,7 +122,7 @@ testing contexts where a real push isn't wanted.
    on `develop` before the merge, on the task's branch.
 7. **Verify, resolve, merge.** The orchestrator merges the branch into `develop` by default,
    with no per-batch grant (`CLAUDE.md` § "Merge authority: orchestrator merges by default"). It
-   does so only after a verify by an independent verifier has passed, per
+   does so only after the one verify by an independent verifier has passed, per
    § "Verify, resolve, merge" below, and with the merge commit header
    `chore(merge): merge task NNNN into develop` (`CONTRIBUTING.md`'s branching model). A human
    decides only a breaking change (defined in `CLAUDE.md`) and every "Ask first" item; a task that
@@ -139,13 +140,24 @@ testing contexts where a real push isn't wanted.
 
 ### Verify, resolve, merge
 
-Step 7 runs as follows, for every task:
+Step 7 runs as follows, for every task. Exactly one independent verifier checks each change per
+round, and no verifier runs per commit.
 
-   - A separate fresh agent verifies the pushed branch: the full gate
-     (`scripts/gate.sh`), every acceptance criterion checked against the
-     files, `git diff --name-only` against `touches`, and, for test changes,
-     that each expected value comes from spec text. For a `feat`, `fix` or
-     breaking change it also checks that the branch adds a changelog fragment
+   - The orchestrator runs one verifier per task per round, in the foreground, and records its
+     result before it starts anything else for that task.
+   - The verifier works in a detached worktree of the orchestrator's checkout, so the gate record it
+     writes lands in the shared git directory where the later steps find it. After
+     `git fetch origin`, the orchestrator makes it with
+     `git worktree add --detach <path> origin/<branch>`; a plain checkout of the branch is refused
+     while the executor's worktree holds it. The verifier makes no commit and needs no `npm ci`.
+     The orchestrator removes the worktree (`git worktree remove <path>`) once it has recorded the
+     result. `housekeep.py worktrees` skips a detached worktree, so this removal is by hand.
+   - The verifier is a fresh agent. It always runs the full gate itself (`scripts/gate.sh`, never
+     `--if-needed`) on a clean tree, so its run is the canonical one and writes the gate record
+     (`gate record <key>` in the output). It never relies on a record another run wrote. It also
+     checks every acceptance criterion against the files, `git diff --name-only` against
+     `touches`, and, for test changes, that each expected value comes from spec text. For a
+     `feat`, `fix` or breaking change it also checks that the branch adds a changelog fragment
      (`changelog.d/<id>.<category>.md`, listed in `touches`) that describes the
      change, and that each commit's type matches what the change does, since a
      wrongly typed commit needs no fragment and drives no release. It reads
@@ -157,19 +169,36 @@ Step 7 runs as follows, for every task:
      item, including edits to `scripts/` or `pyproject.toml` `[tool]`
      sections, or to hooks or CI outside the task's own scope. If either is
      true, the orchestrator
-     does not merge and the task is set `blocked` for a human.
+     does not merge and the task is set `blocked` for a human. Its result ends with the verify line
+     it found, `passed (commit <hash>; gate <record-key>; <counts>)`, or `failed`.
    - The verifier is independent as `CLAUDE.md` § "Merge authority:
      orchestrator merges by default" defines it.
-   - On a failure, a fresh executor fixes the findings on the same branch and
-     a new verifier checks again. After three failed rounds the task is
-     `blocked` and is not merged.
-   - On a clean verify, the orchestrator records it in the report's verify
-     line (`passed (commit <hash>; <counts>)`), commits that on the task
-     branch, and merges with `chore(merge): merge task NNNN into develop`.
-   - It reruns `scripts/gate.sh` on `develop`. Green: push. Red before
+   - On a failure, a fresh executor fixes the findings on the same branch, in new commits, and a new
+     verifier checks again. That fix-round verifier checks that the earlier findings are fixed and
+     reviews the diff since the verified commit. It runs the full gate for the new head, or cites a
+     record that an earlier independent verifier's run wrote for the same code. It rechecks
+     `touches` and "Ask first" for the whole branch, since a fix can break a criterion that already
+     passed. After three failed rounds the task is `blocked` and is not merged.
+   - On a clean verify, the orchestrator records the verifier's line in the report's verify line
+     (`passed (commit <hash>; gate <record-key>; <counts>)`: `<hash>` is the commit verified and
+     `<record-key>` the key of the record the verifier's run wrote), commits that on the task
+     branch, and merges with `chore(merge): merge task NNNN into develop`. The commit changes only
+     a report, which is a bookkeeping record, so it needs no verification and the hooks skip it. It
+     leaves the gate record key unchanged.
+   - After the merge it runs `scripts/gate.sh --if-needed` on the merge commit. When the merge's
+     code equals the verified branch's code, as when no other task merged code first, the
+     verifier's record covers it and no full gate runs. Otherwise the full gate runs, and it skips
+     the slow tests only for a safe-list-only change. The `pre-push` hook for `develop` makes the
+     same call, so a green check is not repeated at the push. Green: push. Red before
      pushing: `git reset --merge ORIG_HEAD` and block the task. Red after
      pushing: `git revert -m 1 <merge>` as a new commit, push, and block the
      task. It never force-pushes.
+   - Commits that change only bookkeeping records (`RECORD_PATHS` in `scripts/config/gate.sh`: task
+     files, reports, `BACKLOG.md`, `.counter`, `LESSONS.md`, plans) need no independent
+     verification and no gate; the hooks skip them. A plan or task file written for the owner keeps
+     one independent review before it is merged.
+   - Gate records are written only by `scripts/gate.sh`. Nobody creates, copies or edits one by
+     hand.
    - Before the next dispatch: `git pull --ff-only origin develop`, and rebase rather than merge
      if `develop` has diverged (step 2).
 
@@ -302,12 +331,22 @@ python .agents/tasks/scripts/housekeep.py all
   `CONTRIBUTING.md` § Agent verify/resolve workflow). A "not configured yet"
   finding on a fresh checkout of this template is the tool working correctly,
   not a bug — it just means the repo's Husky install step hasn't run yet.
-- **`worktrees`** — lists every secondary worktree whose branch is already
-  merged into `develop` but was never removed with `git worktree remove` (step 8
-  of the execution loop), and separately every worktree other than the primary
-  checkout that has `develop` or `main` checked out (forbidden per
-  `CONTRIBUTING.md` § Worktrees for agents). It automates the manual
-  `git worktree list` / `git branch --merged develop` sweep.
+- **`worktrees`** — reports four kinds of leftover, one line per finding, and removes nothing:
+  - a secondary worktree whose branch is already merged into `develop` but was never removed
+    with `git worktree remove` (step 8 of the execution loop);
+  - a secondary worktree on the branch of a `done` or `abandoned` task, merged or not. An unmerged
+    one is flagged for confirmation that the work is not needed before it is removed. A worktree
+    that is both merged and on a finished task's branch is one finding;
+  - a local branch of a `done` or `abandoned` task that has no secondary worktree, merged or not
+    (a `BRANCH` finding, with the `git branch -d` command). A finished task's branch checked out in
+    the primary checkout counts too;
+  - every worktree other than the primary checkout that has `develop` or `main` checked out
+    (forbidden per `CONTRIBUTING.md` § Worktrees for agents).
+
+  Task branches are matched by the task ID in the branch name, and only local branches are read. A
+  detached worktree, such as a verifier's, is skipped. The exit status is 0 with no finding and 1
+  with any, so a leftover of a finished task makes `worktrees` and `all` exit non-zero. It
+  automates the manual `git worktree list` / `git branch --merged develop` sweep.
 - **`all`** — runs all four and prints a compact per-section summary. Every
   subcommand, `all` included, exits non-zero when it finds a problem and
   prints one line per finding, in a form that can be pasted directly into a

@@ -15,8 +15,8 @@ them is `scripts/config/gate.sh`.
 1. **Deterministic pipelines an agent can call instead of reason about.** "Lint, typecheck, test,
    fix, stage, commit" becomes `scripts/gate.sh`, `scripts/autofix.sh`, and a commit helper — not a
    sequence of ad hoc commands re-derived from `PYTHON_CONVENTIONS.md` prose every time.
-2. **The same gate everywhere.** The commands run by an agent before committing, by the
-   verify/resolve loop's independent verifier, by the `pre-commit`/`pre-push` Husky hooks, and by
+2. **The same gate everywhere.** The commands run by an agent while iterating, by the one
+   independent verifier of a finished branch, by the `pre-commit`/`pre-push` Husky hooks, and by
    CI (if present) must be *literally the same script* — never four hand-maintained copies of the
    same four commands that can drift apart.
 3. **Conventional Commits and SemVer enforced programmatically, not by convention alone.** A
@@ -67,7 +67,7 @@ scripts/
                              # SLOW_SAFE_PATHS
   lib/
     common.sh                # shared shell helpers: colors, fail(), section headers
-  gate.sh                    # runs the 4 verify gates from config/gate.sh, fails fast, reports clearly; writes and
+  gate.sh                    # runs the 4 verify gates from config/gate.sh, counts failures, reports clearly; writes and
                              # checks gate records (--if-needed)
   autofix.sh                 # runs the *_FIX_CMD variants from config/gate.sh (safe auto-corrections)
   commit_lint.py              # stdlib-only: validates a commit message against Conventional Commits
@@ -152,10 +152,11 @@ output directly):
 3. `TYPECHECK_CMD`
 4. `TEST_CMD`
 
-Stops at the first failing gate (fail-fast) and exits non-zero. Exit 0 only when all four pass.
-This is what the verify/resolve loop's independent verifier runs, what `pre-push` runs (through
-`--if-needed` for `develop` and `main`), and what a CI job would run — one script, one source of
-truth.
+Runs every gate even after one fails, counts the failures, and exits 1 when any failed
+(`N gate(s) failed`). Exit 0 only when all four pass. This is what the independent verifier of a
+finished branch runs in full, what `pre-push` runs (through `--if-needed` for `develop` and `main`,
+and `--fast` for any other branch), and what a CI job would run — one script, one source of truth.
+An executor iterates with `--fast` and targeted tests; its own runs certify nothing.
 
 Flags:
 
@@ -237,9 +238,13 @@ A full `gate.sh` run that passes writes a record, so later steps do not gate the
   fails.
 
 Records are local files, and any clean full run writes one, an executor's included. The
-independent verifier therefore never relies on a record: it runs the full gate itself. Records
-only let the later mechanical steps skip the same code: the `develop` and `main` pushes, `gitflow.sh finish`
-and the post-merge check. Records written inside scratch repositories by tests and by
+independent verifier therefore never relies on a record: it runs the full gate itself, in a
+detached worktree of the orchestrator's checkout (`git worktree add --detach <path>
+origin/<branch>`), which writes the record into the shared git directory. Only `gate.sh` writes
+records; nobody creates, copies or edits one by hand. Records only let the later mechanical steps
+skip the same code: the `develop` and `main` pushes, `gitflow.sh finish` and the orchestrator's
+post-merge `gate.sh --if-needed`. A fix round's verifier may cite a record an earlier independent
+verifier's run wrote for the same code. Records written inside scratch repositories by tests and by
 `init_project.py` stay in those repositories.
 
 ## Hooks
@@ -529,14 +534,16 @@ step.
 `chore(merge): merge <branch> into <base>`; the hotfix back-merge uses the second form. The
 task form is what `.agents/tasks/scripts/report.py` looks up to find a task's merge commit.
 
-## How this composes with the existing verify/resolve loop
+## How this composes with the verify/resolve workflow
 
-`CONTRIBUTING.md` § Agent verify/resolve workflow is unchanged by this spec — it's the same five
-steps. What changes is that steps 2 ("Verify") and 4 ("repeat") are now literally
-`scripts/gate.sh` and `scripts/autofix.sh` + `scripts/gate.sh`, not a re-derivation of "run ruff,
-ty, pytest" from `PYTHON_CONVENTIONS.md` each time. `CLAUDE.md`'s rule that verification must come
-from "an independent agent invocation (fresh context)" is unaffected — the script makes that
-invocation's job mechanical, it doesn't replace the independence requirement.
+`CONTRIBUTING.md` § Agent verify/resolve workflow has one independent verification per change, of
+the finished branch, and none per commit. The executor iterates with `scripts/gate.sh --fast`,
+`scripts/autofix.sh` and targeted tests, and commits freely. The verifier runs `scripts/gate.sh`
+in full, so its run is the canonical one and writes the gate record that the post-merge check,
+`gitflow.sh finish` and the pushes to `develop` and `main` reuse. A task's report names the record
+in its verify line, `passed (commit <hash>; gate <record-key>; <counts>)`. `CLAUDE.md`'s rule that
+verification must come from "an independent agent invocation (fresh context)" is unaffected: the
+script makes that invocation's job mechanical, it doesn't replace the independence requirement.
 
 ## Installation into a target repo
 

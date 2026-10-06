@@ -123,8 +123,9 @@ before `gate clean`. The file holds `key=`, `commit=`, `slow=yes|no` and `date=`
 hash of the commit's tree listing without the `RECORD_PATHS` entries, followed by one line each from
 `uv --version`, `uv run python -VV`, `git --version` and `node -v`. A change to a record path keeps
 the key; a change to any other tracked file or to a tool version changes it. `--fast`, `--staged`, a
-failed run and a dirty run never write a record, and a dirty run says why. Records are local files,
-never committed, and every worktree of the repository shares them.
+failed run and a dirty run never write a record, and a dirty run says why. Only `gate.sh` writes
+records; never create, copy or edit one by hand. Records are local files, never committed, and
+every worktree of the repository shares them.
 
 `gate.sh --if-needed [<commit>...]` looks for a record per commit (default `HEAD`) and skips the full
 gate for each commit that has a sufficient one (see Slow tests). For a commit without one it runs the commit's own full gate
@@ -172,5 +173,8 @@ the full specification is in `../DEV_TOOLING_SPEC.md`. `gitflow.sh finish` merge
 `chore(merge): merge task NNNN into <base>` (task branches) or `chore(merge): merge <branch> into
 <base>`. The `STAGED_GLOB` pathspec in `config/gate.sh` selects the files `--staged` checks.
 
-These are the same scripts an agent (or you) should run by hand during the verify/resolve loop
-— the hooks are a safety net, not the primary way this gate gets run.
+An agent iterates with `scripts/gate.sh --fast` and targeted tests and commits freely. The one
+independent verifier of a finished branch runs the full `scripts/gate.sh` itself, in a detached
+worktree of the orchestrator's checkout (`git worktree add --detach <path> origin/<branch>`), and
+its record is what the later steps reuse. The hooks check task-branch pushes with `--fast` and
+guard `develop` and `main`; they are not the primary way this gate gets run.

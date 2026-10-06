@@ -60,7 +60,7 @@ time with `git push -u origin <branch>`; a bare `git push` works after that.
   `npm install`) before its first commit.
 - Remove the worktree and delete its local branch once the branch is merged, in both flows this
   repo uses. In the single-agent flow, `scripts/gitflow.sh <kind> finish <topic>` does this after
-  merging (see § Agent verify/resolve workflow, step 6). In the batched orchestrator flow
+  merging (see § Agent verify/resolve workflow, step 5). In the batched orchestrator flow
   (`.agents/README.md`'s execution loop), the subagent that created the worktree is gone by the
   time the orchestrator merges, so whoever performs that merge also runs
   `git worktree remove <path>` and `git branch -d <branch>` as part of the same step. `git branch
@@ -107,9 +107,9 @@ Rules the agent follows:
 - A breaking change is marked **both** with `!` after the type/scope and a `BREAKING CHANGE:` footer
   explaining the break — the footer is what `hatch-vcs`/semver tooling keys off, the `!` is for
   human skimmability.
-- Squash incidental fixup commits made during the verify/resolve loop (see below) into a single
-  clean commit before merge — the merged history should have one commit per logical change, not one
-  per lint fix.
+- Squash incidental fixup commits made while iterating (see § Agent verify/resolve workflow) into a
+  single clean commit before the first push — the merged history should have one commit per logical
+  change, not one per lint fix. A pushed branch is never rewritten; a fix round adds commits.
 
 ### Merge commits
 
@@ -198,7 +198,7 @@ The check runs in two places:
   explanation. Any other status (3 for an internal error, 127 for a missing `python3`, a signal)
   rejects the push with `pre-push: changelog check failed (exit N) for <remote_ref>`, with no claim
   that a fragment is missing.
-- **`scripts/gitflow.sh <kind> finish`**, before the gate and the merge. The range is from the merge
+- **`scripts/gitflow.sh <kind> finish`**, before the merge. The range is from the merge
   base with the base branch to the branch tip. `finish` first runs `git fetch origin <base>`, so
   the base is `origin/<base>` when that remote ref exists afterwards. When the fetch fails it
   prints a warning and uses the local base branch, as it does when there is no remote ref. Unlike
@@ -317,30 +317,48 @@ starts from `v0.0.0`.
 
 ## Agent verify/resolve workflow
 
-Before any commit is written, changes go through an iterative, independently-verified check loop —
-an agent never certifies its own work as passing:
+An agent never certifies its own work as passing. A change gets exactly one independent
+verification, of the finished branch. There is no verifier per commit:
 
-1. **Implement** — the working agent makes the change in its worktree.
-2. **Verify** — a separate, independent agent (fresh context, no stake in the implementation) runs
-   the full gate from the repo root: `scripts/gate.sh`. It runs, in order, `ruff check`,
+1. **Implement** — the working agent makes the change in its worktree. It iterates with
+   `scripts/gate.sh --fast` (lint, format check and typecheck), `scripts/autofix.sh` and targeted
+   tests, may run the full gate whenever it wants, and commits freely per the Commits section
+   above. Its own runs certify nothing. When the branch is finished it pushes it
+   (`git push -u origin <branch>`); the `pre-push` hook runs the fragment check and
+   `gate.sh --fast` for a branch other than `develop` and `main`.
+2. **Verify** — one separate, independent agent (fresh context, no stake in the implementation)
+   checks the pushed branch. It works in a detached worktree of the orchestrator's checkout, made
+   with `git worktree add --detach <path> origin/<branch>`, because a plain checkout of the
+   branch is refused while the executor's worktree holds it. A worktree of the same repository
+   shares the git directory, so the gate record the verifier writes is where the later steps find
+   it. The verifier runs the full gate from the repo root: `scripts/gate.sh`. It never uses
+   `--if-needed`, so the run is its own. The gate runs, in order, `ruff check`,
    `ruff format --check`, `ty check` and `pytest` (the exact commands live in
-   `scripts/config/gate.sh`, the one place to change them).
+   `scripts/config/gate.sh`, the one place to change them). On a clean tree a passing run prints
+   `gate record <key>` and writes the record (§ Gate records), whose key goes into the report's
+   verify line. The verifier also does the judgment checks listed in `.agents/README.md`
+   § "Verify, resolve, merge".
 
-   It produces a report listing every failure (lint violations, type errors, failing tests) — not
-   just a pass/fail summary. The verify agent's ephemeral status/progress chatter while it works
-   (not anything it writes to disk) may be terse, caveman-style, if that mode is available; see
-   `CLAUDE.md` § "Chatter vs. persisted output" for what stays full prose regardless.
+   It produces a report listing every failure (lint violations, type errors, failing tests,
+   unmet criteria) — not just a pass/fail summary. The verify agent's ephemeral status/progress
+   chatter while it works (not anything it writes to disk) may be terse, caveman-style, if that
+   mode is available; see `CLAUDE.md` § "Chatter vs. persisted output" for what stays full prose
+   regardless.
 3. **Resolve** — the resolver agent (may be the original implementing agent) addresses every item in
-   the report. Nothing is marked resolved without a corresponding fix or an explicit, justified
-   waiver called out in the resolution.
-4. **Repeat** steps 2–3 until the verifier reports a clean pass on all four gates. This is iterative
-   by design — do not skip re-verification after fixes, and do not merge partial results.
-5. **Commit** — only once verification is clean, the agent writes the commit message per the
-   Commits section above and commits.
-6. **Merge & push** — according to branch type:
+   the report on the same branch, in new commits. Nothing is marked resolved without a
+   corresponding fix or an explicit, justified waiver called out in the resolution.
+4. **Repeat** steps 2–3 until the verifier reports a clean pass on all four gates. A fix round has a
+   new verifier. It checks the previous findings and the diff since the verified commit, runs the
+   full gate for the new head (or cites a record that an earlier independent verifier's run wrote
+   for the same code), and rechecks the whole branch against its task's `touches` and the "Ask
+   first" list. Do not merge partial results.
+5. **Merge & push** — according to branch type:
    - `feat/<topic>` / `bugfix/<topic>` → merge into `develop`
      (`scripts/gitflow.sh <feature|bugfix> finish <topic>`). A `feat`, `fix` or breaking change
-     has its changelog fragment committed on the branch first; `finish` refuses without it.
+     has its changelog fragment committed on the branch first; `finish` refuses without it. After
+     each merge it makes, `finish` runs `scripts/gate.sh --if-needed HEAD`: the verifier's record
+     covers a merge whose code equals the verified branch's, and any other merge runs the full
+     gate. On red it undoes the merge and stops.
    - `hotfix/<topic>` → merge into `main`, then merge `main` back into `develop` to keep them in
      sync (`scripts/gitflow.sh hotfix finish <topic>`). Nothing is pushed or tagged yet. Push
      `main` and `develop`, then hand the release to the owner: `scripts/release.py --yes` on `main`
@@ -349,28 +367,41 @@ an agent never certifies its own work as passing:
    - Push the target branch(es) to `origin`. Tags are pushed only by `release.py --yes --push`, or
      by the atomic push command it prints.
 
-Husky-managed git hooks re-run the same gate as a final safety net — they should never actually
-catch anything the verify/resolve loop didn't already catch, but a hook failure blocks the
-commit/push regardless of what step 4 concluded.
+A commit that changes only bookkeeping records (`RECORD_PATHS`: task files, reports, `BACKLOG.md`,
+`LESSONS.md`, plans) needs no independent verification and no gate, and the hooks skip it. A plan
+or task file written for the owner keeps one independent review before it is merged.
+
+Husky-managed git hooks are a cheap check on task branches and the guard on `develop` and `main`:
+they reuse the verifier's gate record instead of running the same code again. A hook failure
+blocks the commit or push regardless of what step 4 concluded.
 
 **Installing the hooks**: run `npm install` once per checkout (or worktree). It also runs Husky's
 `prepare` step, which sets `core.hooksPath` to `.husky/_`. A worktree created by
 `scripts/gitflow.sh` already has this (see § Worktrees for agents); any other worktree needs its
 own `npm ci` before its first commit. `.agents/tasks/scripts/housekeep.py setup` checks the
-install.
+install. A detached verifier worktree makes no commit and needs no install.
 
 - `pre-commit` runs `scripts/autofix.sh --staged`, re-stages the files that were staged, then
   `scripts/gate.sh --staged`: lint, format check and typecheck on staged files only (so
   pre-existing, unrelated repo debt cannot block an unrelated commit), and no tests.
 - `commit-msg` runs `scripts/commit_lint.py` against the Conventional Commits rules above.
 - `pre-push` runs `scripts/changelog.py check` for each pushed branch (§ Versioning), against the
-  remote the push goes to, then the full `scripts/gate.sh`, tests included. A failed fragment check,
-  or any exit status of `changelog.py` other than 0 and 2, rejects the push before the gate starts.
-- `pre-commit` and `pre-push` skip the gate when every changed file is under `.agents/` (task
-  files, reports, `BACKLOG.md`, `LESSONS.md`, as `task.py new` pushes). `pre-push` then skips the
-  fragment check too. Code under `.agents/tasks/scripts/` never counts as skippable. A new remote
-  branch, a range git cannot list, or any file outside `.agents/` (including one renamed into it)
-  always runs the full gate.
+  remote the push goes to. A failed fragment check, or any exit status of `changelog.py` other than
+  0 and 2, rejects the push before the gate starts. Then it gates by ref:
+  - a branch other than `develop` and `main` (a task branch): one `scripts/gate.sh --fast` call,
+    lint, format check and typecheck without tests. The verifier's full run follows before any
+    merge;
+  - `develop`: one `scripts/gate.sh --if-needed <sha>...` call with every pushed commit. The full
+    gate runs only for a commit without a sufficient gate record;
+  - `main`: the same call with `--all`, made first, so a record of a run without the slow tests
+    does not count;
+  - tags and other non-branch refs trigger no gate.
+- `pre-commit` and `pre-push` skip the gate when every changed file matches `RECORD_PATHS` in
+  `scripts/config/gate.sh` (task files, reports, `BACKLOG.md`, `LESSONS.md`, plans, as
+  `task.py new` pushes). `pre-push` then skips the fragment check too. Code under
+  `.agents/tasks/scripts/`, the templates and the process docs never counts as a record. A new
+  remote branch, a range git cannot list, or any file outside `RECORD_PATHS` (including one renamed
+  into it) always runs the gate for the ref.
 - A merge commit that git creates itself runs `commit-msg` only. Git runs no `pre-commit` for it,
   and `.husky/` has no `pre-merge-commit` hook, so the `chore(merge)` commits that
   `scripts/gitflow.sh finish` and `scripts/release.py` write are linted but not gated. A merge
@@ -380,11 +411,42 @@ install.
   `commit-msg` only, as above (unless finished by hand after a conflict), and its push passes
   through `pre-push`.
 
+### Slow tests
+
+Two end-to-end cases in `tests/test_init_project.py` carry the `slow` marker and take about 250 to
+300 s of a full gate. `scripts/gate.sh` skips them (`-m "not slow"`) only when every path changed
+since the base is on `SLOW_SAFE_PATHS` in `scripts/config/gate.sh`: `RECORD_PATHS`, the changelog
+fragments, and the prose docs `CONTRIBUTING.md`, `DEV_TOOLING_SPEC.md`, `PYTHON_CONVENTIONS.md` and
+`NOTICE.md`. Any other change, an empty change set and `scripts/gate.sh --all` run them, and so
+does the gate of every push to `main`. The base is the merge base with `origin/develop` (`origin/main` on a
+`hotfix/*` branch). A skipped run prints `slow tests: skipped`. Adding a path to the list is a
+change to `scripts/config/gate.sh` and needs a human.
+
+### Gate records
+
+A full `scripts/gate.sh` run that passes on a tree that is clean before and after writes a record
+under `$(git rev-parse --git-common-dir)/gate-pass/`, shared by every worktree of the repository
+and never committed. The key hashes the commit's tree without the `RECORD_PATHS` entries, plus the
+versions of `uv`, Python, `git` and `node`. A change to a bookkeeping record therefore keeps the
+key, and any other change to the code, or to a tool version, misses the record. The record says
+whether the slow tests ran. `--fast`, `--staged` and a dirty run never write one.
+
+`scripts/gate.sh --if-needed [<commit>...]` (default `HEAD`) exits 0 only when every commit has a
+sufficient record or passes a full gate run, in the checkout when that commit is checked out and
+the tree is clean, otherwise in a temporary detached worktree. A record of a run without the slow
+tests is sufficient only for a change that is safe-list-only, and never with `--all`.
+
+Gate records are written only by `scripts/gate.sh`. Never create, copy or edit one by hand: a
+record stands for a run that happened. A record is a shortcut for the later mechanical steps (the
+post-merge check, `develop` and `main` pushes, `gitflow.sh finish`), never for the verifier's own
+run.
+
 ## Definition of done
 
 A change is done when, and only when:
 
-- [ ] The verify/resolve loop (above) has completed with a clean report.
+- [ ] The one independent verify of the finished branch (above) has passed, and a task's report
+      names its commit and gate record key.
 - [ ] Husky hooks pass on commit and push.
 - [ ] The commit message follows Conventional Commits and correctly reflects the version impact.
 - [ ] A `feat`, `fix` or breaking change has its changelog fragment in `changelog.d/`.

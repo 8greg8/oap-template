@@ -64,9 +64,12 @@ scripts/release.py --yes --push
 `pytest`, `ruff`, and `ty` are declared as `dev` dependency-group entries in the root
 `pyproject.toml` — `uv sync` installs them automatically, no global/tool install needed.
 
-These are the exact commands the independent verifier agent runs in the verify/resolve loop
-described in [`CONTRIBUTING.md`](CONTRIBUTING.md) — run them yourself before handing work off, so
-the verifier's report is a confirmation, not a first discovery of problems.
+These are the exact commands behind `scripts/gate.sh`, which the one independent verifier runs in
+full on a finished branch (see [`CONTRIBUTING.md`](CONTRIBUTING.md) § Agent verify/resolve
+workflow). While iterating, use `scripts/gate.sh --fast` (everything except the tests) and targeted
+`uv run pytest` runs, and run the full `scripts/gate.sh` yourself before handing work off, so the
+verifier's report is a confirmation, not a first discovery of problems. Your own runs certify
+nothing.
 
 ## Dependency Management
 
@@ -97,8 +100,7 @@ uv lock --upgrade-package <package>
 - Tests live under `tests/`, mirroring the module under test: `src/<repo_name>/foo.py` →
   `tests/test_foo.py`.
 - Any new public function/class and any bug fix ships with a test that would have failed before the
-  change — this is what "done" means for the verify/resolve loop's test gate, not a numeric coverage
-  target.
+  change — this is what "done" means for the test gate, not a numeric coverage target.
 - Prefer real objects over mocks where practical; mock only external boundaries (network calls,
   third-party APIs, filesystem/clock where determinism matters).
 
