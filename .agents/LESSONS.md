@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-35 lesson(s) across 17 section(s). Generated 2026-10-06.
+36 lesson(s) across 18 section(s). Generated 2026-10-06.
 
 ## Tag index
 
@@ -20,10 +20,11 @@ to all lessons that carry it.
 - `backlog` — [T-0002](#t-0002-success)
 - `bash` — [T-0012](#t-0012-success)
 - `bash-3.2` — [T-0011](#t-0011-success)
-- `breaking` — [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0028](#t-0028-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success)
+- `breaking` — [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0028](#t-0028-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success), [T-0036](#t-0036-success)
 - `changelog` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0025](#t-0025-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success), [T-0028](#t-0028-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success), [T-0032](#t-0032-success)
 - `changelog-fragments` — [T-0022](#t-0022-success), [T-0025](#t-0025-success)
 - `chore` — [T-0020](#t-0020-success)
+- `claude-md` — [T-0036](#t-0036-success)
 - `code-of-conduct` — [T-0021](#t-0021-success)
 - `commit` — [T-0018](#t-0018-success)
 - `commit-lint` — [T-0004](#t-0004-success)
@@ -37,6 +38,7 @@ to all lessons that carry it.
 - `file-modes` — [T-0007](#t-0007-success)
 - `filter-repo` — [T-0020](#t-0020-success)
 - `gate` — [T-0004](#t-0004-success), [T-0018](#t-0018-success), [T-0033](#t-0033-success), [T-0034](#t-0034-success)
+- `gate-records` — [T-0036](#t-0036-success)
 - `git` — [T-0007](#t-0007-success), [T-0012](#t-0012-success)
 - `git-pathspec` — [T-0008](#t-0008-success), [T-0033](#t-0033-success), [T-0034](#t-0034-success)
 - `git-publish` — [T-0002](#t-0002-success)
@@ -58,6 +60,7 @@ to all lessons that carry it.
 - `pre-commit` — [T-0008](#t-0008-success)
 - `pre-push` — [T-0023](#t-0023-success)
 - `process` — [T-0005](#t-0005-success)
+- `process-docs` — [T-0036](#t-0036-success)
 - `public-release` — [T-0019](#t-0019-success), [T-0020](#t-0020-success)
 - `pytest-marker` — [T-0034](#t-0034-success)
 - `records` — [T-0034](#t-0034-success)
@@ -81,6 +84,7 @@ to all lessons that carry it.
 - `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success), [T-0027](#t-0027-success), [T-0028](#t-0028-success), [T-0029](#t-0029-success)
 - `upstream-tracking` — [T-0010](#t-0010-success)
 - `uv` — [T-0006](#t-0006-success)
+- `verification` — [T-0036](#t-0036-success)
 - `verify-line` — [T-0035](#t-0035-success)
 - `versioning` — [T-0024](#t-0024-success), [T-0026](#t-0026-success)
 - `workflow` — [T-0013](#t-0013-success)
@@ -498,3 +502,15 @@ Source: [`reports/T-0002.md`](tasks/reports/T-0002.md)
 Tags: `tests`, `init`, `changelog`, `release`
 
 Source: [`reports/T-0027.md`](tasks/reports/T-0027.md)
+
+## verification
+
+### T-0036 (success)
+
+- The report file is a `RECORD_PATHS` path but still makes `git status --porcelain` dirty, so a gate run that must write a record has to finish before `report.py new` creates the file in the worktree.
+- `.agents/tasks/scripts/housekeep.py` cites `CONTRIBUTING.md` § "Agent verify/resolve workflow" by name, so that heading must not be renamed.
+- The task's fragment rules forbid "now" as a word; check the fragment for it before the first commit.
+
+Tags: `verification`, `process-docs`, `gate-records`, `claude-md`, `breaking`
+
+Source: [`reports/T-0036.md`](tasks/reports/T-0036.md)
