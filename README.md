@@ -65,4 +65,4 @@ the placeholders (`<repo_name>`, mission, architecture) for your actual reposito
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). Third-party material in this repository is listed in [NOTICE.md](NOTICE.md).
