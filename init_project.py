@@ -105,7 +105,14 @@ README_TEXT = """\
 
 ## Checks
 
-Run the gate before every commit:
+While working, check with the fast gate (lint, format check and typecheck):
+
+```bash
+scripts/gate.sh --fast
+```
+
+The hooks check each commit and push. The full gate also runs the tests. The independent verifier
+of a finished branch runs it, and so do the pushes to `develop` and `main`:
 
 ```bash
 scripts/gate.sh
