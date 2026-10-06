@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# The single source of truth for "does this change pass?" -- run by agents during the
-# verify/resolve loop, by .husky/pre-commit (--staged), by .husky/pre-push, and by CI.
+# The single source of truth for "does this change pass?" -- run by an executor agent while
+# iterating (--fast), by the one independent verifier (the full gate), by later mechanical steps
+# (--if-needed), by .husky/pre-commit (--staged), by .husky/pre-push, and by CI.
 # Never duplicate these commands anywhere else; edit scripts/config/gate.sh instead.
 #
 # Usage: scripts/gate.sh [--fast | --staged | [--all] [--if-needed [<commit>...]]]
