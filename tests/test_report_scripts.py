@@ -157,7 +157,9 @@ def test_done_report_with_passed_verify_is_accepted():
     assert report_module.validate_report(report, task) == []
 
 
-_GATE_KEY = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+_GATE_KEY = (
+    "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"  # gitleaks:allow
+)
 
 
 def _verify_line(status: str) -> str:

@@ -1109,7 +1109,6 @@ def test_script_names_template_strings_plainly():
 
 COMMIT_MESSAGE = "chore: initialize project from OAP template"
 SCRIPT_FILES = ("init_project.py", "tests/test_init_project.py")
-LICENSE_POINTER = "Third-party material in this repository is listed in NOTICE.md."
 
 
 def _stub_gate(s: Scratch, code: int = 0) -> None:
@@ -1215,10 +1214,10 @@ def test_full_run_makes_one_commit_and_both_branches_point_at_it(scratch: Scratc
     assert _refs(scratch.bare) == refs_before
     assert _git(repo, "tag", "--list") == ""
     assert _git(scratch.bare, "tag", "--list") == ""
-    # NOTICE.md and the LICENSE pointer line survive the run.
+    # NOTICE.md survives the run, and LICENSE stays the plain MIT text that ends with "SOFTWARE.".
     assert (repo / "NOTICE.md").read_bytes() == notice
     license_text = _text(repo, "LICENSE")
-    assert LICENSE_POINTER in license_text.splitlines()
+    assert license_text.endswith("SOFTWARE.\n")
     assert f"Copyright (c) {datetime.now().astimezone().year} Jane Doe" in license_text
     assert "8greg8" not in license_text
 
