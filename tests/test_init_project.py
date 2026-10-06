@@ -778,6 +778,36 @@ def test_readme_is_a_fresh_short_project_readme(initialized: Scratch):
     assert "<repo_name>" not in text
 
 
+def _checks_section(text: str) -> str:
+    return text.split("## Checks\n", 1)[1]
+
+
+def test_readme_checks_advise_the_fast_gate_while_working(initialized: Scratch):
+    # T-0037: CONTRIBUTING.md § "Agent verify/resolve workflow" says to iterate with
+    # `scripts/gate.sh --fast`; the full gate is the verifier's and the `develop`/`main` push check.
+    text = _text(initialized.repo, "README.md")
+
+    assert "## Checks\n" in text
+    checks = _checks_section(text)
+    assert "```bash\nscripts/gate.sh --fast\n```" in checks
+    assert "```bash\nscripts/gate.sh\n```" in checks
+    assert "while working" in checks.lower()
+    assert "independent verif" in checks
+    assert "push" in checks
+    assert "`develop`" in checks
+    assert "`main`" in checks
+    assert len(checks.splitlines()) <= 16
+
+
+def test_readme_never_says_to_gate_before_every_commit(initialized: Scratch):
+    text = _text(initialized.repo, "README.md")
+
+    assert "before every commit" not in text
+    assert "before every commit" not in (REPO_ROOT / "init_project.py").read_text(
+        encoding="utf-8"
+    )
+
+
 def test_claude_md_gains_only_a_project_section_before_the_working_unit(
     initialized: Scratch,
 ):
