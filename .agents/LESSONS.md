@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-32 lesson(s) across 15 section(s). Generated 2026-10-05.
+34 lesson(s) across 17 section(s). Generated 2026-10-06.
 
 ## Tag index
 
@@ -36,16 +36,16 @@ to all lessons that carry it.
 - `file-mode` — [T-0009](#t-0009-success)
 - `file-modes` — [T-0007](#t-0007-success)
 - `filter-repo` — [T-0020](#t-0020-success)
-- `gate` — [T-0004](#t-0004-success), [T-0018](#t-0018-success)
+- `gate` — [T-0004](#t-0004-success), [T-0018](#t-0018-success), [T-0033](#t-0033-success)
 - `git` — [T-0007](#t-0007-success), [T-0012](#t-0012-success)
-- `git-pathspec` — [T-0008](#t-0008-success)
+- `git-pathspec` — [T-0008](#t-0008-success), [T-0033](#t-0033-success)
 - `git-publish` — [T-0002](#t-0002-success)
 - `git-worktree` — [T-0010](#t-0010-success), [T-0011](#t-0011-success)
-- `gitflow` — [T-0004](#t-0004-success), [T-0011](#t-0011-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0028](#t-0028-success)
+- `gitflow` — [T-0004](#t-0004-success), [T-0011](#t-0011-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0028](#t-0028-success), [T-0033](#t-0033-success)
 - `history-rewrite` — [T-0020](#t-0020-success)
-- `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success), [T-0028](#t-0028-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success)
-- `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success)
-- `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success)
+- `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success), [T-0028](#t-0028-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success), [T-0033](#t-0033-success)
+- `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success), [T-0035](#t-0035-success)
+- `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success), [T-0033](#t-0033-success)
 - `init` — [T-0027](#t-0027-success)
 - `init-project` — [T-0021](#t-0021-success), [T-0025](#t-0025-success)
 - `init-script` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
@@ -62,7 +62,7 @@ to all lessons that carry it.
 - `release` — [T-0024](#t-0024-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success), [T-0032](#t-0032-success)
 - `rename` — [T-0015](#t-0015-success)
 - `report-gate` — [T-0001](#t-0001-success)
-- `report-validation` — [T-0003](#t-0003-success)
+- `report-validation` — [T-0003](#t-0003-success), [T-0035](#t-0035-success)
 - `ruff` — [T-0007](#t-0007-success)
 - `scripts` — [T-0012](#t-0012-success), [T-0022](#t-0022-success)
 - `scrub` — [T-0019](#t-0019-success)
@@ -78,9 +78,10 @@ to all lessons that carry it.
 - `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success), [T-0027](#t-0027-success), [T-0028](#t-0028-success), [T-0029](#t-0029-success)
 - `upstream-tracking` — [T-0010](#t-0010-success)
 - `uv` — [T-0006](#t-0006-success)
+- `verify-line` — [T-0035](#t-0035-success)
 - `versioning` — [T-0024](#t-0024-success), [T-0026](#t-0026-success)
 - `workflow` — [T-0013](#t-0013-success)
-- `worktree` — [T-0002](#t-0002-success)
+- `worktree` — [T-0002](#t-0002-success), [T-0033](#t-0033-success), [T-0035](#t-0035-success)
 
 ## changelog
 
@@ -274,6 +275,19 @@ Tags: `feat`, `init-project`, `changelog`, `changelog-fragments`
 
 Source: [`reports/T-0025.md`](tasks/reports/T-0025.md)
 
+## gate
+
+### T-0033 (success)
+
+- `git ls-tree` accepts no pathspec magic in git 2.43; `git ls-files` does. A temporary index from `git read-tree --index-output=<file>` gives a pathspec-filtered listing of any commit without touching the real index.
+- A bash-only `export -f` in a scratch `scripts/config/gate.sh` breaks `.husky/pre-push`, which sources the file under `sh`. Log from a stub command on `PATH` instead.
+- `git log <range> -- <pathspec>` simplifies history; add `--full-history` when every commit of the range must count.
+- Do not use `pkill -f` or `kill` by guessed pid in a shared container: other agents' runs match the pattern, and it can kill the calling shell.
+
+Tags: `gate`, `hooks`, `husky`, `gitflow`, `git-pathspec`, `worktree`
+
+Source: [`reports/T-0033.md`](tasks/reports/T-0033.md)
+
 ## git
 
 ### T-0007 (success)
@@ -316,6 +330,19 @@ Source: [`reports/T-0004.md`](tasks/reports/T-0004.md)
 Tags: `hooks`, `husky`, `pre-commit`, `git-pathspec`
 
 Source: [`reports/T-0008.md`](tasks/reports/T-0008.md)
+
+## housekeep
+
+### T-0035 (success)
+
+- A scratch-repo test for `housekeep.py` must patch `load_tasks`; otherwise the real repository's
+  task files decide the result, and a branch named `feat/T-0001-...` matches a real finished task.
+- The task-ID in a task branch name, not the full branch name, is the stable key to a task file:
+  the type prefix and slug can differ from what `Task.branch` generates.
+
+Tags: `housekeep`, `report-validation`, `verify-line`, `worktree`
+
+Source: [`reports/T-0035.md`](tasks/reports/T-0035.md)
 
 ## init-script
 

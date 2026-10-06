@@ -1,7 +1,7 @@
 ---
 id: T-0035
 title: Report leftover worktrees and record the gate in the verify line
-status: open
+status: done
 type: feat
 priority: medium
 depends_on: []

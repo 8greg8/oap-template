@@ -1,7 +1,7 @@
 ---
 id: T-0033
 title: Record gate passes and add gate.sh --if-needed
-status: open
+status: done
 type: feat
 priority: high
 depends_on: []

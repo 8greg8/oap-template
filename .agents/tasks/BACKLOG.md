@@ -4,9 +4,9 @@
 
 # Task Backlog
 
-32 task(s). Generated 2026-10-05.
+36 task(s). Generated 2026-10-06.
 
-| open: 0 | in_progress: 0 | blocked: 0 | review: 0 | done: 32 | abandoned: 0 |
+| open: 2 | in_progress: 0 | blocked: 0 | review: 0 | done: 34 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -28,6 +28,8 @@
 | T-0027 | [Make init tests independent of template fragments and fold the first release entries](T-0027-make-init-tests-independent-of-template.md) | done | high | chore | — | [report](reports/T-0027.md) |
 | T-0028 | [Harden the changelog check and the push hook](T-0028-harden-the-changelog-check-and-the-push-hook.md) | done | high | fix | T-0027 | [report](reports/T-0028.md) |
 | T-0029 | [Fix release.py edge cases](T-0029-fix-release-py-edge-cases.md) | done | high | fix | T-0027 | [report](reports/T-0029.md) |
+| T-0033 | [Record gate passes and add gate.sh --if-needed](T-0033-record-gate-passes-and-add-gate-sh-if-needed.md) | done | high | feat | — | [report](reports/T-0033.md) |
+| T-0034 | [Mark the slow init tests and skip them for safe-list changes](T-0034-mark-the-slow-init-tests-and-skip-them-for-safe.md) | open | high | feat | T-0033 | — |
 | T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
 | T-0008 | [Fix pre-commit re-staging for unusual filenames](T-0008-fix-pre-commit-re-staging-for-unusual-filenames.md) | done | medium | fix | — | [report](reports/T-0008.md) |
 | T-0012 | [Make staged-file handling NUL-safe in gate and autofix scripts](T-0012-make-staged-file-handling-nul-safe-in-gate-and.md) | done | medium | fix | — | [report](reports/T-0012.md) |
@@ -42,10 +44,20 @@
 | T-0030 | [Correct the release docs and add the release to Ask first](T-0030-correct-the-release-docs-and-add-the-release-to.md) | done | medium | docs | T-0028, T-0029 | [report](reports/T-0030.md) |
 | T-0031 | [Fold the post-batch fragments and document the pre-release wording rule](T-0031-fold-the-post-batch-fragments-and-document-the.md) | done | medium | docs | — | [report](reports/T-0031.md) |
 | T-0032 | [Clarify the tag items in Ask first and drop the stale README reference](T-0032-clarify-the-tag-items-in-ask-first-and-drop-the.md) | done | medium | docs | T-0031 | [report](reports/T-0032.md) |
+| T-0035 | [Report leftover worktrees and record the gate in the verify line](T-0035-report-leftover-worktrees-and-record-the-gate.md) | done | medium | feat | — | [report](reports/T-0035.md) |
+| T-0036 | [Rewrite the verification rules for one verifier per change](T-0036-rewrite-the-verification-rules-for-one-verifier.md) | open | medium | docs | T-0033, T-0034, T-0035 | — |
 | T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | done | low | chore | — | [report](reports/T-0009.md) |
 | T-0010 | [Fix agent-doc wording and stale AGENTS.md references](T-0010-fix-agent-doc-wording-and-stale-agents-md.md) | done | low | docs | — | [report](reports/T-0010.md) |
 | T-0011 | [Support docs and chore task branches in gitflow and fix housekeep worktrees](T-0011-support-docs-and-chore-task-branches-in-gitflow.md) | done | low | fix | — | [report](reports/T-0011.md) |
 
 ## Ready to dispatch
 
-*Nothing ready — every open task is blocked or already in flight.*
+Dependencies satisfied, not yet started:
+
+- **T-0034** Mark the slow init tests and skip them for safe-list changes — `pyproject.toml`, `tests/test_init_project.py`, `scripts/gate.sh`, `scripts/config/gate.sh`, `.husky/pre-push`, `tests/test_gate.py`, `tests/test_hooks.py`, `scripts/README.md`, `DEV_TOOLING_SPEC.md`, `tests/test_release.py`, `changelog.d/T-0034.added.md`
+
+Suggested conflict-free parallel batch: T-0034
+
+## Waiting on dependencies
+
+- **T-0036** Rewrite the verification rules for one verifier per change — needs T-0033, T-0034, T-0035
