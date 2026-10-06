@@ -1,7 +1,7 @@
 ---
 id: T-0037
 title: Fix the generated README's per-commit gate advice
-status: open
+status: in_progress
 type: fix
 priority: low
 depends_on: []

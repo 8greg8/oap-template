@@ -1,7 +1,7 @@
 ---
 id: T-0038
 title: Update the stale verify-resolve loop comments in scripts
-status: open
+status: in_progress
 type: docs
 priority: low
 depends_on: []
