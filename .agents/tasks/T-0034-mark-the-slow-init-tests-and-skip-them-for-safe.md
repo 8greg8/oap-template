@@ -1,7 +1,7 @@
 ---
 id: T-0034
 title: Mark the slow init tests and skip them for safe-list changes
-status: open
+status: in_progress
 type: feat
 priority: high
 depends_on: [T-0033]
