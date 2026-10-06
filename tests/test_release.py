@@ -567,7 +567,8 @@ def test_hotfix_release_push_passes_the_pre_push_hook(repo: Path):
     """`release.py --yes --push` after a hotfix: main is checked out, develop is not.
 
     The hook gates main's release commit on the checkout, develop's back-merge in a temporary
-    worktree (which it removes), and runs the fast gate for the tag.
+    worktree (which it removes). The tag push runs no gate: the hook skips tags and other
+    non-branch refs.
     """
     hooks = install_pre_push_hook(repo)  # not wired in yet
     feat(repo, "a")
