@@ -27,3 +27,12 @@ DEVELOP_BRANCH="develop"
 # LINT_CMD, FORMAT_CHECK_CMD and TYPECHECK_CMD (and the *_FIX_CMDs) must accept file paths
 # as trailing arguments; with no arguments they check the whole repo.
 STAGED_GLOB="*.py"
+
+# Paths that only record bookkeeping: one space-separated string of git glob pathspecs, so no
+# entry holds a space. scripts/gate.sh leaves them out of the key of a gate record, and
+# .husky/pre-commit and .husky/pre-push skip a change that touches only these paths. All three
+# exclude each entry as a `:(exclude,glob)<entry>` pathspec, so git is the only matcher: `*`
+# does not cross `/` and `**` does. Everything else, including the task tooling under
+# .agents/tasks/scripts/ and the process docs, is code for both. Shell code expands the string
+# with globbing off (`set -f`).
+RECORD_PATHS=".agents/tasks/T-*.md .agents/tasks/reports/** .agents/tasks/BACKLOG.md .agents/tasks/.counter .agents/LESSONS.md .agents/plans/**"

@@ -60,6 +60,15 @@ start() {
     echo "cd $worktree_dir to begin work."
 }
 
+# undo_merge <commit before the merge>: `git reset --merge ORIG_HEAD` for the merge just made.
+# When the merge made no commit (the branch was already merged), HEAD is still that commit and
+# ORIG_HEAD may be stale, so nothing is reset.
+undo_merge() {
+    if [[ "$(git rev-parse HEAD)" != "$1" ]]; then
+        git reset --merge ORIG_HEAD
+    fi
+}
+
 finish() {
     if ! git show-ref --verify --quiet "refs/heads/$branch"; then
         die "branch $branch does not exist locally"
@@ -93,16 +102,32 @@ finish() {
         die "changelog check failed (exit $check_rc) on $branch"
     fi
 
-    ( cd "$worktree_dir" && "$SCRIPTS_DIR/gate.sh" ) || die "gate failed on $branch -- fix before finishing"
-
+    # The gate runs after each merge, on the merge commit: --if-needed skips it when that code
+    # already has a gate record (the verifier's run on the branch, when the merge changed no
+    # code) and runs it otherwise. On red the merge is undone, so nothing bad is left on the
+    # base branch, and nothing has been pushed.
     section "merging $branch into $base"
     git checkout "$base"
+    base_before="$(git rev-parse HEAD)"
     git merge --no-ff "$branch" -m "$(merge_message "$branch" "$base")"
+    if ! "$SCRIPTS_DIR/gate.sh" --if-needed HEAD; then
+        undo_merge "$base_before"
+        die "gate failed on $base after merging $branch; the merge is undone and nothing was pushed"
+    fi
 
     if [[ "$kind" == "hotfix" ]]; then
         section "back-merging $MAIN_BRANCH into $DEVELOP_BRANCH"
         git checkout "$DEVELOP_BRANCH"
+        develop_before="$(git rev-parse HEAD)"
         git merge --no-ff "$MAIN_BRANCH" -m "$(merge_message "$MAIN_BRANCH" "$DEVELOP_BRANCH")"
+        if ! "$SCRIPTS_DIR/gate.sh" --if-needed HEAD; then
+            # Undo both merges: the back-merge first, while ORIG_HEAD still names its parent,
+            # then the merge into the base branch, from the commit saved before it.
+            undo_merge "$develop_before"
+            git checkout "$base"
+            git reset --merge "$base_before"
+            die "gate failed on $DEVELOP_BRANCH after the back-merge; both merges are undone and nothing was pushed"
+        fi
         warn "hotfix merged into $MAIN_BRANCH and back into $DEVELOP_BRANCH; nothing is pushed or tagged yet."
         warn "next: git push origin $MAIN_BRANCH $DEVELOP_BRANCH"
         warn "then: git checkout $MAIN_BRANCH && scripts/release.py --yes   (release.py refuses an unpushed branch)"

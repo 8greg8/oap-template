@@ -82,13 +82,19 @@ def repo(tmp_path: Path) -> Path:
 
 
 def _install_gate_stubs(repo: Path, exit_code: int = 0) -> tuple[Path, Path]:
-    """Add stub scripts/gate.sh and scripts/autofix.sh (untracked); return their marker files."""
+    """Add stub scripts/gate.sh and scripts/autofix.sh and the real config (all untracked).
+
+    The gate stub appends one line of arguments per call to its marker file. Returns the
+    gate and autofix marker files.
+    """
     gate_marker = repo.parent / "gate-called"
     fix_marker = repo.parent / "autofix-called"
     _stub(
         repo / "scripts" / "gate.sh",
-        f'echo "$@" > "{gate_marker}"\nexit {exit_code}',
+        f'echo "$@" >> "{gate_marker}"\nexit {exit_code}',
     )
+    (repo / "scripts" / "config").mkdir(parents=True, exist_ok=True)
+    shutil.copy(SCRIPTS / "config" / "gate.sh", repo / "scripts" / "config" / "gate.sh")
     _stub(
         repo / "scripts" / "autofix.sh",
         f'echo "$@" > "{fix_marker}"',
@@ -145,6 +151,12 @@ def _run_pre_push(
 
 def _line(local_sha: str, remote_sha: str) -> str:
     return f"refs/heads/develop {local_sha} refs/heads/develop {remote_sha}\n"
+
+
+def _gate_calls(repo: Path) -> list[str]:
+    """The argument lines the stub gate.sh received, one per call, in order."""
+    marker = repo.parent / "gate-called"
+    return marker.read_text().splitlines() if marker.exists() else []
 
 
 def test_agents_only_range_skips_gate(repo: Path) -> None:
@@ -277,6 +289,221 @@ def test_empty_stdin_skips_gate(repo: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert not ran
     assert "skipping gate" in result.stdout
+
+
+# --- pre-push: which gate runs ------------------------------------------------
+
+
+def _push_one_file(repo: Path, name: str) -> str:
+    """Commit one file on develop, run the hook for that push, and return its stdout."""
+    base = _git(repo, "rev-parse", "HEAD")
+    head = _commit(repo, {name: "r\n"})
+    result, _ = _run_pre_push(repo, _line(head, base))
+    assert result.returncode == 0, result.stderr
+    return result.stdout
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        ".agents/tasks/T-0002-new-task.md",
+        ".agents/tasks/reports/T-0002.md",
+        ".agents/tasks/reports/deep/er/T-0002.md",
+        ".agents/tasks/BACKLOG.md",
+        ".agents/tasks/.counter",
+        ".agents/LESSONS.md",
+        ".agents/plans/2026-10-05-a-plan.md",
+        ".agents/plans/sub/dir/plan.md",
+    ],
+)
+def test_each_record_path_alone_skips_gate(repo: Path, name: str) -> None:
+    out = _push_one_file(repo, name)
+    assert "skipping gate" in out
+    assert _gate_calls(repo) == []
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        ".agents/README.md",
+        ".agents/tasks/templates/task.md",
+        ".agents/tasks/scripts/task.py",
+        ".agents/tasks/notes.md",
+        ".agents/other/T-0002.md",
+        ".agents/tasks/sub/T-0002.md",
+        ".agents/tasks/T-0002/inner.md",
+        ".agents/LESSONS.md.bak",
+    ],
+)
+def test_agents_paths_that_are_not_records_run_gate(repo: Path, name: str) -> None:
+    _push_one_file(repo, name)
+    assert len(_gate_calls(repo)) == 1
+
+
+def test_rename_into_a_record_path_runs_gate(repo: Path) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    (repo / ".agents" / "plans").mkdir(parents=True)
+    _git(repo, "mv", "src/app.py", ".agents/plans/app.py")
+    _git(repo, "commit", "-q", "--no-verify", "-m", "mv")
+    head = _git(repo, "rev-parse", "HEAD")
+    result, ran = _run_pre_push(repo, _line(head, base))
+    assert result.returncode == 0, result.stderr
+    assert ran
+
+
+def _config_with_record_paths(record_paths: str) -> dict[str, str]:
+    """`tooling` for `_run_pre_push`: the real config with its RECORD_PATHS replaced."""
+    real = (SCRIPTS / "config" / "gate.sh").read_text(encoding="utf-8")
+    kept = [ln for ln in real.splitlines() if not ln.startswith("RECORD_PATHS=")]
+    kept.append(f'RECORD_PATHS="{record_paths}"')
+    return {"config/gate.sh": "\n".join(kept) + "\n"}
+
+
+def test_pre_push_skips_a_path_the_config_adds_to_record_paths(repo: Path) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    head = _commit(repo, {"notes/n.md": "n\n", "notes/deep/m.md": "m\n"})
+    tooling = _config_with_record_paths("notes/**")
+    result, ran = _run_pre_push(repo, _line(head, base), tooling=tooling)
+    assert result.returncode == 0, result.stderr
+    assert not ran
+    assert "skipping gate" in result.stdout
+
+
+def test_pre_push_gates_a_path_the_config_removes_from_record_paths(
+    repo: Path,
+) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    head = _commit(repo, {"notes/n.md": "n\n", ".agents/plans/p.md": "p\n"})
+    tooling = _config_with_record_paths("notes/**")
+    result, ran = _run_pre_push(repo, _line(head, base), tooling=tooling)
+    assert result.returncode == 0, result.stderr
+    assert ran
+
+
+def test_develop_push_asks_for_a_record_of_the_pushed_sha(repo: Path) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    head = _commit(repo, {"src/app.py": "x = 2\n"})
+    result, _ = _run_pre_push(repo, _line(head, base))
+    assert result.returncode == 0, result.stderr
+    assert _gate_calls(repo) == [f"--if-needed {head}"]
+
+
+def test_main_push_asks_for_a_record_of_the_pushed_sha(repo: Path) -> None:
+    first = _git(repo, "rev-parse", "HEAD")
+    head = _commit(repo, {"src/app.py": "x = 2\n"})
+    line = _ref_line(head, first, "refs/heads/main", "refs/heads/main")
+    result, _ = _run_pre_push(repo, line)
+    assert result.returncode == 0, result.stderr
+    assert _gate_calls(repo) == [f"--if-needed {head}"]
+
+
+def test_first_push_of_develop_asks_for_a_record(repo: Path) -> None:
+    head = _commit(repo, {"src/app.py": "x = 2\n"})
+    result, _ = _run_pre_push(repo, _line(head, ZERO))
+    assert result.returncode == 0, result.stderr
+    assert _gate_calls(repo) == [f"--if-needed {head}"]
+
+
+def test_main_and_develop_pushed_together_pass_every_sha_and_skip_deleted_refs(
+    repo: Path,
+) -> None:
+    first = _git(repo, "rev-parse", "HEAD")
+    main_head = _commit(repo, {"src/app.py": "x = 2\n"})
+    develop_head = _commit(repo, {"src/app.py": "x = 3\n"})
+    stdin = (
+        _ref_line(main_head, first, "refs/heads/main", "refs/heads/main")
+        + _line(develop_head, first)
+        + f"(delete) {ZERO} refs/heads/develop-old {first}\n"
+    )
+    result, _ = _run_pre_push(repo, stdin)
+    assert result.returncode == 0, result.stderr
+    assert _gate_calls(repo) == [f"--if-needed {main_head} {develop_head}"]
+
+
+@pytest.mark.parametrize("remote_sha_is_new", [True, False])
+def test_task_branch_push_runs_only_the_fast_gate(
+    repo: Path, remote_sha_is_new: bool
+) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    _set_origin(repo, "develop", base)
+    _checkout_new(repo, "docs/T-0001-x")
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "docs: change it")
+    remote_sha = ZERO if remote_sha_is_new else base
+    line = _ref_line(
+        head, remote_sha, "refs/heads/docs/T-0001-x", "refs/heads/docs/T-0001-x"
+    )
+    result, _ = _run_pre_push(repo, line)
+    assert result.returncode == 0, result.stderr
+    assert _gate_calls(repo) == ["--fast"]
+
+
+def test_task_branch_and_develop_pushed_together_run_both_modes(repo: Path) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    _set_origin(repo, "develop", base)
+    _checkout_new(repo, "docs/T-0001-x")
+    branch_head = _commit(repo, {"src/app.py": "x = 2\n"}, "docs: change it")
+    develop_head = _commit(repo, {"src/app.py": "x = 3\n"}, "docs: change it again")
+    stdin = _ref_line(
+        branch_head, base, "refs/heads/docs/T-0001-x", "refs/heads/docs/T-0001-x"
+    ) + _line(develop_head, base)
+    result, _ = _run_pre_push(repo, stdin)
+    assert result.returncode == 0, result.stderr
+    assert _gate_calls(repo) == ["--fast", f"--if-needed {develop_head}"]
+
+
+def test_tag_only_push_runs_no_gate(repo: Path) -> None:
+    head = _git(repo, "rev-parse", "HEAD")
+    _git(repo, "tag", "v0.0.1")
+    line = _ref_line(head, ZERO, "refs/tags/v0.0.1", "refs/tags/v0.0.1")
+    result, ran = _run_pre_push(repo, line)
+    assert result.returncode == 0, result.stderr
+    assert not ran
+
+
+def test_tag_pushed_with_a_task_branch_adds_no_gate_call(repo: Path) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    _set_origin(repo, "develop", base)
+    _checkout_new(repo, "docs/T-0001-x")
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "docs: change it")
+    _git(repo, "tag", "v0.0.1")
+    stdin = _ref_line(
+        head, base, "refs/heads/docs/T-0001-x", "refs/heads/docs/T-0001-x"
+    ) + _ref_line(head, ZERO, "refs/tags/v0.0.1", "refs/tags/v0.0.1")
+    result, _ = _run_pre_push(repo, stdin)
+    assert result.returncode == 0, result.stderr
+    assert _gate_calls(repo) == ["--fast"]
+
+
+def test_two_task_branches_run_one_fast_call(repo: Path) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    _set_origin(repo, "develop", base)
+    _checkout_new(repo, "docs/T-0001-x")
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "docs: change it")
+    stdin = _ref_line(
+        head, base, "refs/heads/docs/T-0001-x", "refs/heads/docs/T-0001-x"
+    ) + _ref_line(head, ZERO, "refs/heads/docs/T-0002-y", "refs/heads/docs/T-0002-y")
+    result, _ = _run_pre_push(repo, stdin)
+    assert result.returncode == 0, result.stderr
+    assert _gate_calls(repo) == ["--fast"]
+
+
+def test_failing_fast_gate_blocks_a_task_branch_push(repo: Path) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    _set_origin(repo, "develop", base)
+    _checkout_new(repo, "docs/T-0001-x")
+    head = _commit(repo, {"src/app.py": "x = 2\n"}, "docs: change it")
+    line = _ref_line(head, ZERO, "refs/heads/docs/T-0001-x", "refs/heads/docs/T-0001-x")
+    result, ran = _run_pre_push(repo, line, gate_exit=1)
+    assert ran
+    assert result.returncode != 0
+
+
+def test_failing_if_needed_gate_blocks_a_develop_push(repo: Path) -> None:
+    base = _git(repo, "rev-parse", "HEAD")
+    head = _commit(repo, {"src/app.py": "x = 2\n"})
+    result, ran = _run_pre_push(repo, _line(head, base), gate_exit=1)
+    assert ran
+    assert result.returncode != 0
 
 
 # --- pre-push: changelog fragment check ---------------------------------------
@@ -433,7 +660,7 @@ def test_tag_ref_is_not_checked(repo: Path, remote_ref: str) -> None:
     _git(repo, "tag", "v0.1.0", head)
     result, ran = _run_pre_push(repo, _ref_line(head, ZERO, remote_ref, remote_ref))
     assert result.returncode == 0, result.stderr
-    assert ran
+    assert not ran
     assert "changelog" not in result.stderr
 
 
@@ -745,10 +972,22 @@ def test_push_of_main_alone_is_rejected_when_the_feat_never_had_a_fragment(
 
 
 def _run_pre_commit(
-    repo: Path, gate_exit: int = 0, fix_body: str | None = None
+    repo: Path,
+    gate_exit: int = 0,
+    fix_body: str | None = None,
+    record_paths: str | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], Path, Path]:
-    """Run the hook against the current index; return the result and both marker files."""
+    """Run the hook against the current index; return the result and both marker files.
+
+    `record_paths` replaces RECORD_PATHS in the copied config.
+    """
     gate_marker, fix_marker = _install_gate_stubs(repo, gate_exit)
+    if record_paths is not None:
+        config = repo / "scripts" / "config" / "gate.sh"
+        config.write_text(
+            config.read_text(encoding="utf-8") + f'\nRECORD_PATHS="{record_paths}"\n',
+            encoding="utf-8",
+        )
     if fix_body is not None:
         _stub(
             repo / "scripts" / "autofix.sh", f'echo "$@" > "{fix_marker}"\n{fix_body}'
@@ -871,6 +1110,71 @@ def test_pre_commit_deleting_file_outside_agents_runs_gate(repo: Path) -> None:
     """Parity with pre-push, which lists deletions too: removing src/ code is not a records-only commit."""
     _git(repo, "rm", "-q", "src/app.py")
     result, gate, _ = _run_pre_commit(repo)
+    assert result.returncode == 0, result.stderr
+    assert gate.exists()
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        ".agents/tasks/T-0002-new-task.md",
+        ".agents/tasks/reports/T-0002.md",
+        ".agents/tasks/reports/deep/er/T-0002.md",
+        ".agents/tasks/BACKLOG.md",
+        ".agents/tasks/.counter",
+        ".agents/LESSONS.md",
+        ".agents/plans/2026-10-05-a-plan.md",
+        ".agents/plans/sub/dir/plan.md",
+    ],
+)
+def test_pre_commit_each_record_path_alone_skips_gate(repo: Path, name: str) -> None:
+    _write(repo, {name: "r\n"})
+    _git(repo, "add", "-A")
+    result, gate, fix = _run_pre_commit(repo)
+    assert result.returncode == 0, result.stderr
+    assert not gate.exists()
+    assert not fix.exists()
+    assert "skipping gate" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        ".agents/README.md",
+        ".agents/tasks/templates/task.md",
+        ".agents/tasks/notes.md",
+        ".agents/other/T-0002.md",
+        ".agents/tasks/sub/T-0002.md",
+        ".agents/tasks/T-0002/inner.md",
+    ],
+)
+def test_pre_commit_agents_paths_that_are_not_records_run_gate(
+    repo: Path, name: str
+) -> None:
+    _write(repo, {name: "r\n"})
+    _git(repo, "add", "-A")
+    result, gate, _ = _run_pre_commit(repo)
+    assert result.returncode == 0, result.stderr
+    assert gate.exists()
+    assert "skipping gate" not in result.stdout
+
+
+def test_pre_commit_rename_into_a_record_path_runs_gate(repo: Path) -> None:
+    (repo / ".agents" / "plans").mkdir(parents=True)
+    _git(repo, "mv", "src/app.py", ".agents/plans/app.py")
+    result, gate, _ = _run_pre_commit(repo)
+    assert result.returncode == 0, result.stderr
+    assert gate.exists()
+
+
+def test_pre_commit_skip_rule_follows_record_paths_of_the_config(repo: Path) -> None:
+    _write(repo, {"notes/n.md": "n\n", ".agents/plans/p.md": "p\n"})
+    _git(repo, "add", "notes/n.md")
+    result, gate, _ = _run_pre_commit(repo, record_paths="notes/**")
+    assert result.returncode == 0, result.stderr
+    assert not gate.exists()
+    _git(repo, "add", ".agents/plans/p.md")
+    result, gate, _ = _run_pre_commit(repo, record_paths="notes/**")
     assert result.returncode == 0, result.stderr
     assert gate.exists()
 
@@ -1011,6 +1315,7 @@ def test_gate_config_is_sourceable_by_posix_sh() -> None:
         "MAIN_BRANCH",
         "DEVELOP_BRANCH",
         "STAGED_GLOB",
+        "RECORD_PATHS",
     ]
     script = ". " + shlex.quote(str(SCRIPTS / "config" / "gate.sh")) + "\n"
     script += "".join(f'printf "%s=%s\\n" {name} "${name}"\n' for name in names)

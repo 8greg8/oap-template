@@ -1,11 +1,12 @@
 #!/usr/bin/env sh
 # Two checks run on every push, in this order: the changelog fragment check, then the gate.
 #
-# 1. Skip everything when every pushed commit changes only .agents/ records (task files,
-#    reports, BACKLOG.md, LESSONS.md), as `task.py new` does on each filing. Tooling code
-#    under .agents/tasks/scripts/ always runs the gate. Files are listed per commit, so a
-#    change that a later commit reverts still counts. Anything else runs the full gate: a
-#    file outside .agents/ (including one renamed into it, hence --no-renames), a new remote
+# 1. Skip everything when every pushed commit changes only record paths (RECORD_PATHS in
+#    scripts/config/gate.sh: task files, reports, BACKLOG.md, LESSONS.md, plans), as
+#    `task.py new` does on each filing. Tooling code under .agents/tasks/scripts/ and the
+#    process docs are not records, so they run the gate. Files are listed per commit, so a
+#    change that a later commit reverts still counts. Anything else runs the gate: a file
+#    outside RECORD_PATHS (including one renamed into it, hence --no-renames), a new remote
 #    branch, or a range git cannot list. A merge commit lists its files against its first
 #    parent (--diff-merges=first-parent), so a change made only inside a merge counts.
 #
@@ -28,11 +29,27 @@
 #    no claim about a missing fragment.
 #
 # A failed fragment check rejects the push before the gate starts.
+#
+# The gate depends on the ref. A push of develop or main runs `scripts/gate.sh --if-needed`
+# with every pushed, non-deleted local sha: the full gate runs only for a commit whose code
+# has no gate record, in one call. When the push has any other branch ref (a task branch), one
+# `scripts/gate.sh --fast` call runs as well; the independent verifier's full run follows before
+# a merge. Tags and other non-branch refs trigger no gate.
 # shellcheck disable=SC1091
 . scripts/config/gate.sh
 
 remote=${1:-origin}
 refs=$(cat)
+
+# Every RECORD_PATHS entry becomes a `:(exclude,glob)<entry>` pathspec in "$@", the same
+# matcher gate.sh uses for the key of a gate record. Globbing is off while the string is split.
+# $1 is saved above, so "$@" is free for the list.
+set --
+set -f
+for entry in $RECORD_PATHS; do
+  set -- "$@" ":(exclude,glob)$entry"
+done
+set +f
 
 tasks_only=1
 while read -r local_ref local_sha remote_ref remote_sha; do
@@ -40,12 +57,13 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   case "$local_sha" in *[!0]*) ;; *) continue ;; esac
   # A new remote branch (all-zero remote sha) has no base to diff against.
   case "$remote_sha" in *[!0]*) ;; *) tasks_only=0; break ;; esac
-  if ! changed=$(git log --format= --name-only --no-renames --diff-merges=first-parent "$remote_sha..$local_sha" 2>/dev/null); then
+  # --full-history keeps history simplification from hiding a commit of a merged side branch.
+  # What git prints is every path outside RECORD_PATHS that a commit of the range changes.
+  if ! changed=$(git log --format= --name-only --no-renames --diff-merges=first-parent --full-history "$remote_sha..$local_sha" -- . "$@" 2>/dev/null); then
     tasks_only=0
     break
   fi
-  if printf '%s\n' "$changed" | grep -q -v -e '^\.agents/' -e '^$' \
-      || printf '%s\n' "$changed" | grep -q '^\.agents/tasks/scripts/'; then
+  if [ -n "$changed" ]; then
     tasks_only=0
     break
   fi
@@ -54,7 +72,7 @@ $refs
 EOF
 
 if [ "$tasks_only" = 1 ]; then
-  echo "pre-push: only .agents/ records changed; skipping gate."
+  echo "pre-push: only record paths changed; skipping gate."
   exit 0
 fi
 
@@ -104,4 +122,26 @@ if [ "$fragment_failed" = 1 ] || [ "$check_failed" = 1 ]; then
   exit 1
 fi
 
-exec scripts/gate.sh
+# develop and main need a gate record for every pushed commit; any other branch runs --fast.
+# The shas go in as the "--if-needed" argument list; no sha contains a space.
+needed=""
+fast=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in *[!0]*) ;; *) continue ;; esac
+  case "$remote_ref" in
+    "refs/heads/$MAIN_BRANCH" | "refs/heads/$DEVELOP_BRANCH") needed="$needed $local_sha" ;;
+    refs/heads/*) fast=1 ;;
+    *) ;;
+  esac
+done <<EOF
+$refs
+EOF
+
+if [ "$fast" = 1 ]; then
+  scripts/gate.sh --fast || exit 1
+fi
+if [ -n "$needed" ]; then
+  # shellcheck disable=SC2086
+  scripts/gate.sh --if-needed $needed || exit 1
+fi
+exit 0

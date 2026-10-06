@@ -39,6 +39,8 @@ ls -l .husky                          # hook files should be executable
 scripts/gate.sh              # run all 4 verify gates (lint, format check, typecheck, test)
 scripts/gate.sh --fast       # skip tests, for a quick iteration loop (not a substitute for the full gate)
 scripts/gate.sh --staged     # lint/format/typecheck only staged files matching STAGED_GLOB; no tests
+scripts/gate.sh --if-needed [<commit>...]   # skip the full gate for a commit that already has a gate
+                             # record, run it otherwise (default HEAD); exit 0 only if all pass
 scripts/autofix.sh           # apply lint autofix + formatting, then re-run scripts/gate.sh
 scripts/autofix.sh --staged  # same, but only on staged files matching STAGED_GLOB
 
@@ -60,7 +62,8 @@ scripts/release.py --yes --version v1.0.0   # override the version (canonical vX
                                      # --yes and --push are "Ask first" items in CLAUDE.md
 
 scripts/gitflow.sh feature start <topic>    # worktree + branch from develop
-scripts/gitflow.sh feature finish <topic>   # changelog check, gate, merge to develop, clean up worktree
+scripts/gitflow.sh feature finish <topic>   # changelog check, merge to develop, gate --if-needed HEAD (undo the
+                                            # merge on red), clean up worktree
 scripts/gitflow.sh bugfix  start|finish <topic>
 scripts/gitflow.sh hotfix  start|finish <topic>   # from/into main, with back-merge to develop;
                                                   # then push both and run release.py --yes on main
@@ -71,12 +74,39 @@ scripts/gitflow.sh docs|chore|fix start|finish <T-NNNN-slug>   # task branches, 
 
 | Hook | Runs |
 |---|---|
-| `pre-commit` | `autofix.sh --staged`, re-stages the files that were staged, then `gate.sh --staged` (no tests). Skipped when only `.agents/` records are staged |
+| `pre-commit` | `autofix.sh --staged`, re-stages the files that were staged, then `gate.sh --staged` (no tests). Skipped when only `RECORD_PATHS` paths are staged |
 | `commit-msg` | `commit_lint.py` against the message being committed (lines <= 100 chars) |
-| `pre-push` | `changelog.py check` for each pushed branch, then the full `gate.sh`. Both are skipped when every pushed commit changes only `.agents/` records |
+| `pre-push` | `changelog.py check` for each pushed branch, then the gate: one `gate.sh --if-needed <sha>...` call for `develop` and `main`, one `gate.sh --fast` call when the push has any other branch ref, no gate for tags. All are skipped when every pushed commit changes only `RECORD_PATHS` paths |
 
-Code under `.agents/tasks/scripts/` is never skipped by either hook. A new remote branch, or a
-range git cannot list, always runs the full gate.
+`RECORD_PATHS` in `config/gate.sh` lists the bookkeeping paths (task files, reports, `BACKLOG.md`, the
+task counter, `LESSONS.md` and plans) as one space-separated string of git glob pathspecs. Both hooks
+skip a change that touches only those, and `gate.sh` leaves them out of the key. All three exclude
+each entry as a `:(exclude,glob)<entry>` pathspec. Task tooling under `.agents/tasks/scripts/`, the
+templates and the process docs are code, never skipped. A new remote branch, or a range git cannot
+list, never takes the skip.
+
+### Gate records
+
+A full `gate.sh` run that passes on a tree that is clean before and after (`git status
+--porcelain --untracked-files=all` empty) writes the file
+`$(git rev-parse --git-common-dir)/gate-pass/<key>` and prints `gate record <key> (slow tests: yes)`
+before `gate clean`. The file holds `key=`, `commit=`, `slow=yes|no` and `date=` lines. The key is a
+hash of the commit's tree listing without the `RECORD_PATHS` entries, followed by one line each from
+`uv --version`, `uv run python -VV`, `git --version` and `node -v`. A change to a record path keeps
+the key; a change to any other tracked file or to a tool version changes it. `--fast`, `--staged`, a
+failed run and a dirty run never write a record, and a dirty run says why. Records are local files,
+never committed, and every worktree of the repository shares them.
+
+`gate.sh --if-needed [<commit>...]` looks for a record per commit (default `HEAD`) and skips the full
+gate for each commit that has one. For a commit without a record it runs the commit's own full gate
+on the working tree when that commit is checked out and the tree is clean, and otherwise in a
+temporary detached worktree of that commit, removed afterwards. It never refuses for want of a
+checkout; it unsets the git environment variables a hook may have set and removes the worktree on
+exit. An independent verifier does not rely on a record: it runs the plain `gate.sh` and so
+writes the record that the later steps reuse. `release.py --yes --push` after a hotfix passes the
+hook: the release commit on the checked-out `main` is gated on the checkout, and the back-merge on
+`develop` in a temporary worktree. `gitflow.sh finish` runs `gate.sh --if-needed HEAD` after each
+merge it makes and undoes the merge with `git reset --merge ORIG_HEAD` when the gate is red.
 
 The fragment check in `pre-push` takes its range from the remote ref being updated: for `main` and
 `develop`, `<remote sha>..<local sha>` (a first push of either is not checked); for `hotfix/*`, from

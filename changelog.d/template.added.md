@@ -17,7 +17,7 @@
   `hotfix/*`), and `main` and `develop` from the remote commit to the pushed one. It checks against
   the remote the push goes to, not always `origin`. It reports "changelog check failed (exit N)"
   for any exit status other than a real finding, so a failed check is not mistaken for a missing
-  fragment. Tags, deleted refs and `.agents/`-only pushes are not checked.
+  fragment. Tags, deleted refs and `RECORD_PATHS`-only pushes are not checked.
 - A strict changelog fragment format. A fragment may hold only bullet lines, indented continuation
   lines directly after a bullet and blank lines, so unchecked text cannot reach `CHANGELOG.md`. A
   fragment with no bullet or with a placeholder bullet is rejected. Fragments are decoded strictly
