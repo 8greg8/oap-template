@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-34 lesson(s) across 17 section(s). Generated 2026-10-06.
+35 lesson(s) across 17 section(s). Generated 2026-10-06.
 
 ## Tag index
 
@@ -36,16 +36,16 @@ to all lessons that carry it.
 - `file-mode` — [T-0009](#t-0009-success)
 - `file-modes` — [T-0007](#t-0007-success)
 - `filter-repo` — [T-0020](#t-0020-success)
-- `gate` — [T-0004](#t-0004-success), [T-0018](#t-0018-success), [T-0033](#t-0033-success)
+- `gate` — [T-0004](#t-0004-success), [T-0018](#t-0018-success), [T-0033](#t-0033-success), [T-0034](#t-0034-success)
 - `git` — [T-0007](#t-0007-success), [T-0012](#t-0012-success)
-- `git-pathspec` — [T-0008](#t-0008-success), [T-0033](#t-0033-success)
+- `git-pathspec` — [T-0008](#t-0008-success), [T-0033](#t-0033-success), [T-0034](#t-0034-success)
 - `git-publish` — [T-0002](#t-0002-success)
 - `git-worktree` — [T-0010](#t-0010-success), [T-0011](#t-0011-success)
 - `gitflow` — [T-0004](#t-0004-success), [T-0011](#t-0011-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0028](#t-0028-success), [T-0033](#t-0033-success)
 - `history-rewrite` — [T-0020](#t-0020-success)
 - `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success), [T-0028](#t-0028-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success), [T-0033](#t-0033-success)
 - `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success), [T-0035](#t-0035-success)
-- `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success), [T-0033](#t-0033-success)
+- `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success), [T-0033](#t-0033-success), [T-0034](#t-0034-success)
 - `init` — [T-0027](#t-0027-success)
 - `init-project` — [T-0021](#t-0021-success), [T-0025](#t-0025-success)
 - `init-script` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
@@ -59,6 +59,8 @@ to all lessons that carry it.
 - `pre-push` — [T-0023](#t-0023-success)
 - `process` — [T-0005](#t-0005-success)
 - `public-release` — [T-0019](#t-0019-success), [T-0020](#t-0020-success)
+- `pytest-marker` — [T-0034](#t-0034-success)
+- `records` — [T-0034](#t-0034-success)
 - `release` — [T-0024](#t-0024-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success), [T-0032](#t-0032-success)
 - `rename` — [T-0015](#t-0015-success)
 - `report-gate` — [T-0001](#t-0001-success)
@@ -70,6 +72,7 @@ to all lessons that carry it.
 - `seeding` — [T-0017](#t-0017-success)
 - `set-status` — [T-0001](#t-0001-success)
 - `shebang` — [T-0009](#t-0009-success)
+- `slow-tests` — [T-0034](#t-0034-success)
 - `staged-files` — [T-0012](#t-0012-success)
 - `task-scripts` — [T-0009](#t-0009-success)
 - `task-state` — [T-0016](#t-0016-success)
@@ -287,6 +290,16 @@ Source: [`reports/T-0025.md`](tasks/reports/T-0025.md)
 Tags: `gate`, `hooks`, `husky`, `gitflow`, `git-pathspec`, `worktree`
 
 Source: [`reports/T-0033.md`](tasks/reports/T-0033.md)
+
+### T-0034 (success)
+
+- A scratch repo for slow-selection tests needs an `origin/develop` ref at the old tip, or the base is the local `develop` and a fast-forwarded branch has an empty change set (which runs the slow tests).
+- `git ls-files --others` and `git diff --name-only` both accept the `:(exclude,glob)` pathspecs, so one pathspec list serves records, the hook and the slow-test safe list.
+- A heredoc terminator such as EOF inside a Python heredoc ends the shell heredoc early; write scripts that contain shell heredocs to a file with a different delimiter.
+
+Tags: `gate`, `slow-tests`, `pytest-marker`, `husky`, `git-pathspec`, `records`
+
+Source: [`reports/T-0034.md`](tasks/reports/T-0034.md)
 
 ## git
 
