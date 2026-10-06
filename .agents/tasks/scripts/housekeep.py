@@ -53,6 +53,9 @@ _BRANCH_RE = re.compile(
     r"^(" + "|".join(re.escape(t) for t in TYPES) + r")/(T-\d{4,})-.+$"
 )
 
+#: Task statuses whose branches and worktrees are leftovers once they still exist.
+FINISHED_STATUSES = frozenset({"done", "abandoned"})
+
 #: Default staleness threshold for a task sitting in ``review``.
 DEFAULT_REVIEW_DAYS = 7
 
@@ -393,18 +396,63 @@ def is_branch_merged(branch: str, base: str = INTEGRATION_BRANCH) -> bool:
     return _git("merge-base", "--is-ancestor", branch, base).returncode == 0
 
 
-def check_worktrees() -> list[str]:
-    """Audit local worktrees for stale merged branches and misplaced integration branches.
+def _local_branches() -> list[str]:
+    """List the local branch names.
 
-    Flags two independent problems:
+    Returns:
+        Short names of every ref under ``refs/heads/``; empty if git fails.
+    """
+    result = _git("for-each-ref", "--format=%(refname:short)", "refs/heads/")
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def _finished_task_ids() -> dict[str, str]:
+    """Map the ID of every ``done`` or ``abandoned`` task to its status.
+
+    Returns:
+        ``{task id: status}`` for the tasks whose work is over.
+    """
+    return {
+        task.id.upper(): task.status
+        for task in load_tasks()
+        if task.status in FINISHED_STATUSES
+    }
+
+
+def _task_id_of_branch(branch: str) -> str:
+    """Return the task ID a task branch name carries, or ``""`` for any other branch.
+
+    Args:
+        branch: Local branch name.
+
+    Returns:
+        The upper-case task ID, e.g. ``T-0035``.
+    """
+    match = _BRANCH_RE.match(branch)
+    return match.group(2).upper() if match else ""
+
+
+def check_worktrees() -> list[str]:
+    """Audit local worktrees and branches for leftovers and misplaced integration branches.
+
+    Flags four independent problems:
 
     - A secondary worktree whose branch has commits and is already merged into
       ``develop`` but was never removed with ``git worktree remove`` (the cleanup step
       documented in ``.agents/README.md``'s execution loop and
       ``CONTRIBUTING.md``'s Worktrees section).
+    - A secondary worktree on the branch of a task that is ``done`` or ``abandoned``,
+      merged or not.
+    - A local branch of a ``done`` or ``abandoned`` task that has no secondary worktree,
+      merged or not.
     - Any worktree holding `develop`/`main` checked out that is not the
       primary checkout -- these must only ever live in the primary checkout
       (see ``CONTRIBUTING.md`` § Worktrees).
+
+    A worktree that is both merged and on a finished task's branch yields one finding.
+    The check only reports; it never removes a worktree or deletes a branch.
 
     Returns:
         One finding per problem, in the same style as the other checks.
@@ -415,11 +463,14 @@ def check_worktrees() -> list[str]:
         return findings
 
     primary_path = worktrees[0]["path"]
+    finished = _finished_task_ids()
+    in_secondary: set[str] = set()
 
     for worktree in worktrees[1:]:
         path, branch = worktree["path"], worktree["branch"]
         if not branch:
             continue  # detached HEAD -- nothing to say about it here
+        in_secondary.add(branch)
 
         if branch in ("develop", "main"):
             findings.append(
@@ -429,11 +480,39 @@ def check_worktrees() -> list[str]:
             )
             continue
 
-        if is_branch_merged(branch):
+        task_id = _task_id_of_branch(branch)
+        task_note = (
+            f"task {task_id} is {finished[task_id]}" if task_id in finished else ""
+        )
+        merged = is_branch_merged(branch)
+        if merged:
+            suffix = f" ({task_note})" if task_note else ""
             findings.append(
                 f"WORKTREE {path}: branch {branch!r} is merged into {INTEGRATION_BRANCH} "
-                f"but the worktree was never removed -- run: git worktree remove {path}"
+                f"but the worktree was never removed{suffix} -- run: "
+                f"git worktree remove {path}"
             )
+        elif task_note:
+            findings.append(
+                f"WORKTREE {path}: branch {branch!r} is not merged into "
+                f"{INTEGRATION_BRANCH} but {task_note} -- confirm the work is not "
+                f"needed, then run: git worktree remove {path}"
+            )
+
+    for branch in _local_branches():
+        task_id = _task_id_of_branch(branch)
+        if task_id not in finished or branch in in_secondary:
+            continue
+        state = (
+            f"merged into {INTEGRATION_BRANCH}"
+            if is_branch_merged(branch)
+            else f"not merged into {INTEGRATION_BRANCH}"
+        )
+        findings.append(
+            f"BRANCH {branch}: local branch of {task_id}, which is {finished[task_id]}; "
+            f"it is {state} and has no secondary worktree -- delete it with "
+            "git branch -d once nothing needs it"
+        )
 
     return findings
 
@@ -535,7 +614,10 @@ def parse_args(argv=None):
 
     sub.add_parser(
         "worktrees",
-        help="Flag merged-but-not-removed worktrees and develop/main in a secondary worktree.",
+        help=(
+            "Flag leftover worktrees and local branches of merged, done or abandoned "
+            "tasks, and develop/main in a secondary worktree."
+        ),
     )
 
     all_cmd = sub.add_parser(

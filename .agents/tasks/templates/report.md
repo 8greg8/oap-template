@@ -38,10 +38,16 @@ uv run pytest tests/integration :: not run (no test data mount)
 ```
 
 End the list with the independent-verify line in exactly this form. The
-orchestrator replaces `pending` with `passed (commit <hash>)`, naming the commit
-verified, or with `failed` or `blocked`. Do not state the verify status in
-`## Summary`; the verify line records it. A `done` task whose
-line says `not run` or `pending` fails `report.py validate`.
+orchestrator replaces `pending` with `passed (commit <hash>; gate <record-key>;
+<counts>)`, or with `failed` or `blocked`. `<hash>` is the commit verified.
+`<record-key>` is the key of the gate record the verifier's full gate run wrote
+(a 40 or 64 character lowercase hex digest; cite at least 12 of its
+characters). `<counts>` is the verifier's own result, such as the number
+of tests passed. The `gate <record-key>` part is optional: reports written before
+it existed use `passed (commit <hash>; <counts>)` and still validate, but a part
+that starts with `gate ` must hold a well-formed key. Do not state the verify
+status in `## Summary`; the verify line records it. A `done` task whose line says
+`not run` or `pending` fails `report.py validate`.
 
 ```
 Independent verify agent (fresh context) :: pending
