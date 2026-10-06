@@ -1,7 +1,7 @@
 ---
 id: T-0036
 title: Rewrite the verification rules for one verifier per change
-status: in_progress
+status: review
 type: docs
 priority: medium
 depends_on: [T-0033, T-0034, T-0035]
