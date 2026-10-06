@@ -57,8 +57,9 @@ the placeholders (`<repo_name>`, mission, architecture) for your actual reposito
   `CONTRIBUTING.md`, and `PYTHON_CONVENTIONS.md` are the machine-readable contract.
 - **Work is PR-sized and evidence-based.** A task names its goal, scope, and explicit non-goals; a
   report states exactly what ran and what passed, failed, or wasn't run — never "looks good."
-- **Verification is never self-certified.** An independent check (verify/resolve loop, or a
-  separate reviewing agent) confirms a change before it's committed.
+- **Verification is never self-certified.** One independent verifier checks each finished branch,
+  running the full gate itself, before it merges. The executor iterates with `scripts/gate.sh
+  --fast` and commits freely; there is no verifier per commit.
 - **Non-goals are guardrails, not decoration.** Naming what a task must *not* touch is treated as
   seriously as naming what it must do.
 

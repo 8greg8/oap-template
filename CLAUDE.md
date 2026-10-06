@@ -89,7 +89,9 @@ Within a single task, an agent proceeds end-to-end without stopping for confirma
 - Creating a worktree and branch for the task (`scripts/gitflow.sh`, see `CONTRIBUTING.md` §
   Worktrees for agents).
 - Implementing the change.
-- Running (or being run through) the verify/resolve loop until clean.
+- Iterating with `scripts/gate.sh --fast` and targeted tests, running the full gate whenever it
+  helps, and committing freely. The one independent verify of the finished branch follows (§
+  Verification is not optional).
 - Adding a dev-only dependency (linting/testing tooling) needed to do the above.
 - Writing the commit per Conventional Commits rules in `CONTRIBUTING.md`.
 - Merging to the branch's correct target (`develop` or `main`) and pushing, per branch type —
@@ -100,9 +102,9 @@ Within a single task, an agent proceeds end-to-end without stopping for confirma
   action requiring confirmation; `git branch -d` refuses on an unmerged branch, so the check is
   built into the command.
 
-This is the default flow — do not pause mid-workflow to ask "should I commit now?" or "should I
-merge now?" if the verify/resolve loop is clean and the branch/commit rules in `CONTRIBUTING.md`
-are being followed exactly.
+This is the default flow — do not pause mid-workflow to ask "should I commit now?", and do not
+ask "should I merge now?" once the independent verify of the finished branch is clean and the
+branch/commit rules in `CONTRIBUTING.md` are being followed exactly.
 
 ## Ask first — what agents never do unilaterally
 
@@ -143,11 +145,30 @@ reinterpreting the instructions to fit.
 
 ## Verification is not optional
 
-An agent never certifies its own change as done. The verify step in `CONTRIBUTING.md`'s
-verify/resolve loop must be run by an independent agent invocation (fresh context) — an agent
-should not skip straight from "I made the edit" to "I'm committing" without that separate check
-having actually run and reported clean. That outcome then belongs in the task's report (see
-`.agents/tasks/templates/report.md`), gate by gate — not summarized away.
+An agent never certifies its own change as done. Every change gets exactly one independent
+verifier, which checks the finished, pushed branch. There is no verifier per commit. The executor
+iterates with `scripts/gate.sh --fast` and targeted tests, may run the full gate whenever it
+wants, and commits freely; its own runs certify nothing.
+
+- The verifier is an agent invocation in a fresh context (§ Merge authority defines it). It runs
+  the full gate itself (`scripts/gate.sh`, never `--if-needed`), so a record an executor wrote
+  never stands in for its run. It also does the judgment checks in `.agents/README.md` § "Verify,
+  resolve, merge": acceptance criteria, `touches`, spec-first discipline, the changelog fragment
+  and commit types, breaking changes and "Ask first" items.
+- The verifier's own full run is the canonical one. It writes the gate record that the later
+  mechanical steps reuse (the post-merge check, pushes to `develop` and `main`,
+  `scripts/gitflow.sh finish`). Only `scripts/gate.sh` writes a record. Never create, copy or edit
+  one by hand.
+- The outcome belongs in the task's report (see `.agents/tasks/templates/report.md`), gate by
+  gate, with the record key in the verify line — not summarized away.
+- A fix round gets a new verifier. It checks the earlier findings and the diff since the verified
+  commit, runs the full gate for the new head (or cites a record that an earlier independent
+  verifier's run wrote for the same code), and rechecks `touches` and "Ask first" for the whole
+  branch, since a fix can break a criterion that already passed.
+- A commit that changes only bookkeeping records (`RECORD_PATHS` in `scripts/config/gate.sh`: task
+  files, reports, `BACKLOG.md`, `LESSONS.md`, plans) needs no independent verification and no gate;
+  the hooks skip it. A plan or task file written for the owner keeps one independent review
+  before it is merged.
 
 ## Chatter vs. persisted output
 
@@ -222,15 +243,16 @@ only; tests cannot run there. See `.devcontainer/README.md`.
 
 The orchestrator merges a task branch into `develop` by default. No written grant is needed. The
 one precondition is a passed independent verify of the pushed branch by an independent verifier
-(fresh context; see § Verification is not optional). The independent verifier is an agent that is
-neither the task's executor, nor the executor of any fix round, nor the orchestrator doing the
-merge.
+(fresh context; see § Verification is not optional), one verifier per task per round. The
+independent verifier is an agent that is neither the task's executor, nor the executor of any fix
+round, nor the orchestrator doing the merge.
 
 - An executor never merges its own work and never verifies its own change.
 - The orchestrator follows `.agents/README.md` § "The execution loop", including the merge steps.
   It never merges without a passed independent verify and never force-pushes.
-- After the merge it reruns the full gate (`scripts/gate.sh`) on `develop`. If that is red after
-  the push, it reverts the merge as a new commit and blocks the task.
+- After the merge it runs `scripts/gate.sh --if-needed` on `develop`. The verifier's gate record
+  covers a merge whose code equals the verified branch's code; any other merge runs the full gate.
+  If the check is red after the push, it reverts the merge as a new commit and blocks the task.
 - A task that fails verification three times is `blocked` and is not merged.
 - Orchestrator edits to task files are limited to these three: `task.py set-status`; widening a
   task's `touches`, with the reason recorded in the task's report; and, before dispatch, amending

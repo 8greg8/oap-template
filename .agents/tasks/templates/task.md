@@ -73,10 +73,12 @@ TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
   `develop`, whatever Conventional Commits `type` prefixes it — a genuine
   production hotfix is the separate, human-initiated `hotfix/` flow in
   `CONTRIBUTING.md`, not a task-driven branch.
-- Commit only files related to this task, using Conventional Commits.
+- Commit only files related to this task, using Conventional Commits. Iterate with
+  `scripts/gate.sh --fast` and targeted tests and commit freely. Do not spawn a verifier: your own
+  gate runs certify nothing.
 - Write the report to `.agents/tasks/reports/{id}.md` and commit it on this branch.
-- Push the branch. **Do not merge.** Do not open a pull request. The orchestrator merges after an
-  independent verify by a different agent.
+- Push the branch. **Do not merge.** Do not open a pull request. The orchestrator merges after one
+  independent verify of the pushed branch by a different agent, which runs the full gate itself.
 - Do not hand-edit `.agents/tasks/BACKLOG.md` or any other task's file — the
   orchestrator owns backlog state. Regenerating `BACKLOG.md` with `backlog.py
   reindex` to reflect this task's own status change is expected, and is not an
