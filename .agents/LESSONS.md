@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-36 lesson(s) across 18 section(s). Generated 2026-10-06.
+38 lesson(s) across 19 section(s). Generated 2026-10-06.
 
 ## Tag index
 
@@ -26,6 +26,7 @@ to all lessons that carry it.
 - `chore` — [T-0020](#t-0020-success)
 - `claude-md` — [T-0036](#t-0036-success)
 - `code-of-conduct` — [T-0021](#t-0021-success)
+- `comments` — [T-0038](#t-0038-success)
 - `commit` — [T-0018](#t-0018-success)
 - `commit-lint` — [T-0004](#t-0004-success)
 - `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
@@ -37,7 +38,7 @@ to all lessons that carry it.
 - `file-mode` — [T-0009](#t-0009-success)
 - `file-modes` — [T-0007](#t-0007-success)
 - `filter-repo` — [T-0020](#t-0020-success)
-- `gate` — [T-0004](#t-0004-success), [T-0018](#t-0018-success), [T-0033](#t-0033-success), [T-0034](#t-0034-success)
+- `gate` — [T-0004](#t-0004-success), [T-0018](#t-0018-success), [T-0033](#t-0033-success), [T-0034](#t-0034-success), [T-0037](#t-0037-success)
 - `gate-records` — [T-0036](#t-0036-success)
 - `git` — [T-0007](#t-0007-success), [T-0012](#t-0012-success)
 - `git-pathspec` — [T-0008](#t-0008-success), [T-0033](#t-0033-success), [T-0034](#t-0034-success)
@@ -49,7 +50,7 @@ to all lessons that carry it.
 - `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success), [T-0035](#t-0035-success)
 - `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success), [T-0033](#t-0033-success), [T-0034](#t-0034-success)
 - `init` — [T-0027](#t-0027-success)
-- `init-project` — [T-0021](#t-0021-success), [T-0025](#t-0025-success)
+- `init-project` — [T-0021](#t-0021-success), [T-0025](#t-0025-success), [T-0037](#t-0037-success)
 - `init-script` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
 - `merge-authority` — [T-0013](#t-0013-success), [T-0014](#t-0014-success)
 - `method-text` — [T-0014](#t-0014-success)
@@ -60,16 +61,17 @@ to all lessons that carry it.
 - `pre-commit` — [T-0008](#t-0008-success)
 - `pre-push` — [T-0023](#t-0023-success)
 - `process` — [T-0005](#t-0005-success)
-- `process-docs` — [T-0036](#t-0036-success)
+- `process-docs` — [T-0036](#t-0036-success), [T-0038](#t-0038-success)
 - `public-release` — [T-0019](#t-0019-success), [T-0020](#t-0020-success)
 - `pytest-marker` — [T-0034](#t-0034-success)
+- `readme` — [T-0037](#t-0037-success)
 - `records` — [T-0034](#t-0034-success)
 - `release` — [T-0024](#t-0024-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success), [T-0032](#t-0032-success)
 - `rename` — [T-0015](#t-0015-success)
 - `report-gate` — [T-0001](#t-0001-success)
 - `report-validation` — [T-0003](#t-0003-success), [T-0035](#t-0035-success)
 - `ruff` — [T-0007](#t-0007-success)
-- `scripts` — [T-0012](#t-0012-success), [T-0022](#t-0022-success)
+- `scripts` — [T-0012](#t-0012-success), [T-0022](#t-0022-success), [T-0038](#t-0038-success)
 - `scrub` — [T-0019](#t-0019-success)
 - `security-policy` — [T-0021](#t-0021-success)
 - `seeding` — [T-0017](#t-0017-success)
@@ -86,6 +88,7 @@ to all lessons that carry it.
 - `uv` — [T-0006](#t-0006-success)
 - `verification` — [T-0036](#t-0036-success)
 - `verify-line` — [T-0035](#t-0035-success)
+- `verify-resolve` — [T-0038](#t-0038-success)
 - `versioning` — [T-0024](#t-0024-success), [T-0026](#t-0026-success)
 - `workflow` — [T-0013](#t-0013-success)
 - `worktree` — [T-0002](#t-0002-success), [T-0033](#t-0033-success), [T-0035](#t-0035-success)
@@ -361,6 +364,19 @@ Tags: `housekeep`, `report-validation`, `verify-line`, `worktree`
 
 Source: [`reports/T-0035.md`](tasks/reports/T-0035.md)
 
+## init-project
+
+### T-0037 (success)
+
+- Create the report after the full gate finishes, or the untracked file makes the tree dirty and
+  the run writes no gate record.
+- `gitflow.sh <type> start` leaves the worktree without `.husky/_` when the primary checkout has no
+  `node_modules`. Run `npm ci` in the worktree before the first commit.
+
+Tags: `init-project`, `readme`, `gate`
+
+Source: [`reports/T-0037.md`](tasks/reports/T-0037.md)
+
 ## init-script
 
 ### T-0015 (success)
@@ -460,6 +476,14 @@ Source: [`reports/T-0003.md`](tasks/reports/T-0003.md)
 Tags: `scripts`, `bash`, `git`, `nul-safe`, `staged-files`
 
 Source: [`reports/T-0012.md`](tasks/reports/T-0012.md)
+
+### T-0038 (success)
+
+`scripts/gitflow.sh docs start T-NNNN-<slug>` creates a task worktree with hooks and `node_modules` already wired. Commit signing worked in this run, so no environment override was needed.
+
+Tags: `scripts`, `comments`, `process-docs`, `verify-resolve`
+
+Source: [`reports/T-0038.md`](tasks/reports/T-0038.md)
 
 ## task-scripts
 

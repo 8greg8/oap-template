@@ -6,7 +6,7 @@
 
 38 task(s). Generated 2026-10-06.
 
-| open: 0 | in_progress: 0 | blocked: 0 | review: 2 | done: 36 | abandoned: 0 |
+| open: 0 | in_progress: 0 | blocked: 0 | review: 0 | done: 38 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -49,8 +49,8 @@
 | T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | done | low | chore | — | [report](reports/T-0009.md) |
 | T-0010 | [Fix agent-doc wording and stale AGENTS.md references](T-0010-fix-agent-doc-wording-and-stale-agents-md.md) | done | low | docs | — | [report](reports/T-0010.md) |
 | T-0011 | [Support docs and chore task branches in gitflow and fix housekeep worktrees](T-0011-support-docs-and-chore-task-branches-in-gitflow.md) | done | low | fix | — | [report](reports/T-0011.md) |
-| T-0037 | [Fix the generated README's per-commit gate advice](T-0037-fix-the-generated-readme-s-per-commit-gate.md) | review | low | fix | — | — |
-| T-0038 | [Update the stale verify-resolve loop comments in scripts](T-0038-update-the-stale-verify-resolve-loop-comments.md) | review | low | docs | — | — |
+| T-0037 | [Fix the generated README's per-commit gate advice](T-0037-fix-the-generated-readme-s-per-commit-gate.md) | done | low | fix | — | [report](reports/T-0037.md) |
+| T-0038 | [Update the stale verify-resolve loop comments in scripts](T-0038-update-the-stale-verify-resolve-loop-comments.md) | done | low | docs | — | [report](reports/T-0038.md) |
 
 ## Ready to dispatch
 
