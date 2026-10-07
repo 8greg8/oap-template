@@ -1,7 +1,7 @@
 ---
 id: T-0040
 title: Fix: remove the unlicensed bundled OAP text from the release
-status: open
+status: done
 type: fix
 priority: medium
 depends_on: []

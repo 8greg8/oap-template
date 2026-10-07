@@ -4,9 +4,9 @@
 
 # Task Backlog
 
-39 task(s). Generated 2026-10-07.
+40 task(s). Generated 2026-10-07.
 
-| open: 0 | in_progress: 0 | blocked: 0 | review: 0 | done: 39 | abandoned: 0 |
+| open: 0 | in_progress: 0 | blocked: 0 | review: 0 | done: 40 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
@@ -47,6 +47,7 @@
 | T-0035 | [Report leftover worktrees and record the gate in the verify line](T-0035-report-leftover-worktrees-and-record-the-gate.md) | done | medium | feat | — | [report](reports/T-0035.md) |
 | T-0036 | [Rewrite the verification rules for one verifier per change](T-0036-rewrite-the-verification-rules-for-one-verifier.md) | done | medium | docs | T-0033, T-0034, T-0035 | [report](reports/T-0036.md) |
 | T-0039 | [Replace the bundled OAP method text with a link to its source](T-0039-replace-the-bundled-oap-method-text-with-a-link.md) | done | medium | docs | — | [report](reports/T-0039.md) |
+| T-0040 | [Fix: remove the unlicensed bundled OAP text from the release](T-0040-fix-remove-the-unlicensed-bundled-oap-text-from.md) | done | medium | fix | — | [report](reports/T-0040.md) |
 | T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | done | low | chore | — | [report](reports/T-0009.md) |
 | T-0010 | [Fix agent-doc wording and stale AGENTS.md references](T-0010-fix-agent-doc-wording-and-stale-agents-md.md) | done | low | docs | — | [report](reports/T-0010.md) |
 | T-0011 | [Support docs and chore task branches in gitflow and fix housekeep worktrees](T-0011-support-docs-and-chore-task-branches-in-gitflow.md) | done | low | fix | — | [report](reports/T-0011.md) |
