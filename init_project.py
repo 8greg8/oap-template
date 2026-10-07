@@ -1,0 +1,1008 @@
+#!/usr/bin/env python3
+"""Initialize a new project from the OAP template (plan: .agents/plans/2026-10-03-template-init.md).
+
+Run once, from the primary checkout of a repository made from the template:
+
+    python init_project.py --name "My Project" --package my_project \\
+        --owner "Jane Doe" --description "One sentence." [--dry-run] [--yes] [--skip-install]
+
+Standard library only, so it runs before any dependency is installed. It never pushes or tags.
+Before the commit it stages nothing: files are moved and written with plain file operations.
+
+Plan steps 1 to 5 print the change list, install the tooling, rename the template names, reset
+the task state and seed the project files. Steps 6 to 8 (self-removal, gate, one commit) are in
+`STEPS`, inside the failure handler that prints the undo command. If a lock command failed in
+step 3, the run goes through the gate, then stops before the commit without the undo command
+and prints the commands to finish by hand. Steps 9 and 10 (the missing
+branch, the checklist) are in `POST_COMMIT_STEPS`, after the commit, where the undo command no
+longer applies.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import keyword
+import os
+import re
+import shutil
+import subprocess
+import sys
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+
+TEMPLATE_PACKAGE = "proj_template"
+TEMPLATE_DISTRIBUTION = "proj-template"
+TEMPLATE_NPM_NAME = "oap-template-dev-tooling"
+TEMPLATE_LICENSE_HOLDER = "8greg8"
+
+SCRIPT_FILE = "init_project.py"
+SCRIPT_TEST_FILE = "tests/test_init_project.py"
+GATE_SCRIPT = "scripts/gate.sh"
+COMMIT_MESSAGE = "chore: initialize project from OAP template"
+FINISH_MARKER = "To finish by hand"
+
+PYPROJECT = "pyproject.toml"
+PACKAGE_JSON = "package.json"
+DEVCONTAINER = ".devcontainer/devcontainer.json"
+DEVCONTAINER_SPEC_BLIND = ".devcontainer/spec-blind/devcontainer.json"
+LICENSE = "LICENSE"
+TEST_FILES = ("tests/test_greet.py", "tests/test_farewell.py")
+README = "README.md"
+CLAUDE_MD = "CLAUDE.md"
+SPEC_README = "docs/spec/README.md"
+SMOKE_TEST = "tests/test_smoke.py"
+CHANGELOG = "CHANGELOG.md"
+FRAGMENT_DIR = "changelog.d"
+# Same shape as `FRAGMENT_RE` in `scripts/changelog.py`: `<id>.<category>.md`. The directory's
+# `README.md` never matches, so it stays.
+FRAGMENT_RE = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9_-]*\.(added|changed|deprecated|removed|fixed|security)\.md$"
+)
+# The header and the empty `## [Unreleased]` section of the template's `CHANGELOG.md`.
+CHANGELOG_TEXT = (
+    "# Changelog\n"
+    "\n"
+    "All notable changes to this project will be documented in this file.\n"
+    "\n"
+    "The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),\n"
+    "and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n"
+    "\n"
+    "## [Unreleased]\n"
+)
+# The template owner's code of conduct and security policy name the owner's contact details, so
+# the new project starts without them and the checklist asks the new owner for their own.
+POLICY_FILES = ("CODE_OF_CONDUCT.md", "SECURITY.md")
+# The `## Project` section goes directly before this heading, the first `##` of the template.
+PROJECT_SECTION_ANCHOR = "## Working unit: the task"
+
+TASKS_DIR = ".agents/tasks"
+REPORTS_DIR = f"{TASKS_DIR}/reports"
+PLANS_DIR = ".agents/plans"
+PLANS_README = f"{PLANS_DIR}/README.md"
+COUNTER_FILE = f"{TASKS_DIR}/.counter"
+BACKLOG_FILE = f"{TASKS_DIR}/BACKLOG.md"
+LESSONS_FILE = ".agents/LESSONS.md"
+PLANS_README_TEXT = (
+    "# Plans\n\n"
+    "Owner plans, decisions and approvals for this project go in this directory. "
+    "`CLAUDE.md` § Merge authority names `.agents/plans/` as the place for the owner's "
+    "written approvals.\n"
+)
+
+README_TEXT = """\
+# {display}
+
+{description}
+
+## Where to start
+
+- [`CLAUDE.md`](CLAUDE.md): the entry point for coding agents, with the project's mission,
+  architecture and rules.
+- [`.agents/README.md`](.agents/README.md): the task, report and backlog workflow.
+
+## Checks
+
+While working, check with the fast gate (lint, format check and typecheck):
+
+```bash
+scripts/gate.sh --fast
+```
+
+The hooks check each commit and push. The full gate also runs the tests. The independent verifier
+of a finished branch runs it, and so do the pushes to `develop` and `main`:
+
+```bash
+scripts/gate.sh
+```
+"""
+PROJECT_SECTION_TEXT = """\
+## Project
+
+**{display}.** {description}
+
+<!-- Mission: why this project exists, who it serves, and what success looks like. -->
+
+<!-- Architecture: the main components, how they fit together, and the key design decisions. -->
+
+<!-- Domain terms: the words this project uses with a specific meaning, one definition each. -->
+
+"""
+SPEC_README_TEXT = """\
+# Specification
+
+The specification for this project lives in this directory.
+
+The spec-first test rule in `CLAUDE.md` ("Spec-first test authoring") reads from it: when a
+task derives behavior from the specification, the files here are the source of truth, ahead of
+the code under `src/`.
+"""
+PACKAGE_INIT_TEXT = '"""The `{package}` package."""\n'
+SMOKE_TEST_TEXT = """\
+\"\"\"Smoke test: the package imports.\"\"\"
+
+import {package}
+
+
+def test_package_imports() -> None:
+    assert {package}.__name__ == "{package}"
+"""
+
+# The task scripts regenerate the two derived files; they run as subprocesses in the copy.
+REGENERATE_COMMANDS: tuple[tuple[str, ...], ...] = (
+    (f"{TASKS_DIR}/scripts/backlog.py", "reindex"),
+    (f"{TASKS_DIR}/scripts/report.py", "harvest"),
+)
+
+# Lock files are regenerated by these commands, never edited by hand. `--ignore-scripts` keeps
+# the `prepare` script (husky) out of it: regenerating a lock file needs no lifecycle script, and
+# without `node_modules/` that script would fail.
+LOCK_COMMANDS: tuple[tuple[str, ...], ...] = (
+    ("uv", "lock"),
+    ("npm", "install", "--package-lock-only", "--ignore-scripts"),
+)
+INSTALL_COMMANDS: tuple[tuple[str, ...], ...] = (("npm", "ci"), ("uv", "sync"))
+
+
+class PreconditionError(Exception):
+    """A precondition failed; nothing has been changed."""
+
+
+class StepError(Exception):
+    """A step failed; the undo command applies."""
+
+
+class LockFailureStop(Exception):
+    """A lock command failed. The tree is valid, so the run stops before the commit.
+
+    The undo command does not apply: nothing is wrong with the files, and the lock files
+    only need regenerating before the commit.
+    """
+
+
+@dataclass(frozen=True)
+class Names:
+    """The names derived from `--package` (plan section Names).
+
+    Attributes:
+        package: Import package, as given by `--package`.
+        distribution: `package` with `_` replaced by `-`; the `[project] name`.
+        npm: `<distribution>-dev-tooling`; the `package.json` name.
+        display: The `--name` display name.
+    """
+
+    package: str
+    distribution: str
+    npm: str
+    display: str
+
+
+@dataclass(frozen=True)
+class Context:
+    """Everything a step needs.
+
+    Attributes:
+        root: Repository root (the directory holding this script).
+        names: Derived names.
+        owner: LICENSE holder.
+        description: `[project] description`.
+        year: Year written to the LICENSE.
+        skip_install: Skip step 2.
+        branch: The branch the run starts on (`develop` or `main`); the other one is created.
+        lock_failures: Lock commands that failed in step 3; filled in while the run goes on.
+    """
+
+    root: Path
+    names: Names
+    owner: str
+    description: str
+    year: int
+    skip_install: bool
+    branch: str
+    lock_failures: list[tuple[str, ...]] = field(default_factory=list)
+
+
+def derive_names(package: str, display: str) -> Names:
+    """Derive the distribution and npm names from the import package name.
+
+    Args:
+        package: The import package name.
+        display: The display name.
+
+    Returns:
+        The three derived names plus the display name.
+    """
+    distribution = package.replace("_", "-")
+    return Names(
+        package=package,
+        distribution=distribution,
+        npm=f"{distribution}-dev-tooling",
+        display=display,
+    )
+
+
+def counterpart_branch(branch: str) -> str:
+    """Return the branch step 9 creates: `main` when starting on `develop`, else `develop`.
+
+    Args:
+        branch: The branch the run starts on.
+
+    Returns:
+        The name of the other long-lived branch.
+    """
+    return "main" if branch == "develop" else "develop"
+
+
+def undo_command(package: str) -> str:
+    """Return the command that restores the checkout after a failed run.
+
+    Args:
+        package: The new import package name.
+
+    Returns:
+        The shell command from the plan's Safety section.
+    """
+    return (
+        "git restore --source=HEAD --staged --worktree . && git clean -fd "
+        f"&& rm -rf src/{package}"
+    )
+
+
+# --- preconditions -----------------------------------------------------------------------------
+
+
+def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", "-C", str(root), *args], capture_output=True, text=True, check=False
+    )
+
+
+def check_package_name(package: str) -> None:
+    """Refuse a `--package` that is not a lowercase identifier, edges on `_`, or is the template's.
+
+    Args:
+        package: The value of `--package`.
+
+    Raises:
+        PreconditionError: If the name is invalid.
+    """
+    if (
+        not package.isidentifier()
+        or package != package.lower()
+        or keyword.iskeyword(package)
+    ):
+        raise PreconditionError(
+            f"--package {package!r} is not a valid lowercase Python identifier"
+        )
+    if package.startswith("_") or package.endswith("_"):
+        raise PreconditionError(
+            f"--package {package!r} must not start or end with an underscore "
+            "(the derived distribution name would be invalid)"
+        )
+    if package == TEMPLATE_PACKAGE:
+        raise PreconditionError(f"--package must differ from {TEMPLATE_PACKAGE}")
+
+
+def check_preconditions(root: Path, package: str) -> str:
+    """Run every precondition from the plan, in order.
+
+    Args:
+        root: Repository root.
+        package: The value of `--package`.
+
+    Returns:
+        The current branch, `develop` or `main`.
+
+    Raises:
+        PreconditionError: Naming the first failed check.
+    """
+    check_package_name(package)
+
+    status = _git(root, "status", "--porcelain", "--untracked-files=all")
+    if status.returncode != 0:
+        raise PreconditionError(
+            f"{root} is not a git repository: {status.stderr.strip()}"
+        )
+    if status.stdout.strip():
+        raise PreconditionError(
+            "working tree is not clean (commit, stash or remove changes and untracked "
+            f"files first):\n{status.stdout.rstrip()}"
+        )
+
+    head = _git(root, "symbolic-ref", "--short", "-q", "HEAD")
+    branch = head.stdout.strip()
+    if branch not in ("develop", "main"):
+        raise PreconditionError(
+            f"must be on develop or main, not {branch or 'a detached HEAD'}"
+        )
+
+    if _git(root, "remote", "get-url", "origin").returncode != 0:
+        raise PreconditionError("origin remote is not set")
+
+    if not (root / "src" / TEMPLATE_PACKAGE).is_dir():
+        raise PreconditionError(
+            f"src/{TEMPLATE_PACKAGE}/ not found; the script has probably run already"
+        )
+
+    other = counterpart_branch(branch)
+    if (
+        _git(root, "show-ref", "--verify", "--quiet", f"refs/heads/{other}").returncode
+        == 0
+    ):
+        raise PreconditionError(f"branch {other} already exists locally")
+    remote = _git(
+        root, "ls-remote", "--exit-code", "--heads", "origin", f"refs/heads/{other}"
+    )
+    if remote.returncode == 0:
+        raise PreconditionError(f"branch {other} already exists on origin")
+    if remote.returncode != 2:
+        raise PreconditionError(
+            f"cannot check origin for branch {other}: {remote.stderr.strip()}"
+        )
+    return branch
+
+
+# --- change list -------------------------------------------------------------------------------
+
+
+def plan_changes(ctx: Context) -> list[str]:
+    """List every change the run makes, one line each.
+
+    Args:
+        ctx: The run context.
+
+    Returns:
+        Human-readable change lines, in execution order.
+    """
+    names = ctx.names
+    changes: list[str] = []
+    if not ctx.skip_install:
+        changes.extend(f"run    {' '.join(command)}" for command in INSTALL_COMMANDS)
+    changes += [
+        f"move   src/{TEMPLATE_PACKAGE}/ -> src/{names.package}/",
+        f"edit   {PYPROJECT}: [project] name {TEMPLATE_DISTRIBUTION} -> {names.distribution}",
+        f"edit   {PYPROJECT}: [project] description -> {json.dumps(ctx.description)}",
+        f"edit   {PYPROJECT}: wheel packages src/{TEMPLATE_PACKAGE} -> src/{names.package}",
+        f"edit   {PACKAGE_JSON}: name {TEMPLATE_NPM_NAME} -> {names.npm}",
+        f"edit   {DEVCONTAINER}: name {TEMPLATE_PACKAGE} -> {names.package}",
+        f"edit   {DEVCONTAINER_SPEC_BLIND}: name -> {names.package} (spec-blind)",
+        f"edit   {LICENSE}: holder {TEMPLATE_LICENSE_HOLDER} -> {ctx.owner}, year -> {ctx.year}",
+    ]
+    changes += [f"edit   {path}: import {names.package}" for path in TEST_FILES]
+    changes += [
+        f"regen  uv.lock via `{' '.join(LOCK_COMMANDS[0])}`",
+        f"regen  package-lock.json via `{' '.join(LOCK_COMMANDS[1])}`",
+    ]
+    changes += [f"remove {rel}" for rel in task_state_files(ctx.root)]
+    changes += [
+        f"write  {PLANS_README}",
+        f"write  {COUNTER_FILE}: 0",
+        f"regen  {BACKLOG_FILE} via `backlog.py reindex`",
+        f"regen  {LESSONS_FILE} via `report.py harvest`",
+        f"replace {README}: fresh project README titled {json.dumps(names.display)}",
+        f"replace {CHANGELOG}: Keep a Changelog header and an empty [Unreleased] section",
+        *(f"remove {rel}" for rel in fragment_files(ctx.root)),
+        *(f"remove {rel}" for rel in POLICY_FILES),
+        f"edit   {CLAUDE_MD}: insert `## Project` before `{PROJECT_SECTION_ANCHOR}`",
+        f"write  {SPEC_README}",
+        f"replace src/{names.package}/__init__.py: docstring only (drops greet, farewell)",
+    ]
+    changes += [f"remove {rel}" for rel in TEST_FILES]
+    changes.append(f"write  {SMOKE_TEST}: imports {names.package}")
+    changes += [
+        f"remove {SCRIPT_FILE}",
+        f"remove {SCRIPT_TEST_FILE}",
+        f"run    {GATE_SCRIPT} (on failure: stop without committing)",
+        (
+            f"commit `git add -A`, then one commit: {COMMIT_MESSAGE} "
+            "(not made if a lock command failed)"
+        ),
+        f"create branch {counterpart_branch(ctx.branch)} at the new commit (local only)",
+        (
+            "print  the checklist: push both branches, set the default branch and branch "
+            "protection (it must allow the release push), fill the CLAUDE.md project section, write the first spec, add a "
+            "code of conduct and a security policy"
+        ),
+    ]
+    return changes
+
+
+def fragment_files(root: Path) -> list[str]:
+    """List the changelog fragments step 5 removes.
+
+    Args:
+        root: Repository root.
+
+    Returns:
+        Repository-relative POSIX paths of files in `changelog.d/` named
+        `<id>.<category>.md`, sorted. `changelog.d/README.md` is not listed.
+    """
+    directory = root / FRAGMENT_DIR
+    if not directory.is_dir():
+        return []
+    return sorted(
+        f"{FRAGMENT_DIR}/{path.name}"
+        for path in directory.iterdir()
+        if path.is_file() and FRAGMENT_RE.match(path.name)
+    )
+
+
+def task_state_files(root: Path) -> list[str]:
+    """List the files step 4 removes: task files, reports and every plan.
+
+    Args:
+        root: Repository root.
+
+    Returns:
+        Repository-relative POSIX paths, sorted. `reports/.gitkeep` is not listed; it stays so
+        that the reports directory survives in version control.
+    """
+    found: list[Path] = []
+    found += (root / TASKS_DIR).glob("T-*.md")
+    found += (root / REPORTS_DIR).glob("*.md")
+    found += (p for p in (root / PLANS_DIR).rglob("*") if not p.is_dir())
+    return sorted({path.relative_to(root).as_posix() for path in found})
+
+
+def print_plan(ctx: Context, changes: Sequence[str]) -> None:
+    """Print the derived names and the change list.
+
+    Args:
+        ctx: The run context.
+        changes: The lines from `plan_changes`.
+    """
+    names = ctx.names
+    print("Derived names")
+    print(f"  import package        {names.package}")
+    print(f"  distribution name     {names.distribution}")
+    print(f"  npm package name      {names.npm}")
+    print(f"  display name          {names.display}")
+    print("\nChanges")
+    for line in changes:
+        print(f"  {line}")
+    print(flush=True)
+
+
+# --- steps -------------------------------------------------------------------------------------
+
+
+def _read(path: Path) -> str:
+    return path.read_bytes().decode("utf-8")
+
+
+def _edit(
+    root: Path, rel: str, pattern: str, replacement: str, *, at_least_one: bool = False
+) -> None:
+    """Replace `pattern` in `root/rel` with the literal `replacement`.
+
+    Raises:
+        StepError: If the pattern does not match the expected number of times.
+    """
+    path = root / rel
+    text = _read(path)
+    new, count = re.subn(pattern, lambda _match: replacement, text, flags=re.MULTILINE)
+    if count < 1 or (count != 1 and not at_least_one):
+        raise StepError(f"expected one match for {pattern!r} in {rel}, found {count}")
+    path.write_bytes(new.encode("utf-8"))
+
+
+def _run_command(root: Path, command: Sequence[str]) -> int | None:
+    """Run `command` in `root`; return its exit code, or None if it is not installed."""
+    try:
+        return subprocess.run(list(command), cwd=root, check=False).returncode
+    except FileNotFoundError:
+        return None
+
+
+def step_install(ctx: Context) -> None:
+    """Step 2: install tooling so hooks work, unless `--skip-install`.
+
+    Raises:
+        StepError: If a command is missing or fails.
+    """
+    if ctx.skip_install:
+        return
+    for command in INSTALL_COMMANDS:
+        code = _run_command(ctx.root, command)
+        if code is None:
+            raise StepError(f"`{command[0]}` is not installed or not on PATH")
+        if code != 0:
+            raise StepError(f"`{' '.join(command)}` failed with exit code {code}")
+
+
+def regenerate_locks(ctx: Context) -> None:
+    """Regenerate both lock files.
+
+    A failure is recorded in `ctx.lock_failures` and both commands are printed. The run goes on
+    through the gate and stops before the commit (`step_require_locks`).
+    """
+    for command in LOCK_COMMANDS:
+        if _run_command(ctx.root, command) != 0:
+            ctx.lock_failures.append(command)
+    if ctx.lock_failures:
+        print(
+            "warning: could not regenerate the lock files (offline?). "
+            "Run these commands yourself:",
+            file=sys.stderr,
+        )
+        for command in LOCK_COMMANDS:
+            print(f"  {' '.join(command)}", file=sys.stderr)
+        sys.stderr.flush()
+
+
+def step_rename(ctx: Context) -> None:
+    """Step 3: rename the template names, set LICENSE and description, regenerate locks.
+
+    Raises:
+        StepError: If a file does not have the expected template content.
+    """
+    root, names = ctx.root, ctx.names
+    source = root / "src" / TEMPLATE_PACKAGE
+    target = root / "src" / names.package
+    if target.exists():
+        raise StepError(f"src/{names.package}/ already exists")
+    shutil.move(str(source), str(target))
+
+    _edit(
+        root,
+        PYPROJECT,
+        rf'^name = "{re.escape(TEMPLATE_DISTRIBUTION)}"$',
+        f'name = "{names.distribution}"',
+    )
+    _edit(
+        root,
+        PYPROJECT,
+        r'^description = ".*"$',
+        f"description = {json.dumps(ctx.description, ensure_ascii=False)}",
+    )
+    _edit(
+        root,
+        PYPROJECT,
+        rf'^packages = \["src/{TEMPLATE_PACKAGE}"\]$',
+        f'packages = ["src/{names.package}"]',
+    )
+    _edit(
+        root,
+        PACKAGE_JSON,
+        rf'"name": "{re.escape(TEMPLATE_NPM_NAME)}"',
+        f'"name": "{names.npm}"',
+    )
+    _edit(
+        root,
+        DEVCONTAINER,
+        rf'"name": "{TEMPLATE_PACKAGE}"',
+        f'"name": "{names.package}"',
+    )
+    _edit(
+        root,
+        DEVCONTAINER_SPEC_BLIND,
+        rf'"name": "{TEMPLATE_PACKAGE} \(spec-blind\)"',
+        f'"name": "{names.package} (spec-blind)"',
+    )
+    _edit(
+        root,
+        LICENSE,
+        r"^Copyright \(c\) \d{4} .*$",
+        f"Copyright (c) {ctx.year} {ctx.owner}",
+    )
+    for rel in TEST_FILES:
+        _edit(root, rel, rf"\b{TEMPLATE_PACKAGE}\b", names.package, at_least_one=True)
+
+    regenerate_locks(ctx)
+
+
+def step_reset_tasks(ctx: Context) -> None:
+    """Step 4: reset the copy's task state and regenerate the derived files.
+
+    Removes task files, reports and plans, writes `.agents/plans/README.md` and a zero counter,
+    then regenerates `BACKLOG.md` and `LESSONS.md` with the task scripts. Keeps `templates/`,
+    `scripts/` and `reports/.gitkeep`.
+
+    Raises:
+        StepError: If a task script cannot run or fails.
+    """
+    root = ctx.root
+    for rel in task_state_files(root):
+        (root / rel).unlink()
+    plans = root / PLANS_DIR
+    for directory in sorted(
+        (p for p in plans.rglob("*") if p.is_dir()), key=lambda p: -len(p.parts)
+    ):
+        directory.rmdir()
+    plans.mkdir(parents=True, exist_ok=True)
+    (root / PLANS_README).write_bytes(PLANS_README_TEXT.encode("utf-8"))
+    (root / COUNTER_FILE).write_bytes(b"0\n")
+
+    # No `__pycache__/` next to the scripts, which must stay unchanged.
+    env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+    for script, *args in REGENERATE_COMMANDS:
+        label = f"{script} {' '.join(args)}"
+        try:
+            result = subprocess.run(
+                [sys.executable, script, *args],
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError as error:
+            raise StepError(f"cannot run `{label}`: {error}") from error
+        if result.returncode != 0:
+            raise StepError(
+                f"`{label}` failed with exit code {result.returncode}:\n"
+                f"{(result.stdout + result.stderr).rstrip()}"
+            )
+
+
+def step_seed_files(ctx: Context) -> None:
+    """Step 5: seed the project files and replace the sample code with a smoke test.
+
+    Writes a fresh README and an empty changelog (the Keep a Changelog header and an empty
+    `[Unreleased]` section) and removes every changelog fragment, keeping `changelog.d/README.md`.
+    Removes the template's code of conduct and security policy, inserts
+    the `## Project` section into `CLAUDE.md` before the first `##` section and leaves every
+    other line alone, adds `docs/spec/README.md`, makes the package a docstring-only module,
+    removes the sample tests and adds `tests/test_smoke.py`.
+
+    Raises:
+        StepError: If `CLAUDE.md` does not have the anchor heading exactly once.
+    """
+    root, names = ctx.root, ctx.names
+    section = PROJECT_SECTION_TEXT.format(
+        display=names.display, description=ctx.description
+    )
+    # Checked first: a failure here leaves the earlier seeded files unwritten.
+    _edit(
+        root,
+        CLAUDE_MD,
+        rf"^{re.escape(PROJECT_SECTION_ANCHOR)}$",
+        f"{section}{PROJECT_SECTION_ANCHOR}",
+    )
+    (root / README).write_bytes(
+        README_TEXT.format(display=names.display, description=ctx.description).encode(
+            "utf-8"
+        )
+    )
+    (root / CHANGELOG).write_bytes(CHANGELOG_TEXT.encode("utf-8"))
+    for rel in fragment_files(root):
+        (root / rel).unlink()
+    for rel in POLICY_FILES:
+        (root / rel).unlink(missing_ok=True)
+    spec = root / SPEC_README
+    spec.parent.mkdir(parents=True, exist_ok=True)
+    spec.write_bytes(SPEC_README_TEXT.encode("utf-8"))
+    (root / "src" / names.package / "__init__.py").write_bytes(
+        PACKAGE_INIT_TEXT.format(package=names.package).encode("utf-8")
+    )
+    for rel in TEST_FILES:
+        (root / rel).unlink()
+    (root / SMOKE_TEST).write_bytes(
+        SMOKE_TEST_TEXT.format(package=names.package).encode("utf-8")
+    )
+
+
+def step_remove_residue(ctx: Context) -> None:
+    """Step 6: remove the script and its tests from the copy.
+
+    Raises:
+        StepError: If a file cannot be removed.
+    """
+    for rel in (SCRIPT_FILE, SCRIPT_TEST_FILE):
+        try:
+            (ctx.root / rel).unlink(missing_ok=True)
+        except OSError as error:
+            raise StepError(f"cannot remove {rel}: {error}") from error
+
+
+def step_gate(ctx: Context) -> None:
+    """Step 7: run the gate; on red, stop before any commit.
+
+    The gate's own output goes straight to the terminal.
+
+    Raises:
+        StepError: If the gate cannot run or exits non-zero.
+    """
+    sys.stdout.flush()
+    sys.stderr.flush()
+    code = _run_command(ctx.root, [str(ctx.root / GATE_SCRIPT)])
+    if code is None:
+        raise StepError(f"{GATE_SCRIPT} not found")
+    if code != 0:
+        raise StepError(
+            f"`{GATE_SCRIPT}` failed with exit code {code}; nothing was committed"
+        )
+
+
+def step_require_locks(ctx: Context) -> None:
+    """Stop before the commit if a lock command failed, so no stale lock file is committed.
+
+    Raises:
+        LockFailureStop: If step 3 recorded a failed lock command.
+    """
+    if ctx.lock_failures:
+        raise LockFailureStop
+
+
+def finish_commands(ctx: Context) -> list[str]:
+    """Return the commands that finish a run that stopped on a lock failure.
+
+    Args:
+        ctx: The run context, with `lock_failures` filled in.
+
+    Returns:
+        The failed lock commands again, then staging, the init commit and the missing branch.
+    """
+    return [
+        *(" ".join(command) for command in ctx.lock_failures),
+        "git add -A",
+        f'git commit -m "{COMMIT_MESSAGE}"',
+        f"git branch {counterpart_branch(ctx.branch)}",
+    ]
+
+
+def print_lock_stop(ctx: Context) -> None:
+    """Print which lock commands failed and the exact commands to finish by hand."""
+    print(
+        "Stopped before the commit: a lock command failed, and a lock file that still "
+        "names the template must not be committed. The gate passed and the working tree "
+        "is valid, so it is left as it is. No commit or branch was created. Failed:",
+        file=sys.stderr,
+    )
+    for command in ctx.lock_failures:
+        print(f"  {' '.join(command)}", file=sys.stderr)
+    print(
+        f"{FINISH_MARKER}, run from the repository root (with network access):",
+        file=sys.stderr,
+    )
+    for command in finish_commands(ctx):
+        print(f"  {command}", file=sys.stderr)
+    sys.stderr.flush()
+
+
+def step_commit(ctx: Context) -> None:
+    """Step 8: stage everything and make the one init commit.
+
+    Hooks run as usual and their output goes straight to the terminal.
+
+    Raises:
+        StepError: If staging or the commit fails.
+    """
+    add = _git(ctx.root, "add", "-A")
+    if add.returncode != 0:
+        raise StepError(f"`git add -A` failed: {add.stderr.strip()}")
+    sys.stdout.flush()
+    sys.stderr.flush()
+    commit = subprocess.run(
+        ["git", "-C", str(ctx.root), "commit", "-m", COMMIT_MESSAGE], check=False
+    )
+    if commit.returncode != 0:
+        raise StepError(f"`git commit` failed with exit code {commit.returncode}")
+
+
+def head_commit(root: Path) -> str:
+    """Return the full hash of `HEAD`, or `unknown` if it cannot be read.
+
+    Args:
+        root: Repository root.
+
+    Returns:
+        The commit hash.
+    """
+    result = _git(root, "rev-parse", "HEAD")
+    return result.stdout.strip() if result.returncode == 0 else "unknown"
+
+
+def step_create_branch(ctx: Context) -> None:
+    """Step 9: create the missing `main` or `develop` at the new commit. Local only.
+
+    Raises:
+        StepError: If the branch cannot be created.
+    """
+    target = counterpart_branch(ctx.branch)
+    result = _git(ctx.root, "branch", target)
+    if result.returncode != 0:
+        raise StepError(f"`git branch {target}` failed: {result.stderr.strip()}")
+
+
+def step_checklist(ctx: Context) -> None:
+    """Step 10: print the summary and the checklist of what a human does next."""
+    other = counterpart_branch(ctx.branch)
+    print(
+        f"Initialized {ctx.names.display!r}: one commit {head_commit(ctx.root)} on "
+        f"{ctx.branch}, and {other} created at the same commit. Nothing was pushed."
+    )
+    print("\nChecklist")
+    print(f"  1. Push both branches: git push -u origin {ctx.branch} {other}")
+    print(
+        "  2. On GitHub, set the default branch to `develop` (task.py syncs "
+        "origin/develop; main is for releases) and add branch protection for develop "
+        "and main. Protection must allow the release push (main, develop and the tag), "
+        "or the owner releases through pull requests."
+    )
+    print(
+        "  3. Fill in the `## Project` section of CLAUDE.md: mission, architecture and "
+        "domain terms."
+    )
+    print("  4. Write the first spec under docs/spec/.")
+    print(
+        "  5. Add your own code of conduct (CODE_OF_CONDUCT.md) and security policy "
+        "(SECURITY.md)."
+    )
+    sys.stdout.flush()
+
+
+# Plan steps 2 to 8 run here, inside the failure handler that prints the undo command.
+STEPS: tuple[Callable[[Context], None], ...] = (
+    step_install,
+    step_rename,
+    step_reset_tasks,
+    step_seed_files,
+    step_remove_residue,
+    step_gate,
+    step_require_locks,
+    step_commit,
+)
+
+# Plan steps 9 and 10 run after the commit, outside that handler.
+POST_COMMIT_STEPS: tuple[Callable[[Context], None], ...] = (
+    step_create_branch,
+    step_checklist,
+)
+
+
+# --- CLI ---------------------------------------------------------------------------------------
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    """Parse the command line.
+
+    Args:
+        argv: Arguments, or None for `sys.argv`.
+
+    Returns:
+        The parsed namespace.
+    """
+    parser = argparse.ArgumentParser(
+        description="Initialize a new project from the OAP template."
+    )
+    parser.add_argument(
+        "--name", required=True, help="Display name, e.g. 'My Project'."
+    )
+    parser.add_argument(
+        "--package", required=True, help="Import package, e.g. my_project."
+    )
+    parser.add_argument("--owner", required=True, help="LICENSE copyright holder.")
+    parser.add_argument(
+        "--description", required=True, help="One-sentence description."
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print the change list and stop."
+    )
+    parser.add_argument("--yes", action="store_true", help="Apply the changes.")
+    parser.add_argument(
+        "--skip-install",
+        action="store_true",
+        help=(
+            "Skip `npm ci` and `uv sync`. The lock commands still run; if one fails, the run "
+            "stops before the commit and prints the commands to finish by hand."
+        ),
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run the init script.
+
+    Args:
+        argv: Arguments, or None for `sys.argv`.
+
+    Returns:
+        The process exit code: 0 on success or dry run, 1 on a refusal or failure.
+    """
+    args = parse_args(argv)
+    root = Path(__file__).resolve().parent
+
+    try:
+        branch = check_preconditions(root, args.package)
+    except PreconditionError as error:
+        print(f"refused: {error}", file=sys.stderr)
+        return 1
+
+    ctx = Context(
+        root=root,
+        names=derive_names(args.package, args.name),
+        owner=args.owner,
+        description=args.description,
+        year=datetime.now().astimezone().year,
+        skip_install=args.skip_install,
+        branch=branch,
+    )
+    print_plan(ctx, plan_changes(ctx))
+    if args.dry_run:
+        print("Dry run: nothing was changed.")
+        return 0
+    if not args.yes:
+        print("refused: rerun with --yes to apply these changes.", file=sys.stderr)
+        return 1
+
+    try:
+        for step in STEPS:
+            step(ctx)
+    except LockFailureStop:
+        print_lock_stop(ctx)
+        return 1
+    except (Exception, KeyboardInterrupt) as error:  # noqa: BLE001 - any failure prints the undo
+        detail = str(error) if isinstance(error, StepError) else repr(error)
+        print(f"error: {detail}", file=sys.stderr)
+        print(
+            "Initialization failed before any commit or branch was created. To undo, run "
+            "from the repository root:",
+            file=sys.stderr,
+        )
+        print(f"  {undo_command(args.package)}", file=sys.stderr)
+        return 1
+
+    return run_post_commit_steps(ctx)
+
+
+def run_post_commit_steps(ctx: Context) -> int:
+    """Run steps 9 and 10. A failure here never prints the undo command.
+
+    The init commit exists by now, so the undo command would throw it away. On a failure the
+    commit hash is printed and, if step 9 did not complete, the command that creates the branch.
+
+    Args:
+        ctx: The run context.
+
+    Returns:
+        0 on success, 1 on a failure.
+    """
+    branch_created = False
+    try:
+        for step in POST_COMMIT_STEPS:
+            step(ctx)
+            branch_created = branch_created or step is step_create_branch
+    except (Exception, KeyboardInterrupt) as error:  # noqa: BLE001 - report, never undo
+        detail = str(error) if isinstance(error, StepError) else repr(error)
+        commit = head_commit(ctx.root)
+        print(f"error: {detail}", file=sys.stderr)
+        print(
+            f"The initialization commit {commit} was created on {ctx.branch}; keep it.",
+            file=sys.stderr,
+        )
+        if not branch_created:
+            target = counterpart_branch(ctx.branch)
+            print(
+                f"The branch {target} was not created. Create it with:\n"
+                f"  git branch {target} {commit}",
+                file=sys.stderr,
+            )
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

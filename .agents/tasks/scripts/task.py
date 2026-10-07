@@ -4,10 +4,20 @@
 Run without a virtualenv; this tool is stdlib-only on purpose so it works in a
 fresh git worktree that has never been ``uv sync``-ed.
 
+``new`` files the task directly on ``develop``: it syncs the primary checkout
+to ``origin/develop``, allocates an ID, writes the file, commits, and pushes
+in one step -- no branch or worktree needed to create a task, and a
+concurrent publish from another checkout is resolved automatically by
+reallocating the next free ID and retrying (see ``_git_publish.py``). It must
+therefore be run from the primary checkout on ``develop``; pass
+``--no-publish`` to just write the file locally (e.g. for scripting/testing)
+instead.
+
 Usage:
     python .agents/tasks/scripts/task.py new --title "..." --type fix
     python .agents/tasks/scripts/task.py show T-0004
     python .agents/tasks/scripts/task.py set-status T-0004 in_progress
+    python .agents/tasks/scripts/task.py set-status T-0004 review  # needs a valid report
     python .agents/tasks/scripts/task.py validate
 """
 
@@ -22,9 +32,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _frontmatter import FrontmatterError, serialize  # noqa: E402
-from _ids import allocate_id  # noqa: E402
-from _schema import (  # noqa: E402
+from _frontmatter import FrontmatterError, serialize
+from _git_publish import PublishError, publish_task
+from _ids import allocate_id
+from _schema import (
     PRIORITIES,
     STATUSES,
     TASK_TEMPLATE,
@@ -39,8 +50,13 @@ from _schema import (  # noqa: E402
     validate_citations,
     validate_task,
 )
+from report import report_problems
 
 logger = logging.getLogger("task")
+
+#: Statuses a task may only enter once its report exists and validates.
+#: ``open`` and ``in_progress`` are exempt: no report is expected yet.
+REPORT_REQUIRED_STATUSES = frozenset({"review", "blocked", "done", "abandoned"})
 
 
 def render_template(template: Path, values: dict[str, str]) -> str:
@@ -105,7 +121,7 @@ def create_task(
             "priority": priority,
             "depends_on": ", ".join(item.strip().upper() for item in depends_on),
             "touches": ", ".join(item.strip() for item in touches),
-            "created": dt.date.today().isoformat(),
+            "created": dt.datetime.now().astimezone().date().isoformat(),
             "slug": slug,
         },
     )
@@ -123,12 +139,29 @@ def set_status(task_id: str, status: str) -> Path:
     Returns:
         Path of the updated task file.
 
+    Moving to ``review``, ``blocked``, ``done`` or ``abandoned`` is gated: the
+    task's report must exist and pass the same check as ``report.py validate``.
+    The report is read from the working tree, else from the task's branch via
+    git. A move to ``done`` is checked as ``validate`` checks a done task (the
+    verify line must have passed). A refused transition leaves the task file
+    untouched.
+
     Raises:
-        ValidationError: If the status is unknown or the task does not exist.
+        ValidationError: If the status is unknown, the task does not exist, or
+            the status needs a report that is missing or incomplete.
+        FrontmatterError: If the report's frontmatter cannot be parsed.
     """
     if status not in STATUSES:
         raise ValidationError(f"status {status!r} not in {list(STATUSES)}")
     task = find_task(task_id)
+    if status in REPORT_REQUIRED_STATUSES:
+        problems = report_problems(task, target_status=status)
+        if problems:
+            listed = "\n".join(f"  - {problem}" for problem in problems)
+            raise ValidationError(
+                f"cannot set {task.id} to {status!r}: its report is missing or "
+                f"incomplete\n{listed}"
+            )
     task.meta["status"] = status
     task.path.write_text(serialize(task.meta, task.body), encoding="utf-8")
     return task.path
@@ -149,6 +182,16 @@ def _collect_problems() -> list[str]:
             problems.append(str(exc))
 
     known_ids = [task.id for task in tasks]
+    live: dict[str, str] = {}
+    for task in tasks:
+        if task.status == "abandoned":
+            continue
+        first = live.setdefault(task.id, task.path.name)
+        if first != task.path.name:
+            problems.append(
+                f"{task.path.name}: duplicate id {task.id} (also {first}); "
+                "only abandoned tasks may share an id"
+            )
     for task in tasks:
         for problem in validate_task(task, known_ids):
             problems.append(f"{task.path.name}: {problem}")
@@ -178,10 +221,18 @@ def parse_args(argv=None):
     new = sub.add_parser("new", help="Create a task from the template.")
     new.add_argument("-t", "--title", required=True, help="One-line task title.")
     new.add_argument(
-        "-T", "--type", required=True, choices=list(TYPES), help="Conventional Commits type."
+        "-T",
+        "--type",
+        required=True,
+        choices=list(TYPES),
+        help="Conventional Commits type.",
     )
     new.add_argument(
-        "-p", "--priority", default="medium", choices=list(PRIORITIES), help="Priority bucket."
+        "-p",
+        "--priority",
+        default="medium",
+        choices=list(PRIORITIES),
+        help="Priority bucket.",
     )
     new.add_argument(
         "-d",
@@ -199,11 +250,26 @@ def parse_args(argv=None):
         metavar="PATH",
         help="Repo-relative paths this task will modify.",
     )
+    new.add_argument(
+        "--no-publish",
+        action="store_true",
+        help=(
+            "Write the task file locally only; skip the sync/commit/push to "
+            "develop. For scripting or testing contexts only -- the normal "
+            "flow publishes immediately."
+        ),
+    )
 
     show = sub.add_parser("show", help="Print a task file.")
     show.add_argument("id", help="Task ID, e.g. T-0004.")
 
-    status = sub.add_parser("set-status", help="Change a task's status.")
+    status = sub.add_parser(
+        "set-status",
+        help=(
+            "Change a task's status. review, blocked, done and abandoned "
+            "require a report that passes report.py validate."
+        ),
+    )
     status.add_argument("id", help="Task ID, e.g. T-0004.")
     status.add_argument("status", choices=list(STATUSES), help="New status.")
 
@@ -229,13 +295,20 @@ def main(argv=None):
 
     try:
         if args.command == "new":
-            path = create_task(
-                title=args.title,
-                task_type=args.type,
-                priority=args.priority,
-                depends_on=args.depends_on,
-                touches=args.touches,
-            )
+
+            def _create() -> Path:
+                return create_task(
+                    title=args.title,
+                    task_type=args.type,
+                    priority=args.priority,
+                    depends_on=args.depends_on,
+                    touches=args.touches,
+                )
+
+            if args.no_publish:
+                path = _create()
+            else:
+                path = publish_task(_create)
             print(path.relative_to(TASKS_DIR.parent.parent))
             return 0
 
@@ -250,7 +323,8 @@ def main(argv=None):
 
         if args.command == "list-ids":
             for task in load_tasks():
-                print(task.id)
+                if task.status != "abandoned":
+                    print(task.id)
             return 0
 
         if args.command == "validate":
@@ -259,7 +333,10 @@ def main(argv=None):
                 problems = [
                     f"{task.path.name}: {problem}"
                     for problem in validate_task(task, [t.id for t in load_tasks()])
-                ] + [f"{task.path.name}: {problem}" for problem in validate_citations(task)]
+                ] + [
+                    f"{task.path.name}: {problem}"
+                    for problem in validate_citations(task)
+                ]
             else:
                 problems = _collect_problems()
             if problems:
@@ -270,7 +347,7 @@ def main(argv=None):
             print("All tasks valid.")
             return 0
 
-    except (ValidationError, FrontmatterError) as exc:
+    except (ValidationError, FrontmatterError, PublishError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 1
 

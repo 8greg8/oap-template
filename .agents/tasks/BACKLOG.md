@@ -4,15 +4,53 @@
 
 # Task Backlog
 
-0 task(s). Generated 2026-09-15.
+38 task(s). Generated 2026-10-06.
 
-| open: 0 | in_progress: 0 | blocked: 0 | review: 0 | done: 0 | abandoned: 0 |
+| open: 0 | in_progress: 0 | blocked: 0 | review: 0 | done: 38 | abandoned: 0 |
 |---|---|---|---|---|---|
 
 ## Tasks
 
 | ID | Title | Status | Prio | Type | Depends on | Report |
 |---|---|---|---|---|---|---|
+| T-0001 | [Enforce report writing as a pipeline gate, not an agent courtesy](T-0001-enforce-report-writing-as-a-pipeline-gate-not.md) | done | high | chore | T-0003, T-0005 | [report](reports/T-0001.md) |
+| T-0002 | [Port git-atomic task filing and backlog fixes](T-0002-port-git-atomic-task-filing-and-backlog-fixes.md) | done | high | fix | — | [report](reports/T-0002.md) |
+| T-0003 | [Port report validation, harvest and housekeep checks](T-0003-port-report-validation-harvest-and-housekeep.md) | done | high | fix | T-0002 | [report](reports/T-0003.md) |
+| T-0004 | [Reconcile hooks and dev tooling with the merge and push rules](T-0004-reconcile-hooks-and-dev-tooling-with-the-merge.md) | done | high | feat | — | [report](reports/T-0004.md) |
+| T-0005 | [Port agent rules, process docs and orchestrator-merge rules](T-0005-port-agent-rules-process-docs-and-orchestrator.md) | done | high | docs | T-0002, T-0003, T-0004, T-0006 | [report](reports/T-0005.md) |
+| T-0007 | [Make task scripts executable](T-0007-make-task-scripts-executable.md) | done | high | fix | — | [report](reports/T-0007.md) |
+| T-0013 | [Make orchestrator merge into develop the default](T-0013-make-orchestrator-merge-into-develop-the-default.md) | done | high | docs | — | [report](reports/T-0013.md) |
+| T-0019 | [Scrub private references and attribute the method text](T-0019-scrub-private-references-and-attribute-the.md) | done | high | docs | — | [report](reports/T-0019.md) |
+| T-0020 | [Rewrite history into a clean public repository copy](T-0020-rewrite-history-into-a-clean-public-repository.md) | done | high | chore | T-0015, T-0016, T-0017, T-0018, T-0019 | [report](reports/T-0020.md) |
+| T-0022 | [Add the changelog tool, CHANGELOG.md and changelog fragments](T-0022-add-the-changelog-tool-changelog-md-and.md) | done | high | feat | — | [report](reports/T-0022.md) |
+| T-0023 | [Require a changelog fragment on push and at finish](T-0023-require-a-changelog-fragment-on-push-and-at.md) | done | high | feat | T-0022 | [report](reports/T-0023.md) |
+| T-0024 | [Release from develop into main with the changelog](T-0024-release-from-develop-into-main-with-the.md) | done | high | feat | T-0023 | [report](reports/T-0024.md) |
+| T-0027 | [Make init tests independent of template fragments and fold the first release entries](T-0027-make-init-tests-independent-of-template.md) | done | high | chore | — | [report](reports/T-0027.md) |
+| T-0028 | [Harden the changelog check and the push hook](T-0028-harden-the-changelog-check-and-the-push-hook.md) | done | high | fix | T-0027 | [report](reports/T-0028.md) |
+| T-0029 | [Fix release.py edge cases](T-0029-fix-release-py-edge-cases.md) | done | high | fix | T-0027 | [report](reports/T-0029.md) |
+| T-0033 | [Record gate passes and add gate.sh --if-needed](T-0033-record-gate-passes-and-add-gate-sh-if-needed.md) | done | high | feat | — | [report](reports/T-0033.md) |
+| T-0034 | [Mark the slow init tests and skip them for safe-list changes](T-0034-mark-the-slow-init-tests-and-skip-them-for-safe.md) | done | high | feat | T-0033 | [report](reports/T-0034.md) |
+| T-0006 | [Add a devcontainer](T-0006-add-a-devcontainer.md) | done | medium | feat | — | [report](reports/T-0006.md) |
+| T-0008 | [Fix pre-commit re-staging for unusual filenames](T-0008-fix-pre-commit-re-staging-for-unusual-filenames.md) | done | medium | fix | — | [report](reports/T-0008.md) |
+| T-0012 | [Make staged-file handling NUL-safe in gate and autofix scripts](T-0012-make-staged-file-handling-nul-safe-in-gate-and.md) | done | medium | fix | — | [report](reports/T-0012.md) |
+| T-0014 | [Amend the OAP method text so CLAUDE.md governs merge authority](T-0014-amend-the-oap-method-text-so-claude-md-governs.md) | done | medium | docs | — | [report](reports/T-0014.md) |
+| T-0015 | [Add init script CLI, preconditions, names and rename step](T-0015-add-init-script-cli-preconditions-names-and.md) | done | medium | feat | — | [report](reports/T-0015.md) |
+| T-0016 | [Reset task state in the init script](T-0016-reset-task-state-in-the-init-script.md) | done | medium | feat | T-0015 | [report](reports/T-0016.md) |
+| T-0017 | [Seed project files in the init script](T-0017-seed-project-files-in-the-init-script.md) | done | medium | feat | T-0016 | [report](reports/T-0017.md) |
+| T-0018 | [Finish the init script with gate, commit, branch and self-removal](T-0018-finish-the-init-script-with-gate-commit-branch.md) | done | medium | feat | T-0017 | [report](reports/T-0018.md) |
+| T-0021 | [Add a code of conduct and a security policy](T-0021-add-a-code-of-conduct-and-a-security-policy.md) | done | medium | docs | — | [report](reports/T-0021.md) |
+| T-0025 | [Start generated projects with an empty changelog](T-0025-start-generated-projects-with-an-empty-changelog.md) | done | medium | feat | T-0022 | [report](reports/T-0025.md) |
+| T-0026 | [Document the changelog and release workflow](T-0026-document-the-changelog-and-release-workflow.md) | done | medium | docs | T-0024, T-0025 | [report](reports/T-0026.md) |
+| T-0030 | [Correct the release docs and add the release to Ask first](T-0030-correct-the-release-docs-and-add-the-release-to.md) | done | medium | docs | T-0028, T-0029 | [report](reports/T-0030.md) |
+| T-0031 | [Fold the post-batch fragments and document the pre-release wording rule](T-0031-fold-the-post-batch-fragments-and-document-the.md) | done | medium | docs | — | [report](reports/T-0031.md) |
+| T-0032 | [Clarify the tag items in Ask first and drop the stale README reference](T-0032-clarify-the-tag-items-in-ask-first-and-drop-the.md) | done | medium | docs | T-0031 | [report](reports/T-0032.md) |
+| T-0035 | [Report leftover worktrees and record the gate in the verify line](T-0035-report-leftover-worktrees-and-record-the-gate.md) | done | medium | feat | — | [report](reports/T-0035.md) |
+| T-0036 | [Rewrite the verification rules for one verifier per change](T-0036-rewrite-the-verification-rules-for-one-verifier.md) | done | medium | docs | T-0033, T-0034, T-0035 | [report](reports/T-0036.md) |
+| T-0009 | [Drop shebangs from private task script helpers](T-0009-drop-shebangs-from-private-task-script-helpers.md) | done | low | chore | — | [report](reports/T-0009.md) |
+| T-0010 | [Fix agent-doc wording and stale AGENTS.md references](T-0010-fix-agent-doc-wording-and-stale-agents-md.md) | done | low | docs | — | [report](reports/T-0010.md) |
+| T-0011 | [Support docs and chore task branches in gitflow and fix housekeep worktrees](T-0011-support-docs-and-chore-task-branches-in-gitflow.md) | done | low | fix | — | [report](reports/T-0011.md) |
+| T-0037 | [Fix the generated README's per-commit gate advice](T-0037-fix-the-generated-readme-s-per-commit-gate.md) | done | low | fix | — | [report](reports/T-0037.md) |
+| T-0038 | [Update the stale verify-resolve loop comments in scripts](T-0038-update-the-stale-verify-resolve-loop-comments.md) | done | low | docs | — | [report](reports/T-0038.md) |
 
 ## Ready to dispatch
 

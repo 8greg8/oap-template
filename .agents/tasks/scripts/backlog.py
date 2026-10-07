@@ -22,8 +22,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _frontmatter import FrontmatterError  # noqa: E402
-from _schema import (  # noqa: E402
+from _frontmatter import FrontmatterError
+from _schema import (
     BACKLOG_FILE,
     DONE_STATUSES,
     INACTIVE_STATUSES,
@@ -79,25 +79,34 @@ def ready_tasks(tasks: Sequence[Task]) -> list[Task]:
     return sorted(candidates, key=sort_key)
 
 
-def parallel_batch(tasks: Sequence[Task], limit: int) -> list[Task]:
+def parallel_batch(
+    tasks: Sequence[Task], limit: int, active: Sequence[Task] = ()
+) -> list[Task]:
     """Select a set of ready tasks whose file scopes do not overlap.
 
-    Greedy by priority: the highest-priority ready task is always taken, then
+    Greedy by priority: the highest-priority ready task is taken first, then
     each subsequent candidate is accepted only if its ``touches`` list is
-    disjoint from every task already in the batch. This is what makes it safe to
-    run the batch as parallel worktrees without creating merge conflicts.
+    disjoint from every task already in the batch. A candidate whose ``touches``
+    overlap a task that is already ``in_progress`` or in ``review`` (not yet
+    merged) is excluded outright. This is what makes it safe to run the batch as
+    parallel worktrees without creating merge conflicts.
 
     Args:
         tasks: Candidate tasks, typically the output of :func:`ready_tasks`.
         limit: Maximum batch size.
+        active: Tasks already in flight; only those with status ``in_progress``
+            or ``review`` exclude candidates.
 
     Returns:
         A conflict-free batch of at most ``limit`` tasks.
     """
+    running = [task for task in active if task.status in ("in_progress", "review")]
     batch: list[Task] = []
     for task in tasks:
         if len(batch) >= limit:
             break
+        if any(tasks_conflict(task, other) for other in running):
+            continue
         if any(tasks_conflict(task, chosen) for chosen in batch):
             continue
         batch.append(task)
@@ -123,9 +132,11 @@ def render_backlog(tasks: Sequence[Task]) -> str:
         "",
         "# Task Backlog",
         "",
-        f"{len(ordered)} task(s). Generated {dt.date.today().isoformat()}.",
+        f"{len(ordered)} task(s). Generated {dt.datetime.now().astimezone().date().isoformat()}.",
         "",
-        "| " + " | ".join(f"{status}: {counts.get(status, 0)}" for status in STATUSES) + " |",
+        "| "
+        + " | ".join(f"{status}: {counts.get(status, 0)}" for status in STATUSES)
+        + " |",
         "|" + "---|" * len(STATUSES),
         "",
         "## Tasks",
@@ -136,8 +147,9 @@ def render_backlog(tasks: Sequence[Task]) -> str:
 
     for task in ordered:
         deps = ", ".join(task.depends_on) or "—"
-        if task.report_path.exists():
-            report = f"[report](reports/{task.id}.md)"
+        report_rel = str(task.meta.get("report") or f"reports/{task.id}.md")
+        if (TASKS_DIR / report_rel).exists():
+            report = f"[report]({report_rel})"
         else:
             report = "—"
         title = f"[{task.title}]({task.path.name})"
@@ -154,14 +166,16 @@ def render_backlog(tasks: Sequence[Task]) -> str:
         for task in dispatchable:
             scope = ", ".join(f"`{item}`" for item in task.touches) or "*(unscoped)*"
             lines.append(f"- **{task.id}** {task.title} — {scope}")
-        batch = parallel_batch(dispatchable, 3)
+        batch = parallel_batch(dispatchable, 3, ordered)
         lines += [
             "",
             "Suggested conflict-free parallel batch: "
             + ", ".join(task.id for task in batch),
         ]
     else:
-        lines.append("*Nothing ready — every open task is blocked or already in flight.*")
+        lines.append(
+            "*Nothing ready — every open task is blocked or already in flight.*"
+        )
 
     dispatchable_ids = {task.id for task in dispatchable}
     blocked = [
@@ -172,7 +186,9 @@ def render_backlog(tasks: Sequence[Task]) -> str:
     if blocked:
         lines += ["", "## Waiting on dependencies", ""]
         for task in blocked:
-            lines.append(f"- **{task.id}** {task.title} — needs {', '.join(task.depends_on)}")
+            lines.append(
+                f"- **{task.id}** {task.title} — needs {', '.join(task.depends_on)}"
+            )
 
     lines.append("")
     return "\n".join(lines)
@@ -207,7 +223,9 @@ def parse_args(argv=None):
     sub.add_parser("reindex", help="Regenerate BACKLOG.md from the task files.")
 
     listing = sub.add_parser("list", help="List tasks as a plain table.")
-    listing.add_argument("-s", "--status", choices=list(STATUSES), help="Filter by status.")
+    listing.add_argument(
+        "-s", "--status", choices=list(STATUSES), help="Filter by status."
+    )
     listing.add_argument(
         "-p", "--priority", choices=list(PRIORITIES), help="Filter by priority."
     )
@@ -270,7 +288,7 @@ def main(argv=None):
     if args.command == "ready":
         dispatchable = ready_tasks(tasks)
         if args.parallel:
-            dispatchable = parallel_batch(dispatchable, args.parallel)
+            dispatchable = parallel_batch(dispatchable, args.parallel, tasks)
         for task in dispatchable:
             if args.verbose:
                 scope = ", ".join(task.touches) or "(unscoped)"

@@ -7,6 +7,534 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-0 entr(ies) across 0 tag(s). Generated 2026-09-15.
+38 lesson(s) across 19 section(s). Generated 2026-10-06.
 
-*No lessons recorded yet.*
+## Tag index
+
+Each lesson appears once, under its first tag; the index links every tag
+to all lessons that carry it.
+
+- `agent-rules` — [T-0005](#t-0005-success)
+- `agent-workflow` — [T-0010](#t-0010-success)
+- `ask-first` — [T-0030](#t-0030-success), [T-0032](#t-0032-success)
+- `backlog` — [T-0002](#t-0002-success)
+- `bash` — [T-0012](#t-0012-success)
+- `bash-3.2` — [T-0011](#t-0011-success)
+- `breaking` — [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0028](#t-0028-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success), [T-0036](#t-0036-success)
+- `changelog` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0025](#t-0025-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success), [T-0028](#t-0028-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success), [T-0032](#t-0032-success)
+- `changelog-fragments` — [T-0022](#t-0022-success), [T-0025](#t-0025-success)
+- `chore` — [T-0020](#t-0020-success)
+- `claude-md` — [T-0036](#t-0036-success)
+- `code-of-conduct` — [T-0021](#t-0021-success)
+- `comments` — [T-0038](#t-0038-success)
+- `commit` — [T-0018](#t-0018-success)
+- `commit-lint` — [T-0004](#t-0004-success)
+- `devcontainer` — [T-0006](#t-0006-success), [T-0007](#t-0007-success)
+- `docker` — [T-0006](#t-0006-success)
+- `docs` — [T-0005](#t-0005-success), [T-0010](#t-0010-success), [T-0013](#t-0013-success), [T-0014](#t-0014-success), [T-0019](#t-0019-success), [T-0021](#t-0021-success), [T-0026](#t-0026-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success), [T-0032](#t-0032-success)
+- `end-to-end` — [T-0018](#t-0018-success)
+- `execution-loop` — [T-0001](#t-0001-success)
+- `feat` — [T-0022](#t-0022-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0025](#t-0025-success)
+- `file-mode` — [T-0009](#t-0009-success)
+- `file-modes` — [T-0007](#t-0007-success)
+- `filter-repo` — [T-0020](#t-0020-success)
+- `gate` — [T-0004](#t-0004-success), [T-0018](#t-0018-success), [T-0033](#t-0033-success), [T-0034](#t-0034-success), [T-0037](#t-0037-success)
+- `gate-records` — [T-0036](#t-0036-success)
+- `git` — [T-0007](#t-0007-success), [T-0012](#t-0012-success)
+- `git-pathspec` — [T-0008](#t-0008-success), [T-0033](#t-0033-success), [T-0034](#t-0034-success)
+- `git-publish` — [T-0002](#t-0002-success)
+- `git-worktree` — [T-0010](#t-0010-success), [T-0011](#t-0011-success)
+- `gitflow` — [T-0004](#t-0004-success), [T-0011](#t-0011-success), [T-0023](#t-0023-success), [T-0024](#t-0024-success), [T-0028](#t-0028-success), [T-0033](#t-0033-success)
+- `history-rewrite` — [T-0020](#t-0020-success)
+- `hooks` — [T-0004](#t-0004-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success), [T-0028](#t-0028-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success), [T-0033](#t-0033-success)
+- `housekeep` — [T-0003](#t-0003-success), [T-0011](#t-0011-success), [T-0035](#t-0035-success)
+- `husky` — [T-0004](#t-0004-success), [T-0006](#t-0006-success), [T-0008](#t-0008-success), [T-0023](#t-0023-success), [T-0033](#t-0033-success), [T-0034](#t-0034-success)
+- `init` — [T-0027](#t-0027-success)
+- `init-project` — [T-0021](#t-0021-success), [T-0025](#t-0025-success), [T-0037](#t-0037-success)
+- `init-script` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
+- `merge-authority` — [T-0013](#t-0013-success), [T-0014](#t-0014-success)
+- `method-text` — [T-0014](#t-0014-success)
+- `notice` — [T-0019](#t-0019-success)
+- `nul-safe` — [T-0012](#t-0012-success)
+- `orchestrator` — [T-0005](#t-0005-success), [T-0013](#t-0013-success)
+- `port` — [T-0003](#t-0003-success)
+- `pre-commit` — [T-0008](#t-0008-success)
+- `pre-push` — [T-0023](#t-0023-success)
+- `process` — [T-0005](#t-0005-success)
+- `process-docs` — [T-0036](#t-0036-success), [T-0038](#t-0038-success)
+- `public-release` — [T-0019](#t-0019-success), [T-0020](#t-0020-success)
+- `pytest-marker` — [T-0034](#t-0034-success)
+- `readme` — [T-0037](#t-0037-success)
+- `records` — [T-0034](#t-0034-success)
+- `release` — [T-0024](#t-0024-success), [T-0026](#t-0026-success), [T-0027](#t-0027-success), [T-0029](#t-0029-success), [T-0030](#t-0030-success), [T-0031](#t-0031-success), [T-0032](#t-0032-success)
+- `rename` — [T-0015](#t-0015-success)
+- `report-gate` — [T-0001](#t-0001-success)
+- `report-validation` — [T-0003](#t-0003-success), [T-0035](#t-0035-success)
+- `ruff` — [T-0007](#t-0007-success)
+- `scripts` — [T-0012](#t-0012-success), [T-0022](#t-0022-success), [T-0038](#t-0038-success)
+- `scrub` — [T-0019](#t-0019-success)
+- `security-policy` — [T-0021](#t-0021-success)
+- `seeding` — [T-0017](#t-0017-success)
+- `set-status` — [T-0001](#t-0001-success)
+- `shebang` — [T-0009](#t-0009-success)
+- `slow-tests` — [T-0034](#t-0034-success)
+- `staged-files` — [T-0012](#t-0012-success)
+- `task-scripts` — [T-0009](#t-0009-success)
+- `task-state` — [T-0016](#t-0016-success)
+- `task-tooling` — [T-0001](#t-0001-success), [T-0002](#t-0002-success)
+- `template` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
+- `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success), [T-0027](#t-0027-success), [T-0028](#t-0028-success), [T-0029](#t-0029-success)
+- `upstream-tracking` — [T-0010](#t-0010-success)
+- `uv` — [T-0006](#t-0006-success)
+- `verification` — [T-0036](#t-0036-success)
+- `verify-line` — [T-0035](#t-0035-success)
+- `verify-resolve` — [T-0038](#t-0038-success)
+- `versioning` — [T-0024](#t-0024-success), [T-0026](#t-0026-success)
+- `workflow` — [T-0013](#t-0013-success)
+- `worktree` — [T-0002](#t-0002-success), [T-0033](#t-0033-success), [T-0035](#t-0035-success)
+
+## changelog
+
+### T-0028 (success)
+
+- A heredoc whose terminator word also appears inside the quoted text ends early and hangs the
+  command. Use a distinct terminator or the Edit tool when a script contains shell here-documents.
+- The session's global commit signing can fail with "too many open files" after many scratch
+  commits. Set `commit.gpgsign=false` through `GIT_CONFIG_COUNT` for test runs only.
+- `git log -M` with a pathspec cannot see a rename whose source is outside the pathspec, so test
+  rename handling with both paths inside `changelog.d/`.
+
+Tags: `changelog`, `hooks`, `gitflow`, `breaking`, `tests`
+
+Source: [`reports/T-0028.md`](tasks/reports/T-0028.md)
+
+### T-0031 (success)
+
+- Fragments written before a first tag should state features, not deltas. Words like "no longer"
+  describe a change to something never released.
+- A docs report cannot cite its own commit hash. Name the content commit and say the report commit
+  follows it.
+
+Tags: `changelog`, `docs`, `release`
+
+Source: [`reports/T-0031.md`](tasks/reports/T-0031.md)
+
+### T-0032 (success)
+
+- A commit body line over 100 characters fails the commit-msg hook. Check line length before
+  committing a long `BREAKING CHANGE:` footer.
+- Reflow a markdown paragraph after replacing a sentence in it, or a line exceeds the wrap width.
+
+Tags: `changelog`, `docs`, `release`, `ask-first`
+
+Source: [`reports/T-0032.md`](tasks/reports/T-0032.md)
+
+## devcontainer
+
+### T-0006 (success)
+
+- The `mcr.microsoft.com/devcontainers/base:ubuntu` image (Ubuntu 26.04) has only
+  `python3-minimal`; `uv` selects it and builds fail on missing `tomllib`. Set
+  `UV_PYTHON_PREFERENCE=only-managed`.
+- A git worktree's `.git` file points to a host path, so git does not work in a container opened
+  on a worktree; test devcontainers from a normal clone.
+- `devcontainer up --experimental-lockfile` writes the lock file next to the config used, so run
+  it once per configuration.
+
+Tags: `devcontainer`, `uv`, `husky`, `docker`
+
+Source: [`reports/T-0006.md`](tasks/reports/T-0006.md)
+
+## docs
+
+### T-0005 (success)
+
+`scripts/gitflow.sh` cannot create `docs/` or `chore/` task branches, so a task branch of those
+types needs a hand-written `git worktree add ... origin/develop`, and `node_modules` is not
+symlinked into it. `npm ci` is needed before its first commit if the hooks are to run.
+
+Tags: `docs`, `agent-rules`, `process`, `orchestrator`
+
+Source: [`reports/T-0005.md`](tasks/reports/T-0005.md)
+
+### T-0010 (success)
+
+- `git worktree add -b <branch> origin/develop` sets the new branch to track `origin/develop`. A bare `git push` then fails under `push.default=simple` because the names differ. `--no-track` leaves no upstream, so the first push still needs `git push -u origin <branch>`.
+- Line numbers quoted in a task's context can drift as other tasks merge. The `AGENTS.md` citations had moved by two lines.
+
+Tags: `docs`, `agent-workflow`, `git-worktree`, `upstream-tracking`
+
+Source: [`reports/T-0010.md`](tasks/reports/T-0010.md)
+
+### T-0013 (success)
+
+The merge-authority wording lives in `CLAUDE.md`, `.agents/README.md`, `CONTRIBUTING.md` and the task template. A later change to merge rules should grep all four, plus `.agents/plans/`, for the section names it renames.
+
+Tags: `docs`, `merge-authority`, `orchestrator`, `workflow`
+
+Source: [`reports/T-0013.md`](tasks/reports/T-0013.md)
+
+### T-0014 (success)
+
+The method text is one long-line-per-paragraph file, and its cited line numbers shift after any insertion. Re-grep by phrase rather than trusting a line number from an earlier report.
+
+Tags: `docs`, `merge-authority`, `method-text`
+
+Source: [`reports/T-0014.md`](tasks/reports/T-0014.md)
+
+### T-0019 (success)
+
+- Do not guess a short form by taking initials of a project name. Derive it from an existing embedded occurrence, then check the rule counts against the counts the task states. A wrong guess matched nothing and the count mismatch exposed it.
+- A script run by a worktree-isolated agent must write its scratch data to the scratchpad directory by absolute path, so private literals never land in the tree.
+
+Tags: `docs`, `public-release`, `scrub`, `notice`
+
+Source: [`reports/T-0019.md`](tasks/reports/T-0019.md)
+
+### T-0021 (success)
+
+- `tests/test_init_project.py` builds its scratch copy from `git ls-files`, so a new root file
+  must be staged (`git add`) before the init tests see it; per the file's docstring, only
+  `init_project.py` and the test file are copied from the working tree.
+
+Tags: `docs`, `security-policy`, `code-of-conduct`, `init-project`
+
+Source: [`reports/T-0021.md`](tasks/reports/T-0021.md)
+
+### T-0026 (success)
+
+- `init_project.py` and its tests depend on `CLAUDE.md` keeping `## Working unit: the task` as its
+  first `##` heading. A new `CLAUDE.md` rule goes inside that section, not above it.
+- Run the gate on a committed tree. `tests/test_init_project.py` scans tracked files for the
+  template strings, so an uncommitted file is not checked and a committed one is.
+
+Tags: `docs`, `changelog`, `release`, `versioning`
+
+Source: [`reports/T-0026.md`](tasks/reports/T-0026.md)
+
+### T-0030 (success)
+
+- A merge git completes itself runs `prepare-commit-msg` and `commit-msg` (and `pre-merge-commit`
+  if one exists), never `pre-commit`. After a conflict, `git commit --no-edit` runs `pre-commit`
+  as well. Any statement about which hook covers a merge must name which of the two cases it means.
+- In a scratch repository, a logging hook that appends to a file shows exactly which hooks fire;
+  it is cheaper and more certain than reading git's hook documentation.
+- `origin/develop` can lag local `develop` in a session that may not push. Check
+  `git merge-base --is-ancestor origin/develop HEAD` before trusting `git log HEAD..origin/develop`.
+
+Tags: `docs`, `release`, `changelog`, `hooks`, `ask-first`, `breaking`
+
+Source: [`reports/T-0030.md`](tasks/reports/T-0030.md)
+
+## feat
+
+### T-0022 (success)
+
+- Modules loaded with `importlib.util.spec_from_file_location` are not in `sys.modules` unless
+  added by hand. A `@dataclass` under `from __future__ import annotations` then fails at import.
+  Use `NamedTuple` in `scripts/` files that tests load this way.
+- ruff's `DTZ011` bans `datetime.date.today()` here. Use
+  `datetime.datetime.now().astimezone().date()`.
+- `git log` detects renames by default. Add `--no-renames` when filtering on `--diff-filter=A`.
+- A gate run before new files are tracked can miss scans that read `git ls-files`. Commit first,
+  then run the gate.
+- Re-read the task file on `develop` before a fix round; the worktree copy can be stale.
+
+Tags: `feat`, `changelog`, `scripts`, `changelog-fragments`
+
+Source: [`reports/T-0022.md`](tasks/reports/T-0022.md)
+
+### T-0023 (success)
+
+- The `scratch` fixture in `tests/test_gitflow.py` runs `gitflow.sh start`, which fetches and
+  recreates `refs/remotes/origin/develop`. A test that needs that ref absent must delete it after
+  `start`, not before.
+- A new remote branch (all-zero `remote_sha`) never takes the `.agents/`-only skip, so a test of
+  that skip must push with a real `remote_sha`.
+- Remote-tracking refs for hook tests can be made with `git update-ref refs/remotes/origin/<name>
+  <sha>`, with no remote configured.
+
+Tags: `feat`, `breaking`, `husky`, `pre-push`, `gitflow`, `changelog`, `hooks`
+
+Source: [`reports/T-0023.md`](tasks/reports/T-0023.md)
+
+### T-0024 (success)
+
+- A refusal test cannot compare remote-tracking refs before and after, because the required
+  `git fetch origin` legitimately updates them. Compare `refs/heads` and `refs/tags` only.
+- `git branch -m` on the bare remote does not remove the stale `origin/<branch>` ref in the clone.
+  A test of a missing remote branch must also delete the tracking ref.
+- Commit before the final `scripts/gate.sh` so `tests/test_init_project.py` and the staged-file
+  checks see tracked files; keep the gate result tied to the commit hash.
+
+Tags: `feat`, `breaking`, `release`, `versioning`, `changelog`, `gitflow`
+
+Source: [`reports/T-0024.md`](tasks/reports/T-0024.md)
+
+### T-0025 (success)
+
+- `tests/test_init_project.py` copies `git ls-files` into a scratch repo, so a new file must be
+  tracked, that is committed, before the tests see it. Untracked fragments are invisible to the
+  scratch copy.
+- Compare the generated changelog with the template's text up to `## [Unreleased]`, not with the
+  whole file. After the first release the template's file gains released sections.
+- The scratch-copy tests run the real `scripts/changelog.py`, so the generated project is proven
+  to parse, not only to match a string.
+
+Tags: `feat`, `init-project`, `changelog`, `changelog-fragments`
+
+Source: [`reports/T-0025.md`](tasks/reports/T-0025.md)
+
+## gate
+
+### T-0033 (success)
+
+- `git ls-tree` accepts no pathspec magic in git 2.43; `git ls-files` does. A temporary index from `git read-tree --index-output=<file>` gives a pathspec-filtered listing of any commit without touching the real index.
+- A bash-only `export -f` in a scratch `scripts/config/gate.sh` breaks `.husky/pre-push`, which sources the file under `sh`. Log from a stub command on `PATH` instead.
+- `git log <range> -- <pathspec>` simplifies history; add `--full-history` when every commit of the range must count.
+- Do not use `pkill -f` or `kill` by guessed pid in a shared container: other agents' runs match the pattern, and it can kill the calling shell.
+
+Tags: `gate`, `hooks`, `husky`, `gitflow`, `git-pathspec`, `worktree`
+
+Source: [`reports/T-0033.md`](tasks/reports/T-0033.md)
+
+### T-0034 (success)
+
+- A scratch repo for slow-selection tests needs an `origin/develop` ref at the old tip, or the base is the local `develop` and a fast-forwarded branch has an empty change set (which runs the slow tests).
+- `git ls-files --others` and `git diff --name-only` both accept the `:(exclude,glob)` pathspecs, so one pathspec list serves records, the hook and the slow-test safe list.
+- A heredoc terminator such as EOF inside a Python heredoc ends the shell heredoc early; write scripts that contain shell heredocs to a file with a different delimiter.
+
+Tags: `gate`, `slow-tests`, `pytest-marker`, `husky`, `git-pathspec`, `records`
+
+Source: [`reports/T-0034.md`](tasks/reports/T-0034.md)
+
+## git
+
+### T-0007 (success)
+
+- A fresh clone takes file modes from the git index, so a host checkout can pass ruff `EXE001` while a clone fails; verify mode-sensitive lint in a fresh clone.
+- In this harness, a Bash call that combines git with a loop or `&&` chain can be refused for worktree-isolation checks; run git commands as plain separate calls.
+
+Tags: `git`, `ruff`, `file-modes`, `devcontainer`
+
+Source: [`reports/T-0007.md`](tasks/reports/T-0007.md)
+
+## gitflow
+
+### T-0011 (success)
+
+- `housekeep.py`'s old merged check was ancestry-only, so any test that wanted a "merged" worktree could pass with an empty branch. Such tests must commit on the branch and merge it.
+- `ruff format` wraps lines at 88 columns here; the gate's format check fails on a single over-long condition, so run `uv run ruff format <files>` before the gate.
+
+Tags: `gitflow`, `housekeep`, `git-worktree`, `bash-3.2`
+
+Source: [`reports/T-0011.md`](tasks/reports/T-0011.md)
+
+## hooks
+
+### T-0004 (success)
+
+- A worktree shares `core.hooksPath` with the primary checkout, so hooks run from the primary checkout's `.husky/_` (files from the checked-out branch there), not the worktree's edited hooks.
+- The sibling `../source-project` path does not resolve from inside `.claude/worktrees/<id>/`; use the absolute path `/path/to/source-project`.
+
+Tags: `hooks`, `husky`, `gate`, `commit-lint`, `gitflow`
+
+Source: [`reports/T-0004.md`](tasks/reports/T-0004.md)
+
+### T-0008 (success)
+
+- A rename is invisible to a `--diff-filter=ACMR` listing as anything but its new path. Use `--no-renames` and no filter when deciding on "what did this commit touch", as `pre-push` does.
+- `git add -- <name>` treats `[`, `*` and `?` in a name as pathspec globs, so a test that stages `a[1].py` must use `:(literal)a[1].py`, and the hook must set `GIT_LITERAL_PATHSPECS=1`.
+- Hook tests with stub `autofix.sh`/`gate.sh` cannot show problems inside the real scripts. Check unusual names against the real `staged_files` too.
+
+Tags: `hooks`, `husky`, `pre-commit`, `git-pathspec`
+
+Source: [`reports/T-0008.md`](tasks/reports/T-0008.md)
+
+## housekeep
+
+### T-0035 (success)
+
+- A scratch-repo test for `housekeep.py` must patch `load_tasks`; otherwise the real repository's
+  task files decide the result, and a branch named `feat/T-0001-...` matches a real finished task.
+- The task-ID in a task branch name, not the full branch name, is the stable key to a task file:
+  the type prefix and slug can differ from what `Task.branch` generates.
+
+Tags: `housekeep`, `report-validation`, `verify-line`, `worktree`
+
+Source: [`reports/T-0035.md`](tasks/reports/T-0035.md)
+
+## init-project
+
+### T-0037 (success)
+
+- Create the report after the full gate finishes, or the untracked file makes the tree dirty and
+  the run writes no gate record.
+- `gitflow.sh <type> start` leaves the worktree without `.husky/_` when the primary checkout has no
+  `node_modules`. Run `npm ci` in the worktree before the first commit.
+
+Tags: `init-project`, `readme`, `gate`
+
+Source: [`reports/T-0037.md`](tasks/reports/T-0037.md)
+
+## init-script
+
+### T-0015 (success)
+
+- `npm install --package-lock-only` still runs the project's `prepare` script. In this repo that is `husky`, so the command exits 127 in a tree without `node_modules`, though the lock file is written.
+- `git status --porcelain` output passed through a `.strip()` helper loses the leading space of the first line, so ` M file` reads as a staged `M file`. Use `git diff --cached --name-only` to test for staged files.
+- The ruff configuration in this repo flags `datetime.date.today()` (DTZ011) and a bare `except Exception` (BLE001), and flags a shebang file that is not executable (EXE001). Use `datetime.now().astimezone()`, add a reasoned `noqa`, and `chmod +x`.
+- A worktree-isolated agent's shell refuses commands that mention git in a compound or inline-script form. Put such helper code in a file under the scratchpad and run that.
+
+Tags: `init-script`, `template`, `rename`, `tests`
+
+Source: [`reports/T-0015.md`](tasks/reports/T-0015.md)
+
+### T-0016 (success)
+
+- The pre-commit hook runs lint, format and type checks on the staged files, not the test suite. A tests-first commit is therefore possible; this task recorded the failing run in the report instead.
+- `git ls-files` does not keep an empty directory, and `.agents/tasks/reports/` survives only through `.gitkeep`. Any reset that removes `reports/*.md` must leave that file.
+- The task scripts resolve paths from their own file location, so running them as subprocesses with `cwd` in the copy is enough to regenerate the copy's files. Set `PYTHONDONTWRITEBYTECODE=1`, or `__pycache__/` appears inside the directory that must stay unchanged.
+- A worktree-isolated agent's shell refuses an inline heredoc script that mentions git. Use the edit tools for such changes.
+
+Tags: `init-script`, `template`, `task-state`, `tests`
+
+Source: [`reports/T-0016.md`](tasks/reports/T-0016.md)
+
+### T-0017 (success)
+
+- A new text block inserted before an anchor heading round-trips byte for byte only if it ends with a blank line and the edit helper replaces the heading line itself; test the round trip by cutting from the section start to the anchor.
+- When a later step deletes files an earlier step edits, the earlier step's observable assertions move to the later step's replacement files. Check the existing tests for this before adding a deleting step.
+
+Tags: `init-script`, `template`, `seeding`, `tests`
+
+Source: [`reports/T-0017.md`](tasks/reports/T-0017.md)
+
+### T-0018 (success)
+
+- `npm install --package-lock-only` still runs the root `prepare` script. In a copy without `node_modules/`, that is `husky: not found` and exit 127, which looks like a network failure. Pass `--ignore-scripts`.
+- `husky` sets `core.hooksPath` in the repo where it runs, so a test copy that ran `npm ci` or `npm install` without `--ignore-scripts` has live hooks from then on, whatever the test set earlier.
+- A commit body line over 100 characters fails `scripts/commit_lint.py`; wrap bodies.
+- When a later step makes an earlier step's test assumptions false (the script removes itself), keep the earlier cases by truncating `STEPS` in a small driver rather than editing their assertions.
+
+Tags: `init-script`, `template`, `gate`, `commit`, `end-to-end`, `tests`
+
+Source: [`reports/T-0018.md`](tasks/reports/T-0018.md)
+
+## public-release
+
+### T-0020 (success)
+
+- After a repository rename, a cloud session's git access still follows the old name; attach the
+  renamed and the new repository explicitly before cloning or pushing.
+- A newly created repository needs the Claude GitHub App granted to it before any push; the
+  symptom is a 403 from `git ls-remote`.
+- Pushing a rewritten history to a fresh repository, and writing files that describe it, can be
+  blocked by the session's permission classifier; the owner's explicit approval in the session
+  is what unblocks it.
+- filter-repo applies plain-text rules before regex rules, so a regex rule must not depend on a
+  plain-text rule's output, and a rule that does must be ordered accordingly.
+
+Tags: `public-release`, `history-rewrite`, `filter-repo`, `chore`
+
+Source: [`reports/T-0020.md`](tasks/reports/T-0020.md)
+
+## release
+
+### T-0029 (success)
+
+- Git sends a commit or merge hook's stdout to stderr, so a hook cannot make `git` print on both
+  streams. To test both streams, use a case where git itself writes stdout (`Auto-merging <file>`
+  from a clean two-sided merge) and a `pre-merge-commit` hook that writes to stderr.
+- Running real hooks in a fixture leaves `scripts/__pycache__/` (from `changelog.py`), which makes
+  the tree dirty, so `release.py` refuses. The fixture needs a `.gitignore` for `__pycache__/`.
+- `GIT_TRACE=<file>` on the `release.py` subprocess records `run_command: ... .husky/<hook>` lines.
+  That proves which hooks git ran without editing the copied hooks.
+- A merge made by `git merge --no-ff` runs `commit-msg` only (on `.git/MERGE_MSG`); with
+  `core.hooksPath=.husky` there is no `pre-merge-commit` hook.
+
+Tags: `release`, `tests`, `hooks`, `breaking`
+
+Source: [`reports/T-0029.md`](tasks/reports/T-0029.md)
+
+## report-validation
+
+### T-0003 (success)
+
+`housekeep.py` reads module-level `REPO_ROOT` and `_schema.REPORTS_DIR` (via `Task.report_path`); tests must patch both to point at a tmp repo.
+
+Tags: `report-validation`, `housekeep`, `port`
+
+Source: [`reports/T-0003.md`](tasks/reports/T-0003.md)
+
+## scripts
+
+### T-0012 (success)
+
+- `git diff --cached --name-only` without `-z` C-quotes only names with a double quote, backslash, control character or non-ASCII byte. Spaces and single quotes pass through, so a test with only those names proves nothing about quoting.
+
+Tags: `scripts`, `bash`, `git`, `nul-safe`, `staged-files`
+
+Source: [`reports/T-0012.md`](tasks/reports/T-0012.md)
+
+### T-0038 (success)
+
+`scripts/gitflow.sh docs start T-NNNN-<slug>` creates a task worktree with hooks and `node_modules` already wired. Commit signing worked in this run, so no environment override was needed.
+
+Tags: `scripts`, `comments`, `process-docs`, `verify-resolve`
+
+Source: [`reports/T-0038.md`](tasks/reports/T-0038.md)
+
+## task-scripts
+
+### T-0009 (success)
+
+`git update-index --chmod=-x` also stages the file's current content, so a later `git add` is not needed for edits made before it.
+
+Tags: `task-scripts`, `shebang`, `file-mode`
+
+Source: [`reports/T-0009.md`](tasks/reports/T-0009.md)
+
+## task-tooling
+
+### T-0001 (success)
+
+`Task.report_path` resolves from `_schema.REPORTS_DIR`, which derives from the script's own location. Tests can therefore exercise `task.py` safely by copying `scripts/` and `templates/` into `tmp_path` and running the copy, with no monkeypatching. `task.py new --no-publish` seeds a valid task file there without git. For branch tests, `git init` the same `tmp_path`, commit the report on a task branch, and strip `GIT_*` variables from the test's git calls. A `validate_report` rule that keys on `task.status` can be judged for a target status by passing a copy of the task with that status; no rule change is needed.
+
+Tags: `task-tooling`, `report-gate`, `set-status`, `execution-loop`
+
+Source: [`reports/T-0001.md`](tasks/reports/T-0001.md)
+
+### T-0002 (success)
+
+- The agent worktree started on the initial scaffold commit, not `develop`; fast-forward the new branch to `develop` before reading task files.
+- Worktree-isolated Bash refuses commands whose text mentions git alongside other constructs; run git commands as separate plain calls and put multi-line Python in a scratchpad file.
+
+Tags: `task-tooling`, `git-publish`, `backlog`, `worktree`
+
+Source: [`reports/T-0002.md`](tasks/reports/T-0002.md)
+
+## tests
+
+### T-0027 (success)
+
+- A test that needs changelog fragments must plant its own. The repository's `changelog.d/` is
+  empty after every release, so assertions on it break the next push.
+- `git rm` of tracked fragments can be denied by the permission layer. Get the owner's approval
+  for the exact files first.
+
+Tags: `tests`, `init`, `changelog`, `release`
+
+Source: [`reports/T-0027.md`](tasks/reports/T-0027.md)
+
+## verification
+
+### T-0036 (success)
+
+- The report file is a `RECORD_PATHS` path but still makes `git status --porcelain` dirty, so a gate run that must write a record has to finish before `report.py new` creates the file in the worktree.
+- `.agents/tasks/scripts/housekeep.py` cites `CONTRIBUTING.md` § "Agent verify/resolve workflow" by name, so that heading must not be renamed.
+- The task's fragment rules forbid "now" as a word; check the fragment for it before the first commit.
+
+Tags: `verification`, `process-docs`, `gate-records`, `claude-md`, `breaking`
+
+Source: [`reports/T-0036.md`](tasks/reports/T-0036.md)

@@ -59,10 +59,21 @@ python .agents/tasks/scripts/report.py lessons --tag <tag>
 python .agents/tasks/scripts/report.py validate T-0004
 ```
 
-`task.py new` allocates an ID under an exclusive lock, so several sessions or
-worktrees can create tasks simultaneously without colliding. The allocator also
-reconciles against the task files actually on disk, so a lost or
-merge-clobbered `.counter` cannot hand out a duplicate.
+`task.py set-status` to `review`, `blocked`, `done` or `abandoned` requires a
+report that passes `report.py validate` (see § Task lifecycle).
+
+`task.py new` files the task directly on `develop`: it syncs the primary
+checkout to `origin/develop`, allocates an ID under an exclusive lock,
+reconciled against the task files actually on disk, writes the file, and
+commits and pushes it in the same invocation. No branch or worktree is
+created just to file a task. It must therefore be run from the primary
+checkout, on `develop`; running it from a secondary worktree or from any
+other branch fails fast rather than filing the task somewhere invisible to
+everyone else. If a push is rejected because another checkout published a
+task in the same window, it resyncs, reallocates the next free ID, and
+retries automatically (at most 5 times), so a colliding ID never needs a human
+to resolve it. `--no-publish` writes the file locally only, for scripting and
+testing contexts where a real push isn't wanted.
 
 > **Why these are not `[project.scripts]` entry points.**
 > `PYTHON_CONVENTIONS.md` says CLI entry points belong in `[project.scripts]`.
@@ -73,28 +84,142 @@ merge-clobbered `.counter` cannot hand out a duplicate.
 
 ## The execution loop
 
+0. **File.** `task.py new ...` from the primary checkout on `develop`, for
+   each task to add. It publishes straight to `develop` (see § Commands
+   above), so it is visible to every worktree before dispatch even starts.
+   Filing never uses a worktree or branch; only execution (step 4) does.
 1. **Select.** `backlog.py ready --parallel 3` → a conflict-free batch of IDs.
-2. **Mark.** `task.py set-status T-00XX in_progress` for each, then
+   Candidates whose `touches` overlap a task already `in_progress` or `review`
+   are left out, and `blocked` tasks are never listed.
+2. **Mark.** First sync the primary checkout: `git pull --ff-only origin develop`, before any
+   `set-status` and before dispatch, so a task is never started from a stale `develop`. If local
+   `develop` has diverged from `origin/develop` (the orchestrator has unpushed status commits and
+   `origin` has moved), the pull refuses. Rebase the unpushed status commits onto `origin/develop`
+   (`git fetch origin`, then `git rebase origin/develop`) instead of merging, so `develop` gets no
+   `merge origin/develop into develop` commit. Only unpushed commits are rebased, never commits
+   already on `origin`. Then `task.py set-status T-00XX in_progress` for each, then
    `backlog.py reindex`.
 3. **Dispatch.** One subagent per task, each on its own git worktree (see
-   `CONTRIBUTING.md` § Worktrees), prompted with: *read `AGENTS.md`, then
-   execute `.agents/tasks/T-00XX-*.md`.*
+   `CONTRIBUTING.md` § Worktrees for agents), prompted with: *read
+   `CLAUDE.md`, then execute `.agents/tasks/T-00XX-*.md`.* Also tell the
+   subagent that its ephemeral status/progress chatter (not anything it writes
+   to disk) may be terse, caveman-style, if that mode is available; see
+   `CLAUDE.md` § "Chatter vs. persisted output" for what stays full prose
+   regardless.
 4. **Execute.** The subagent creates a worktree and branches from `develop` as
    `<type>/T-00XX-<slug>` (Conventional Commits type as the prefix, per
    `CONTRIBUTING.md`), does the work, writes and commits its report, and
-   pushes. It does not merge.
+   pushes. It iterates with `scripts/gate.sh --fast` and targeted tests,
+   commits freely, and spawns no verifier of its own. It does not merge.
 5. **Collect.** The orchestrator reads the report without leaving the main tree:
    ```bash
    git show <branch>:.agents/tasks/reports/T-00XX.md
    ```
 6. **Close.** `task.py set-status T-00XX review` (or `blocked`), then
-   `backlog.py reindex` and `report.py harvest`.
-7. **Merge.** A human reviews and merges the branch into `develop`, per
-   `CONTRIBUTING.md`'s branching model. Whether a PR/MR is opened
-   automatically depends on whether a git-host CLI (`gh`, `glab`, etc.) is
-   available in the environment — where it isn't, a task ends at *branch
-   pushed, report committed*, and opening the PR/MR stays a human step, same
-   as agents never merging their own work (see `AGENTS.md`).
+   `backlog.py reindex` and `report.py harvest`. `set-status` enforces the
+   report gate (see § Task lifecycle): it fails unless the task's report passes
+   `report.py validate`. It finds the report in the working tree, or, when run
+   on `develop` before the merge, on the task's branch.
+7. **Verify, resolve, merge.** The orchestrator merges the branch into `develop` by default,
+   with no per-batch grant (`CLAUDE.md` § "Merge authority: orchestrator merges by default"). It
+   does so only after the one verify by an independent verifier has passed, per
+   § "Verify, resolve, merge" below, and with the merge commit header
+   `chore(merge): merge task NNNN into develop` (`CONTRIBUTING.md`'s branching model). A human
+   decides only a breaking change (defined in `CLAUDE.md`) and every "Ask first" item; a task that
+   needs either is `blocked`. This default does not extend to `main`, release tags or releases.
+   Whether a PR/MR is opened automatically depends on whether a git-host CLI (`gh`, `glab`, etc.)
+   is available in the environment. Where it isn't, no PR/MR is needed: the orchestrator merges
+   locally and pushes `develop`. Executors never merge their own work (see `CLAUDE.md`).
+8. **Clean up.** Whoever performed the merge in step 7 also removes the
+   now-merged branch's worktree (`git worktree remove <path>`) and deletes
+   the local branch (`git branch -d <branch>`, which refuses on an unmerged
+   branch, making this safe by construction). The dispatched subagent from
+   step 4 is long gone by this point, so this step belongs to the merger, not
+   the executor. `housekeep.py worktrees` (see § Housekeeping) exists to catch
+   this step being skipped.
+
+### Verify, resolve, merge
+
+Step 7 runs as follows, for every task. Exactly one independent verifier checks each change per
+round, and no verifier runs per commit.
+
+   - The orchestrator runs one verifier per task per round, in the foreground, and records its
+     result before it starts anything else for that task.
+   - The verifier works in a detached worktree of the orchestrator's checkout, so the gate record it
+     writes lands in the shared git directory where the later steps find it. After
+     `git fetch origin`, the orchestrator makes it with
+     `git worktree add --detach <path> origin/<branch>`; a plain checkout of the branch is refused
+     while the executor's worktree holds it. The verifier makes no commit and needs no `npm ci`.
+     The orchestrator removes the worktree (`git worktree remove <path>`) once it has recorded the
+     result. `housekeep.py worktrees` skips a detached worktree, so this removal is by hand.
+   - The verifier is a fresh agent. It always runs the full gate itself (`scripts/gate.sh`, never
+     `--if-needed`) on a clean tree, so its run is the canonical one and writes the gate record
+     (`gate record <key>` in the output). It never relies on a record another run wrote. It also
+     checks every acceptance criterion against the files, `git diff --name-only` against
+     `touches`, and, for test changes, that each expected value comes from spec text. For a
+     `feat`, `fix` or breaking change it also checks that the branch adds a changelog fragment
+     (`changelog.d/<id>.<category>.md`, listed in `touches`) that describes the
+     change, and that each commit's type matches what the change does, since a
+     wrongly typed commit needs no fragment and drives no release. It reads
+     each new fragment against the wording rule in `changelog.d/README.md`
+     § "Before the first release" and, until the first `vX.Y.Z` tag exists,
+     reports "Breaking:", "no longer", "used to" or "now". It reports
+     every failure and fixes nothing. It must also check and report whether
+     the change is a breaking change (as `CLAUDE.md` defines it) or crosses any "Ask first"
+     item, including edits to `scripts/` or `pyproject.toml` `[tool]`
+     sections, or to hooks or CI outside the task's own scope. If either is
+     true, the orchestrator
+     does not merge and the task is set `blocked` for a human. Its result ends with the verify line
+     it found, `passed (commit <hash>; gate <record-key>; <counts>)`, or `failed`.
+   - The verifier is independent as `CLAUDE.md` § "Merge authority:
+     orchestrator merges by default" defines it.
+   - On a failure, a fresh executor fixes the findings on the same branch, in new commits, and a new
+     verifier checks again. That fix-round verifier checks that the earlier findings are fixed and
+     reviews the diff since the verified commit. It runs the full gate for the new head, or cites a
+     record that an earlier independent verifier's run wrote for the same code. It rechecks
+     `touches` and "Ask first" for the whole branch, since a fix can break a criterion that already
+     passed. After three failed rounds the task is `blocked` and is not merged.
+   - On a clean verify, the orchestrator records the verifier's line in the report's verify line
+     (`passed (commit <hash>; gate <record-key>; <counts>)`: `<hash>` is the commit verified and
+     `<record-key>` the key of the record the verifier's run wrote), commits that on the task
+     branch, and merges with `chore(merge): merge task NNNN into develop`. The commit changes only
+     a report, which is a bookkeeping record, so it needs no verification and the hooks skip it. It
+     leaves the gate record key unchanged.
+   - After the merge it runs `scripts/gate.sh --if-needed` on the merge commit. When the merge's
+     code equals the verified branch's code, as when no other task merged code first, the
+     verifier's record covers it and no full gate runs. Otherwise the full gate runs, and it skips
+     the slow tests only for a safe-list-only change. The `pre-push` hook for `develop` makes the
+     same call, so a green check is not repeated at the push. Green: push. Red before
+     pushing: `git reset --merge ORIG_HEAD` and block the task. Red after
+     pushing: `git revert -m 1 <merge>` as a new commit, push, and block the
+     task. It never force-pushes.
+   - Commits that change only bookkeeping records (`RECORD_PATHS` in `scripts/config/gate.sh`: task
+     files, reports, `BACKLOG.md`, `.counter`, `LESSONS.md`, plans) need no independent
+     verification and no gate; the hooks skip them. A plan or task file written for the owner keeps
+     one independent review before it is merged.
+   - Gate records are written only by `scripts/gate.sh`. Nobody creates, copies or edits one by
+     hand.
+   - Before the next dispatch: `git pull --ff-only origin develop`, and rebase rather than merge
+     if `develop` has diverged (step 2).
+
+Rules for every batch:
+
+- An executor that meets an ambiguity its task file does not settle records it
+  under the report's open questions and stops; the orchestrator blocks the
+  task. Nobody guesses an owner decision.
+- Every other "Ask first" rule in `CLAUDE.md` stands. A task that would cross
+  one is `blocked`.
+- Executors never regenerate `BACKLOG.md` or `LESSONS.md` on a task branch;
+  the orchestrator does it on `develop` when it changes a status.
+- Orchestrator edits to task files are limited to these three: `task.py set-status`;
+  widening a task's `touches`, with the reason recorded in the task's report; and, before
+  dispatch, amending a task file with the findings of a pre-batch review, on a `docs/`
+  branch.
+- A worktree not made by `scripts/gitflow.sh` needs `npm ci` before its first
+  commit, so the hooks run.
+- Commit body lines stay at or under 100 characters.
+- Optionally, before dispatch, a fresh agent reviews the batch's task files
+  against the repository.
 
 ## Task lifecycle
 
@@ -108,6 +233,30 @@ open ──> in_progress ──> review ──> done
 
 Only `done` satisfies a dependency. `blocked` and `abandoned` still require a
 report explaining why.
+
+**The report is an enforced gate.** `task.py set-status` refuses a transition
+to `review`, `blocked`, `done` or `abandoned` unless the task's report exists
+and passes the same check as `report.py validate T-00XX` (no placeholder left
+in a required section, valid outcome, and the other rules `validate` applies).
+On refusal it exits non-zero, names each problem, and leaves the task file
+unchanged. Transitions to `open` and `in_progress` are not gated.
+
+The gate looks for `.agents/tasks/reports/T-00XX.md` in the working tree of
+the checkout the command runs in. If it is absent there, it falls back to the
+task's branch through git: a local or `origin/` branch matching `*/T-00XX-*`
+(local first), read with `git show <branch>:.agents/tasks/reports/T-00XX.md`.
+That is what lets step 6 of the execution loop run on `develop` before the
+merge, when the report exists only on the task branch. The content found is
+validated the same way whichever source it came from. A report in neither place,
+or an unparseable one, is refused.
+
+A move to `done` is checked as `validate` checks a done task: the verify line
+must start with `passed` and name its commit, and the summary must not call the
+verify pending. The touches rule applies once the task's merge commit is
+reachable from `HEAD`, and is skipped before that, exactly as in `validate`.
+`review`, `blocked` and `abandoned` accept a `pending` verify line. The gate
+reuses `report.py`'s validation rather than defining a second one, so the two
+cannot disagree on what counts as a valid report.
 
 ## Writing a good task
 
@@ -156,19 +305,24 @@ stdlib-only and runs with no virtualenv.
 python .agents/tasks/scripts/housekeep.py touches [<branch> ...]
 python .agents/tasks/scripts/housekeep.py drift [--review-days N]
 python .agents/tasks/scripts/housekeep.py setup
+python .agents/tasks/scripts/housekeep.py worktrees
 python .agents/tasks/scripts/housekeep.py all
 ```
 
 - **`touches`** — diffs each task branch (or, with no arguments, every local
   branch matching `<type>/T-00XX-<slug>`) against `develop` and reports any
-  changed file outside that task's declared `touches`, plus any declared path
-  the branch never touched. Reuses `_schema.paths_overlap`, the same
+  changed file outside that task's declared `touches`. The task's own report
+  file (`.agents/tasks/reports/T-00XX.md`) is in scope, because the workflow
+  requires the subagent to write it, and a declared path the branch never
+  touched is not reported. Reuses `_schema.paths_overlap`, the same
   prefix-matching semantics `backlog.py ready --parallel` uses to decide what
   may run together, so the two checks cannot disagree. A branch with no
   common history with `develop`, or that does not exist, is reported rather
   than crashing the check.
 - **`drift`** — reports staleness: a `BACKLOG.md` that no longer matches the
-  task files on disk, a `done` task with no report, an `in_progress` task
+  task files on disk, a `done` task with no report (the task branch is checked via
+  `git show <branch>:.agents/tasks/reports/T-00XX.md` before the report is
+  declared missing), an `in_progress` task
   whose branch does not exist or has no commits ahead of `develop`, a
   `review` task older than `--review-days` (default 7), and a `depends_on`
   reference to a task that is `in_progress` rather than `done`.
@@ -177,7 +331,23 @@ python .agents/tasks/scripts/housekeep.py all
   `CONTRIBUTING.md` § Agent verify/resolve workflow). A "not configured yet"
   finding on a fresh checkout of this template is the tool working correctly,
   not a bug — it just means the repo's Husky install step hasn't run yet.
-- **`all`** — runs all three and prints a compact per-section summary. Every
+- **`worktrees`** — reports four kinds of leftover, one line per finding, and removes nothing:
+  - a secondary worktree whose branch is already merged into `develop` but was never removed
+    with `git worktree remove` (step 8 of the execution loop);
+  - a secondary worktree on the branch of a `done` or `abandoned` task, merged or not. An unmerged
+    one is flagged for confirmation that the work is not needed before it is removed. A worktree
+    that is both merged and on a finished task's branch is one finding;
+  - a local branch of a `done` or `abandoned` task that has no secondary worktree, merged or not
+    (a `BRANCH` finding, with the `git branch -d` command). A finished task's branch checked out in
+    the primary checkout counts too;
+  - every worktree other than the primary checkout that has `develop` or `main` checked out
+    (forbidden per `CONTRIBUTING.md` § Worktrees for agents).
+
+  Task branches are matched by the task ID in the branch name, and only local branches are read. A
+  detached worktree, such as a verifier's, is skipped. The exit status is 0 with no finding and 1
+  with any, so a leftover of a finished task makes `worktrees` and `all` exit non-zero. It
+  automates the manual `git worktree list` / `git branch --merged develop` sweep.
+- **`all`** — runs all four and prints a compact per-section summary. Every
   subcommand, `all` included, exits non-zero when it finds a problem and
   prints one line per finding, in a form that can be pasted directly into a
   report.
@@ -190,16 +360,14 @@ it compounds across a merge).
 
 ## Testing the tooling
 
-This tooling has no test suite in the template by default. If you add one, it
-belongs under `tests/` per `PYTHON_CONVENTIONS.md` (e.g.
-`tests/test_task_scripts.py`), and should cover at minimum: frontmatter
-parsing (including everything it must reject), ID allocation under both
-thread and process concurrency, scope-overlap detection, dependency-cycle
-detection, and the readiness/batching queries — plus an assertion that every
-committed task validates and that `BACKLOG.md` is not stale. Run it the same
-way as the rest of the suite:
+The tooling is tested under `tests/` (`tests/test_task_scripts.py` for task
+filing, IDs, backlog and batching; `tests/test_report_scripts.py` for report
+validation, harvest and `housekeep.py`; `tests/test_set_status_gate.py` for the
+report gate on `set-status`). Run it the same way as the rest of the
+suite, normally through the gate:
 
 ```bash
-uv run pytest tests/test_task_scripts.py -v
-uv run ruff check .agents/tasks/scripts tests
+scripts/gate.sh
+uv run pytest tests/test_task_scripts.py tests/test_report_scripts.py \
+    tests/test_set_status_gate.py -v
 ```

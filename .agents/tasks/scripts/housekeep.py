@@ -15,6 +15,7 @@ Usage:
     python .agents/tasks/scripts/housekeep.py touches [<branch> ...]
     python .agents/tasks/scripts/housekeep.py drift [--review-days N]
     python .agents/tasks/scripts/housekeep.py setup
+    python .agents/tasks/scripts/housekeep.py worktrees
     python .agents/tasks/scripts/housekeep.py all
 """
 
@@ -32,9 +33,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from _frontmatter import FrontmatterError  # noqa: E402
-from _schema import (  # noqa: E402
+from _frontmatter import FrontmatterError
+from _schema import (
     BACKLOG_FILE,
+    INTEGRATION_BRANCH,
     REPO_ROOT,
     TYPES,
     Task,
@@ -46,11 +48,13 @@ from _schema import (  # noqa: E402
 
 logger = logging.getLogger("housekeep")
 
-#: The integration branch every task branches from and is diffed against.
-INTEGRATION_BRANCH = "develop"
-
 #: Matches a task branch name, e.g. ``chore/T-0014-housekeeping-audit``.
-_BRANCH_RE = re.compile(r"^(" + "|".join(re.escape(t) for t in TYPES) + r")/(T-\d{4,})-.+$")
+_BRANCH_RE = re.compile(
+    r"^(" + "|".join(re.escape(t) for t in TYPES) + r")/(T-\d{4,})-.+$"
+)
+
+#: Task statuses whose branches and worktrees are leftovers once they still exist.
+FINISHED_STATUSES = frozenset({"done", "abandoned"})
 
 #: Default staleness threshold for a task sitting in ``review``.
 DEFAULT_REVIEW_DAYS = 7
@@ -84,7 +88,9 @@ def branch_exists(branch: str) -> bool:
     Returns:
         ``True`` if git resolves the branch to a commit.
     """
-    return _git("rev-parse", "--verify", "--quiet", f"refs/heads/{branch}").returncode == 0
+    return (
+        _git("rev-parse", "--verify", "--quiet", f"refs/heads/{branch}").returncode == 0
+    )
 
 
 def list_task_branches() -> list[str]:
@@ -157,6 +163,24 @@ def file_age_days(path: Path) -> float | None:
     return (time.time() - int(stamp)) / _SECONDS_PER_DAY
 
 
+def file_exists_on_branch(branch: str, path: Path) -> bool:
+    """Report whether ``path`` exists on ``branch``.
+
+    Args:
+        branch: Branch name to inspect.
+        path: Absolute path to a tracked file.
+
+    Returns:
+        ``True`` if ``git show <branch>:<path>`` resolves the file.
+    """
+    try:
+        rel = path.relative_to(REPO_ROOT)
+    except ValueError:
+        rel = path
+    result = _git("show", f"{branch}:{rel}")
+    return result.returncode == 0
+
+
 # --- touches conformance ---------------------------------------------------------
 
 
@@ -168,9 +192,8 @@ def check_touches(branches: Sequence[str] | None = None) -> list[str]:
             local branch matching the task-branch naming convention is used.
 
     Returns:
-        One finding per problem: a changed file outside scope, or a declared
-        path the branch never touched. Empty means every checked branch is
-        clean.
+        One finding per problem: a changed file outside scope. Empty means
+        every checked branch is clean.
     """
     findings: list[str] = []
     targets = list(branches) if branches else list_task_branches()
@@ -206,22 +229,19 @@ def check_touches(branches: Sequence[str] | None = None) -> list[str]:
             # everything" (see _schema.tasks_conflict) -- nothing to flag.
             continue
 
-        touched_declared: set[str] = set()
-        for changed_path in changed:
-            covered = [entry for entry in declared if paths_overlap(entry, changed_path)]
-            if covered:
-                touched_declared.update(covered)
-            else:
-                findings.append(
-                    f"TOUCHES {branch}: {changed_path} is outside {task_id}'s declared "
-                    f"touches {declared}"
-                )
+        try:
+            report_rel = task.report_path.relative_to(REPO_ROOT)
+        except ValueError:
+            report_rel = task.report_path
+        in_scope = list(declared) + [str(report_rel)]
 
-        for entry in declared:
-            if entry not in touched_declared:
-                findings.append(
-                    f"TOUCHES {branch}: declared path {entry!r} for {task_id} was never touched"
-                )
+        for changed_path in changed:
+            if any(paths_overlap(entry, changed_path) for entry in in_scope):
+                continue
+            findings.append(
+                f"TOUCHES {branch}: {changed_path} is outside {task_id}'s declared "
+                f"touches {declared}"
+            )
 
     return findings
 
@@ -274,7 +294,14 @@ def check_drift(review_days: int = DEFAULT_REVIEW_DAYS) -> list[str]:
                 report_rel = task.report_path.relative_to(REPO_ROOT)
             except ValueError:
                 report_rel = task.report_path
-            findings.append(f"DRIFT {task.id}: status done but no report at {report_rel}")
+            branch = task.branch
+            report_on_branch = branch_exists(branch) and file_exists_on_branch(
+                branch, task.report_path
+            )
+            if not report_on_branch:
+                findings.append(
+                    f"DRIFT {task.id}: status done but no report at {report_rel}"
+                )
 
         if task.status == "in_progress":
             branch = task.branch
@@ -314,6 +341,182 @@ def check_drift(review_days: int = DEFAULT_REVIEW_DAYS) -> list[str]:
     return findings
 
 
+# --- worktree hygiene -----------------------------------------------------------
+
+
+def list_worktrees() -> list[dict[str, str]]:
+    """List all git worktrees for this repo via ``git worktree list --porcelain``.
+
+    Returns:
+        One dict per worktree with keys ``path`` and ``branch`` (``branch``
+        is ``""`` for a detached HEAD). The first entry is always the
+        primary checkout, per git's own ordering.
+    """
+    result = _git("worktree", "list", "--porcelain")
+    if result.returncode != 0:
+        return []
+    worktrees: list[dict[str, str]] = []
+    current: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        if not line.strip():
+            if current:
+                worktrees.append(current)
+                current = {}
+            continue
+        if line.startswith("worktree "):
+            current = {"path": line[len("worktree ") :].strip(), "branch": ""}
+        elif line.startswith("branch "):
+            ref = line[len("branch ") :].strip()
+            current["branch"] = ref.removeprefix("refs/heads/")
+    if current:
+        worktrees.append(current)
+    return worktrees
+
+
+def is_branch_merged(branch: str, base: str = INTEGRATION_BRANCH) -> bool:
+    """Report whether ``branch`` is already an ancestor of ``base``.
+
+    A branch whose tip equals ``base``'s tip has no commits of its own yet (a freshly
+    created task branch), so it counts as not merged.
+
+    Args:
+        branch: Branch to check.
+        base: Branch to check ancestry against.
+
+    Returns:
+        ``True`` if ``branch`` has commits and has already been merged into ``base``.
+    """
+    branch_tip = _git("rev-parse", "--verify", "--quiet", f"{branch}^{{commit}}")
+    base_tip = _git("rev-parse", "--verify", "--quiet", f"{base}^{{commit}}")
+    if (
+        branch_tip.returncode == 0
+        and branch_tip.stdout.strip() == base_tip.stdout.strip()
+    ):
+        return False
+    return _git("merge-base", "--is-ancestor", branch, base).returncode == 0
+
+
+def _local_branches() -> list[str]:
+    """List the local branch names.
+
+    Returns:
+        Short names of every ref under ``refs/heads/``; empty if git fails.
+    """
+    result = _git("for-each-ref", "--format=%(refname:short)", "refs/heads/")
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def _finished_task_ids() -> dict[str, str]:
+    """Map the ID of every ``done`` or ``abandoned`` task to its status.
+
+    Returns:
+        ``{task id: status}`` for the tasks whose work is over.
+    """
+    return {
+        task.id.upper(): task.status
+        for task in load_tasks()
+        if task.status in FINISHED_STATUSES
+    }
+
+
+def _task_id_of_branch(branch: str) -> str:
+    """Return the task ID a task branch name carries, or ``""`` for any other branch.
+
+    Args:
+        branch: Local branch name.
+
+    Returns:
+        The upper-case task ID, e.g. ``T-0035``.
+    """
+    match = _BRANCH_RE.match(branch)
+    return match.group(2).upper() if match else ""
+
+
+def check_worktrees() -> list[str]:
+    """Audit local worktrees and branches for leftovers and misplaced integration branches.
+
+    Flags four independent problems:
+
+    - A secondary worktree whose branch has commits and is already merged into
+      ``develop`` but was never removed with ``git worktree remove`` (the cleanup step
+      documented in ``.agents/README.md``'s execution loop and
+      ``CONTRIBUTING.md``'s Worktrees section).
+    - A secondary worktree on the branch of a task that is ``done`` or ``abandoned``,
+      merged or not.
+    - A local branch of a ``done`` or ``abandoned`` task that has no secondary worktree,
+      merged or not.
+    - Any worktree holding `develop`/`main` checked out that is not the
+      primary checkout -- these must only ever live in the primary checkout
+      (see ``CONTRIBUTING.md`` § Worktrees).
+
+    A worktree that is both merged and on a finished task's branch yields one finding.
+    The check only reports; it never removes a worktree or deletes a branch.
+
+    Returns:
+        One finding per problem, in the same style as the other checks.
+    """
+    findings: list[str] = []
+    worktrees = list_worktrees()
+    if not worktrees:
+        return findings
+
+    primary_path = worktrees[0]["path"]
+    finished = _finished_task_ids()
+    in_secondary: set[str] = set()
+
+    for worktree in worktrees[1:]:
+        path, branch = worktree["path"], worktree["branch"]
+        if not branch:
+            continue  # detached HEAD -- nothing to say about it here
+        in_secondary.add(branch)
+
+        if branch in ("develop", "main"):
+            findings.append(
+                f"WORKTREE {path}: checked out on {branch!r}, which must only live in "
+                f"the primary checkout ({primary_path}) -- see CONTRIBUTING.md's "
+                "Worktrees section"
+            )
+            continue
+
+        task_id = _task_id_of_branch(branch)
+        task_note = (
+            f"task {task_id} is {finished[task_id]}" if task_id in finished else ""
+        )
+        merged = is_branch_merged(branch)
+        if merged:
+            suffix = f" ({task_note})" if task_note else ""
+            findings.append(
+                f"WORKTREE {path}: branch {branch!r} is merged into {INTEGRATION_BRANCH} "
+                f"but the worktree was never removed{suffix} -- run: "
+                f"git worktree remove {path}"
+            )
+        elif task_note:
+            findings.append(
+                f"WORKTREE {path}: branch {branch!r} is not merged into "
+                f"{INTEGRATION_BRANCH} but {task_note} -- confirm the work is not "
+                f"needed, then run: git worktree remove {path}"
+            )
+
+    for branch in _local_branches():
+        task_id = _task_id_of_branch(branch)
+        if task_id not in finished or branch in in_secondary:
+            continue
+        state = (
+            f"merged into {INTEGRATION_BRANCH}"
+            if is_branch_merged(branch)
+            else f"not merged into {INTEGRATION_BRANCH}"
+        )
+        findings.append(
+            f"BRANCH {branch}: local branch of {task_id}, which is {finished[task_id]}; "
+            f"it is {state} and has no secondary worktree -- delete it with "
+            "git branch -d once nothing needs it"
+        )
+
+    return findings
+
+
 # --- environment setup ---------------------------------------------------------
 
 
@@ -340,7 +543,9 @@ def check_setup() -> list[str]:
             p for p in husky_dir.iterdir() if p.is_file() and not p.name.startswith("_")
         )
         if not hook_files:
-            findings.append("SETUP .husky/: directory exists but contains no hook scripts")
+            findings.append(
+                "SETUP .husky/: directory exists but contains no hook scripts"
+            )
         for hook in hook_files:
             if not os.access(hook, os.X_OK):
                 findings.append(f"SETUP .husky/{hook.name}: not executable")
@@ -390,10 +595,14 @@ def parse_args(argv=None):
         help=f"Diff task branches against {INTEGRATION_BRANCH} and flag out-of-scope changes.",
     )
     touches.add_argument(
-        "branches", nargs="*", help="Explicit branch names. Default: every task branch found."
+        "branches",
+        nargs="*",
+        help="Explicit branch names. Default: every task branch found.",
     )
 
-    drift = sub.add_parser("drift", help="Report backlog, report, branch, and dependency drift.")
+    drift = sub.add_parser(
+        "drift", help="Report backlog, report, branch, and dependency drift."
+    )
     drift.add_argument(
         "--review-days",
         type=int,
@@ -403,7 +612,17 @@ def parse_args(argv=None):
 
     sub.add_parser("setup", help="Verify the quality gate is actually installed.")
 
-    all_cmd = sub.add_parser("all", help="Run touches, drift, and setup; summarize.")
+    sub.add_parser(
+        "worktrees",
+        help=(
+            "Flag leftover worktrees and local branches of merged, done or abandoned "
+            "tasks, and develop/main in a secondary worktree."
+        ),
+    )
+
+    all_cmd = sub.add_parser(
+        "all", help="Run touches, drift, setup, and worktrees; summarize."
+    )
     all_cmd.add_argument(
         "--review-days",
         type=int,
@@ -442,11 +661,17 @@ def main(argv=None) -> int:
             _print_findings(findings)
             return 1 if findings else 0
 
+        if args.command == "worktrees":
+            findings = check_worktrees()
+            _print_findings(findings)
+            return 1 if findings else 0
+
         if args.command == "all":
             sections = [
                 ("touches", check_touches()),
                 ("drift", check_drift(args.review_days)),
                 ("setup", check_setup()),
+                ("worktrees", check_worktrees()),
             ]
             total = 0
             for name, findings in sections:
@@ -455,7 +680,9 @@ def main(argv=None) -> int:
                 total += len(findings)
                 print()
             if total:
-                print(f"housekeep all: {total} finding(s) across {len(sections)} check(s).")
+                print(
+                    f"housekeep all: {total} finding(s) across {len(sections)} check(s)."
+                )
                 return 1
             print("housekeep all: clean -- no findings.")
             return 0

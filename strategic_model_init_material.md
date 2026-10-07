@@ -1911,10 +1911,12 @@ For coding-agent systems, this is not optional. Prompt history, tool logs, shell
 
 ### Approval gates
 
+This text is general doctrine. Where a project's `CLAUDE.md` differs, it governs. In this repository, `CLAUDE.md` lets the orchestrator merge verified task branches into `develop` by default. A human decides only breaking changes and the "Ask first" items, and merges into `main`, tags and releases stay human decisions. Everywhere, an agent never merges its own work or verifies its own change.
+
 Human approval is required for:
 
 - production deployment;
-- merge to protected branches;
+- merge to protected branches (see the note above for this repository's `develop` rule);
 - destructive data operations;
 - credential rotation;
 - public release claims;
@@ -2638,7 +2640,7 @@ Mitigation:
 - demand short evidence briefs;
 - inspect deeper when evidence is weak;
 - ask for external review;
-- treat every merge as a human decision.
+- treat every merge as a deliberate, evidenced decision: the human's by default, the orchestrator's only where the project's rules delegate it (see Approval gates), and never the authoring agent's.
 
 ## VII.2 Practical OAP Doctrine
 
@@ -2682,7 +2684,7 @@ For a small serious project:
 - run focused tests;
 - require a PR;
 - produce a short decision brief before merge;
-- human interrogates evidence before merge;
+- interrogate the evidence before merge: the human by default, or an independent verifier and the orchestrator where the project's rules delegate it (see Approval gates);
 - keep a simple handoff file.
 
 ### Mature OAP
@@ -2915,7 +2917,7 @@ Report:
 - [ ] Known limitations documented.
 - [ ] Local setup changes documented.
 - [ ] Strategic decision brief prepared.
-- [ ] Human release or merge decision maker understands goal match, evidence, and risk.
+- [ ] The release or merge decision maker (the human, or the orchestrator where the project's rules delegate a merge) understands goal match, evidence, and risk.
 
 ## Appendix E: Release readiness checklist
 

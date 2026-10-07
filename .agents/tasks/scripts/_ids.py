@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Lock-safe allocation of sequential task identifiers.
 
 Task creation may happen from several sessions or worktrees at once, so the
@@ -115,9 +114,9 @@ def _acquire(lock_file: Path, timeout: float) -> int:
 
 
 def allocate_id(
-    tasks_dir: Path = TASKS_DIR,
-    counter_file: Path = COUNTER_FILE,
-    lock_file: Path = LOCK_FILE,
+    tasks_dir: Path | None = None,
+    counter_file: Path | None = None,
+    lock_file: Path | None = None,
     timeout: float = ACQUIRE_TIMEOUT_SECONDS,
 ) -> str:
     """Reserve and return the next unused task identifier.
@@ -127,9 +126,13 @@ def allocate_id(
     ID that is already taken.
 
     Args:
-        tasks_dir: Directory holding the task files.
-        counter_file: File storing the last allocated number.
-        lock_file: Lock guarding the counter.
+        tasks_dir: Directory holding the task files. Defaults to this
+            module's ``TASKS_DIR``, resolved at call time (not import time),
+            so tests can point it elsewhere via ``monkeypatch.setattr``.
+        counter_file: File storing the last allocated number. Same
+            call-time-default behavior as ``tasks_dir``.
+        lock_file: Lock guarding the counter. Same call-time-default
+            behavior as ``tasks_dir``.
         timeout: Seconds to wait for the lock.
 
     Returns:
@@ -138,6 +141,13 @@ def allocate_id(
     Raises:
         LockTimeout: If the lock cannot be acquired in time.
     """
+    if tasks_dir is None:
+        tasks_dir = TASKS_DIR
+    if counter_file is None:
+        counter_file = COUNTER_FILE
+    if lock_file is None:
+        lock_file = LOCK_FILE
+
     fd = _acquire(lock_file, timeout)
     try:
         stored = 0
@@ -146,7 +156,9 @@ def allocate_id(
             if text.isdigit():
                 stored = int(text)
             else:
-                logger.warning("counter file %s is unreadable; rebuilding", counter_file)
+                logger.warning(
+                    "counter file %s is unreadable; rebuilding", counter_file
+                )
 
         next_number = max(stored, highest_existing_id(tasks_dir)) + 1
 

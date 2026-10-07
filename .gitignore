@@ -15,6 +15,10 @@ build/
 # uv
 uv.lock.tmp
 
+# npm (Husky is a devDependency only -- see DEV_TOOLING_SPEC.md). No trailing slash: gitflow.sh
+# symlinks this into feature worktrees, and a trailing-slash pattern does not match a symlink.
+node_modules
+
 # Editors / OS
 .DS_Store
 .idea/

@@ -1,0 +1,46 @@
+#!/usr/bin/env sh
+# Staged files only, no tests: .husky/pre-push runs the gate. A commit that stages only
+# record paths (RECORD_PATHS in scripts/config/gate.sh: task filing, status changes, reports,
+# BACKLOG.md, LESSONS.md, plans) skips the hook, so `task.py new` and the orchestrator's state
+# commits stay fast. The tooling code under .agents/tasks/scripts/ and the process docs are
+# not records and are never skipped.
+#
+# The skip decision lists every staged path with --no-renames and no --diff-filter, as
+# .husky/pre-push does: a file renamed into a record path shows as a deletion outside it plus
+# an addition inside, and the deletion keeps the gate on. Path lists are NUL-delimited (-z),
+# so spaces, quotes, newlines and non-ASCII bytes in a name are never quoted or split. The
+# decision list is turned into lines only to test it for emptiness.
+# shellcheck disable=SC1091
+. scripts/config/gate.sh
+
+staged=$(git diff --cached -z --name-only --no-renames | tr '\0' '\n')
+[ -n "$staged" ] || exit 0
+
+# Every RECORD_PATHS entry becomes a `:(exclude,glob)<entry>` pathspec in "$@", the same
+# matcher gate.sh uses for the key of a gate record. Globbing is off while the string is split.
+set --
+set -f
+for entry in $RECORD_PATHS; do
+    set -- "$@" ":(exclude,glob)$entry"
+done
+set +f
+
+# What git prints is every staged path outside RECORD_PATHS.
+if [ -z "$(git diff --cached -z --name-only --no-renames -- . "$@" | tr '\0' '\n')" ]; then
+    echo "pre-commit: only record paths staged; skipping gate."
+    exit 0
+fi
+
+scripts/autofix.sh --staged
+
+# Re-stage only what was already staged (autofix edits the working tree, not the index), as
+# literal paths. `git add -u` would sweep in unrelated dirty files, and a glob character in
+# a name (`a[1].py`) would do the same unless pathspecs are literal. Deleted paths have
+# nothing to re-stage, and with no path left xargs is not run, so a deletion-only commit
+# never reaches `git add` with an empty list.
+if git diff --cached --name-only --diff-filter=ACMR --no-renames | grep -q .; then
+    git diff --cached -z --name-only --diff-filter=ACMR --no-renames \
+        | GIT_LITERAL_PATHSPECS=1 xargs -0 git add --
+fi
+
+exec scripts/gate.sh --staged

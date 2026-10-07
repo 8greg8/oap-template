@@ -12,6 +12,10 @@ report: reports/{id}.md
 
 # {id} — {title}
 
+Write every section below in concise prose (see `CLAUDE.md`'s "Concise
+prose in task and report files" section) — required literal content
+(Non-goals, acceptance criteria) still stays complete.
+
 ## Goal
 
 TODO: one paragraph. What must be true when this task is finished? Write it so a
@@ -49,8 +53,10 @@ not a passing test; a test that was not run is not evidence.
 ## Documentation required
 
 TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`AGENTS.md`, `CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason.
+`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
+a reason. A `feat`, `fix` or breaking change also adds a changelog fragment,
+`changelog.d/<id>.<category>.md`, listed in `touches` (see `CONTRIBUTING.md`
+§ Versioning).
 
 ## Acceptance criteria
 
@@ -60,17 +66,23 @@ TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
 
 ## Workflow
 
-- Read `AGENTS.md` (and `CLAUDE.md`, if present) first.
+- Read `CLAUDE.md` first — it is the primary router. (`AGENTS.md` is a redirect to it for
+  models that look for that filename; reading it gains nothing.)
 - Create a worktree and branch from `develop` as `{type}/{id}-{slug}`, per
   `CONTRIBUTING.md`'s worktree conventions. Every task branch integrates into
   `develop`, whatever Conventional Commits `type` prefixes it — a genuine
   production hotfix is the separate, human-initiated `hotfix/` flow in
   `CONTRIBUTING.md`, not a task-driven branch.
-- Commit only files related to this task, using Conventional Commits.
+- Commit only files related to this task, using Conventional Commits. Iterate with
+  `scripts/gate.sh --fast` and targeted tests and commit freely. Do not spawn a verifier: your own
+  gate runs certify nothing.
 - Write the report to `.agents/tasks/reports/{id}.md` and commit it on this branch.
-- Push the branch. **Do not merge.** Do not open a pull request.
-- Do not edit `.agents/tasks/BACKLOG.md` or any other task's file — the
-  orchestrator owns backlog state.
+- Push the branch. **Do not merge.** Do not open a pull request. The orchestrator merges after one
+  independent verify of the pushed branch by a different agent, which runs the full gate itself.
+- Do not hand-edit `.agents/tasks/BACKLOG.md` or any other task's file — the
+  orchestrator owns backlog state. Regenerating `BACKLOG.md` with `backlog.py
+  reindex` to reflect this task's own status change is expected, and is not an
+  edit in the sense meant here.
 
 ## Report
 

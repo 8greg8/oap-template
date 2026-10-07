@@ -29,6 +29,9 @@ Standard `src` layout, managed as a single `uv` workspace with one root `pyproje
 - `[tool.hatch.version]` uses `source = "vcs"`, so the package version is derived directly from
   `vX.Y.Z` git tags at the repo root (see [`CONTRIBUTING.md`](CONTRIBUTING.md)) — no extra
   `raw-options.root` needed since the workspace root and the version-controlled root are the same.
+  Tags are created only by `scripts/release.py`, never by hand, and a change that is a `feat`, `fix`
+  or breaking change adds a changelog fragment under `changelog.d/` (see `CONTRIBUTING.md` §
+  Versioning).
 
 ## Commands
 
@@ -53,16 +56,20 @@ uv run ruff format            # format code
 # Type check
 uv run ty check
 
-# Build and publish (via git tags)
-git tag vX.Y.Z && git push --tags
+# Release: tag, changelog and push (a human runs this; see CONTRIBUTING.md § Versioning)
+scripts/release.py              # dry run: next version, commits, changelog section
+scripts/release.py --yes --push
 ```
 
 `pytest`, `ruff`, and `ty` are declared as `dev` dependency-group entries in the root
 `pyproject.toml` — `uv sync` installs them automatically, no global/tool install needed.
 
-These are the exact commands the independent verifier agent runs in the verify/resolve loop
-described in [`CONTRIBUTING.md`](CONTRIBUTING.md) — run them yourself before handing work off, so
-the verifier's report is a confirmation, not a first discovery of problems.
+These are the exact commands behind `scripts/gate.sh`, which the one independent verifier runs in
+full on a finished branch (see [`CONTRIBUTING.md`](CONTRIBUTING.md) § Agent verify/resolve
+workflow). While iterating, use `scripts/gate.sh --fast` (everything except the tests) and targeted
+`uv run pytest` runs, and run the full `scripts/gate.sh` yourself before handing work off, so the
+verifier's report is a confirmation, not a first discovery of problems. Your own runs certify
+nothing.
 
 ## Dependency Management
 
@@ -93,8 +100,7 @@ uv lock --upgrade-package <package>
 - Tests live under `tests/`, mirroring the module under test: `src/<repo_name>/foo.py` →
   `tests/test_foo.py`.
 - Any new public function/class and any bug fix ships with a test that would have failed before the
-  change — this is what "done" means for the verify/resolve loop's test gate, not a numeric coverage
-  target.
+  change — this is what "done" means for the test gate, not a numeric coverage target.
 - Prefer real objects over mocks where practical; mock only external boundaries (network calls,
   third-party APIs, filesystem/clock where determinism matters).
 
