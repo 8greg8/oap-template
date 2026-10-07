@@ -18,51 +18,55 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+The repository no longer contains `strategic_model_init_material.md`. Every pointer to it links to <https://edu.slaif.si/trainings/workshop-orchestrated-agentic-programming> instead. `NOTICE.md` credits the source without claiming a license for the text.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+- `strategic_model_init_material.md` is a 3,131-line copy of "Orchestrated Agentic Programming" v1.0.1 by Janez Perš, amended by T-0014.
+- No license appears on the file or the source page (`.agents/plans/2026-10-03-public-release-cleanup.md` lines 47-50). Redistribution rights are unconfirmed.
+- References: `README.md` lines 4 and 22, `.agents/README.md` line 6, `NOTICE.md` line 5. No code, test or script reads the file.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+- Delete `strategic_model_init_material.md`.
+- `README.md`: link the intro to <https://edu.slaif.si/trainings/workshop-orchestrated-agentic-programming>. Replace the table row with a row for that link, described as the external method text.
+- `.agents/README.md`: point line 6 at the same URL.
+- `NOTICE.md`: replace the "Third-party material" entry with a "Referenced material" entry. Keep title, version 1.0.1, author and source URL. State that the text is not bundled and that its license is not confirmed. Keep the SLAIF acknowledgement.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not rewrite git history or remove the file from past commits. That is an "Ask first" action.
+- Do not edit historical task, report or plan files under `.agents/tasks/` and `.agents/plans/` that name the file.
+- Do not change `CLAUDE.md`, `scripts/`, `pyproject.toml` or any code.
+- Do not make the repository public.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `README.md`, `.agents/README.md`, `NOTICE.md`
+- `git grep -n strategic_model_init_material` for live references outside `.agents/tasks/` and `.agents/plans/`
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+After the change, `git grep strategic_model_init_material -- . ':!.agents/tasks' ':!.agents/plans'` finds nothing. Every link to the method text resolves to the source URL.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- `scripts/gate.sh --fast` while iterating.
+- `python .agents/tasks/scripts/task.py validate`.
+- The independent verifier runs the full `scripts/gate.sh`.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason. A `feat`, `fix` or breaking change also adds a changelog fragment,
-`changelog.d/<id>.<category>.md`, listed in `touches` (see `CONTRIBUTING.md`
-§ Versioning).
+The edits above are the documentation change. No changelog fragment: type is `docs`.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] `strategic_model_init_material.md` is deleted.
+- [ ] The `git grep` above finds nothing.
+- [ ] `README.md`, `.agents/README.md` and `NOTICE.md` link to the source URL.
+- [ ] `NOTICE.md` does not say the text is MIT-licensed or bundled.
+- [ ] Only files in `touches`, plus the report, changed.
+- [ ] Full gate passes.
 
 ## Workflow
 

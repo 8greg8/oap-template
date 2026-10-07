@@ -1,7 +1,7 @@
 # OAP Template
 
 A starting point for Python repositories built to be worked on by AI coding agents, following
-[Orchestrated Agentic Programming](strategic_model_init_material.md) (OAP): a human-governed method
+[Orchestrated Agentic Programming](https://edu.slaif.si/trainings/workshop-orchestrated-agentic-programming) (OAP): a human-governed method
 that separates strategic reasoning (specification, architecture, task decomposition) from bounded,
 evidence-producing execution.
 
@@ -19,7 +19,7 @@ the placeholders (`<repo_name>`, mission, architecture) for your actual reposito
 | [`.agents/`](.agents/README.md) | Tooling for running work as discrete, PR-sized **tasks**: task files as work orders, reports as evidence, a generated backlog, and harvested lessons-learned memory. See `.agents/README.md`. |
 | [`.agents/plans/`](.agents/plans/) | Dated plans: the owner's written decisions and approvals for a body of work, and other task-independent notes. |
 | [`.devcontainer/`](.devcontainer/README.md) | Dev container with `uv`, Node and Claude Code, hooks installed on first boot. `.devcontainer/spec-blind/` is a second configuration that hides `src/` for authoring spec-first tests (authoring only; tests cannot run there). |
-| [`strategic_model_init_material.md`](strategic_model_init_material.md) | The full OAP reference manual this template's workflow is derived from. |
+| [Orchestrated Agentic Programming](https://edu.slaif.si/trainings/workshop-orchestrated-agentic-programming) | The external OAP reference text this template's workflow is derived from. It is not bundled; see [`NOTICE.md`](NOTICE.md). |
 
 ## Getting started with a new project
 
