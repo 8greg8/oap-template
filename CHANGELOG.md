@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-07
+
+### Fixed
+
+- Removed the bundled copy of the "Orchestrated Agentic Programming" text, whose license is not
+  confirmed. The README, `.agents/README.md` and `NOTICE.md` link to its source page instead.
+
 ## [0.1.0] - 2026-10-07
 
 ### Added
