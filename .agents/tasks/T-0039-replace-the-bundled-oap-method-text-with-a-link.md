@@ -1,7 +1,7 @@
 ---
 id: T-0039
 title: Replace the bundled OAP method text with a link to its source
-status: open
+status: done
 type: docs
 priority: medium
 depends_on: []

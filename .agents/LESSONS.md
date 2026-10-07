@@ -7,7 +7,7 @@
 Harvested from task reports. Read the tags relevant to your task before
 starting — these are repo-specific traps that already cost someone time.
 
-38 lesson(s) across 19 section(s). Generated 2026-10-06.
+39 lesson(s) across 20 section(s). Generated 2026-10-07.
 
 ## Tag index
 
@@ -84,6 +84,7 @@ to all lessons that carry it.
 - `task-tooling` — [T-0001](#t-0001-success), [T-0002](#t-0002-success)
 - `template` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success)
 - `tests` — [T-0015](#t-0015-success), [T-0016](#t-0016-success), [T-0017](#t-0017-success), [T-0018](#t-0018-success), [T-0027](#t-0027-success), [T-0028](#t-0028-success), [T-0029](#t-0029-success)
+- `untagged` — [T-0039](#t-0039-success)
 - `upstream-tracking` — [T-0010](#t-0010-success)
 - `uv` — [T-0006](#t-0006-success)
 - `verification` — [T-0036](#t-0036-success)
@@ -526,6 +527,16 @@ Source: [`reports/T-0002.md`](tasks/reports/T-0002.md)
 Tags: `tests`, `init`, `changelog`, `release`
 
 Source: [`reports/T-0027.md`](tasks/reports/T-0027.md)
+
+## untagged
+
+### T-0039 (success)
+
+None specific to this repo.
+
+Tags: `untagged`
+
+Source: [`reports/T-0039.md`](tasks/reports/T-0039.md)
 
 ## verification
 
