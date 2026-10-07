@@ -18,51 +18,46 @@ prose in task and report files" section) — required literal content
 
 ## Goal
 
-TODO: one paragraph. What must be true when this task is finished? Write it so a
-reviewer can tell success from failure without reading the diff.
+A changelog fragment records that the bundled copy of the OAP method text was removed because its license is unconfirmed, so v0.1.1 can be released.
 
 ## Context / current verified state
 
-TODO: what is true in the repo *right now*. Cite files and line numbers. If this
-contradicts what you find when you start, stop and report the difference rather
-than building on a stale assumption.
+T-0039 (merged, `docs` type) deleted `strategic_model_init_material.md` and linked the source page. `docs` drives no release, so `scripts/release.py --version v0.1.1` refuses with "nothing to release since v0.1.0". `v0.1.0` still ships the file. `changelog.d/` holds only `README.md`.
 
 ## Scope
 
-TODO: the specific changes this task covers.
+Add `changelog.d/T-0040.fixed.md` with one bullet describing the removal and the new links. The commit type is `fix`, since the removal corrects a redistribution problem in the shipped template.
 
 ## Non-goals
 
-TODO: what this task must NOT do. Name files not to touch, APIs not to change,
-features not to add, refactors not to start. This section is a guardrail, not a
-formality — an empty Non-goals section fails validation.
+- Do not edit any other file, including `CHANGELOG.md`, `README.md` and `NOTICE.md`.
+- Do not rewrite git history.
+- Do not cut the release. The owner's release run does that.
 
 ## Files to inspect
 
-TODO: paths to read before editing. Keep this aligned with `touches`.
+- `changelog.d/README.md` (fragment format and wording rule)
 
 ## Required behavior
 
-TODO: the concrete behavior the implementation must exhibit.
+`scripts/changelog.py check` accepts the fragment. A dry run of `scripts/release.py --version v0.1.1` after merge finds a release.
 
 ## Tests required
 
-TODO: name the tests to add or run, and the exact commands. A skipped test is
-not a passing test; a test that was not run is not evidence.
+- `python scripts/changelog.py check`.
+- `python .agents/tasks/scripts/task.py validate`.
+- The independent verifier runs the full `scripts/gate.sh`.
 
 ## Documentation required
 
-TODO: which docs must change with this behavior (`README.md`, `CLAUDE.md`,
-`CONTRIBUTING.md`, `PYTHON_CONVENTIONS.md`), or "none needed" with
-a reason. A `feat`, `fix` or breaking change also adds a changelog fragment,
-`changelog.d/<id>.<category>.md`, listed in `touches` (see `CONTRIBUTING.md`
-§ Versioning).
+The fragment is the documentation. No other change.
 
 ## Acceptance criteria
 
-TODO: a checklist a reviewer can walk. Each item must be objectively checkable.
-
-- [ ] ...
+- [ ] `changelog.d/T-0040.fixed.md` exists with one valid bullet.
+- [ ] The branch changes only that file, the task file and the report.
+- [ ] The commit type is `fix`.
+- [ ] Full gate passes.
 
 ## Workflow
 
