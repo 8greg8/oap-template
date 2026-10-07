@@ -3,7 +3,7 @@
 Bounded work orders for coding agents, designed so several tasks can run in
 parallel on isolated git worktrees without colliding.
 
-The model is the one described in `strategic_model_init_material.md`
+The model is the one described in <https://edu.slaif.si/trainings/workshop-orchestrated-agentic-programming>
 (Orchestrated Agentic Programming): a **task file is a work order**, a
 **report is the executor's evidence**, the **backlog is project state**, and
 `LESSONS.md` is durable memory across tasks.
